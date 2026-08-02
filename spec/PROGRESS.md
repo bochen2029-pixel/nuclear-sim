@@ -7,13 +7,14 @@
 
 - **Milestone:** M0 — Foundation
 - **VERIFY:** `cmake --preset win-x64 && cmake --build --preset win-x64-rel && ctest --preset win-x64-rel` — the `12 §2` canonical loop; falsifiable and real (configure + compile + link + 6 passing tests, incl. a CUDA kernel round-trip on the dev GPU). Takes ~1 min warm. Fast per-task probe: `ctest --preset win-x64-rel -R toolchain`.
-- **NEXT ACTION:** Execute M0-T3 — author `spec/appendix/constants.data.toml` (strict machine-readable sibling of the human appendix, `03 §1`: values + lo/hi, `PENDING` where unresolved) plus `tools/gen_constants` emitting `data/constants.toml`, the C++ headers and a **generated** `docs/VERIFICATION.md`; the generator must hard-error on a missing citation/status and on any material species lacking a molar mass (appendix §3 completeness rule), and `constants_roundtrip` must prove the bijection under ctest; port `C:\Astrophage\scripts\canon.py` + its `docs/VERIFICATION.md` pattern per `spec/11-testing.md` §5 rather than hand-writing the oracle; see `spec/03-data-contracts.md` §1 and `spec/appendix/constants.md`; DoD in `07-milestones.md` M0-T3.
+- **NEXT ACTION:** Execute M0-T4 — implement `core/rng` Philox per `spec/04-module-core.md` §2 (normative counter/key layout, `rng::fork`, the `(ctr, sub)` pair), with 3 Random123 known-answer tests, a project-local vector, a fork KAT and a `(ctr,sub)` round-trip; register the test executable as `catch_discover_tests(test_rng TEST_PREFIX "rng.")` per `11 §1`; stream ids are already generated in `constants_generated.h` as `nukesim::constants::rng_stream_registry::*` (C-907) — use them, do not re-declare; DoD in `07-milestones.md` M0-T4.
 
 ## Ready-queue (runnable now)
 
-1. **M0-T3** (recommended — NEXT ACTION) — constants + generated verification oracle; unblocks M0-T5
-2. **M0-T4** — Philox RNG per `04 §2`; independent of M0-T3, safe to run in parallel in another session
-3. *(M0-T5 needs M0-T3; M0-T6 needs M0-T5)*
+1. **M0-T4** (recommended — NEXT ACTION) — Philox RNG per `04 §2`; unblocks nothing directly but is on every downstream path
+2. **M0-T3-b** — generated `docs/VERIFICATION.md` oracle per `11 §5`; independent of M0-T4, safe to run in parallel in another session
+3. **M0-T5** — loaders; now runnable, M0-T3-a is done
+4. *(M0-T6 needs M0-T5)*
 
 **Repository:** <https://github.com/bochen2029-pixel/nuclear-sim> — public, MIT (ADR-011). Remote exists, so the full claim protocol (`README §5.3`: branch + PROGRESS edit + pushed `claim:` commit) applies from M0-T2 onward and parallel sessions are now safe.
 
@@ -38,9 +39,10 @@
 |---|---|---|---|---|---|
 | M0-T1 | **done** | session-2026-08-03-a | 2026-08-03 | — | repo init in place (BLK-12); MIT LICENSE + NOTICE; `.gitignore` gate-evidence un-ignores verified both ways (QC-07); pushed to github.com/bochen2029-pixel/nuclear-sim |
 | M0-T2 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T1 | canonical loop green from a clean build dir + cold vcpkg cache; 6/6 ctest incl. a real CUDA kernel round-trip. Generator `Visual Studio 17 2022` (win-x64), triplet `x64-windows-static`, baseline `d59284957…` — all recorded in `12 §1` |
-| M0-T3 | todo | — | — | M0-T2 | author `spec/appendix/constants.data.toml` + gen_constants + roundtrip |
+| M0-T3-a | **done** | session-2026-08-02-b | 2026-08-02 | M0-T2 | 96 strict entries ↔ 96 appendix rows, bijective; `[[band]]` added (ADR-015); Φ_kt recomputed = 1.4508041e23; 26 validator guards; 15/15 ctest |
+| M0-T3-b | todo | — | — | M0-T3-a | SPLIT from M0-T3 (§8): generated `docs/VERIFICATION.md` first-principles oracle per `11 §5` (all six sections) + byte-identical regeneration check |
 | M0-T4 | todo | — | — | M0-T2 | Philox per `04 §2` (layout, fork, (ctr,sub), KATs) |
-| M0-T5 | todo | — | — | M0-T2, M0-T3 | loaders incl. xs v2 semantics + negative tests |
+| M0-T5 | todo | — | — | M0-T2, M0-T3-a | loaders incl. xs v2 semantics + negative tests (needs the constants pipeline, not the oracle) |
 | M0-T6 | todo | — | — | M0-T5 | local CI + Actions workflow → Actions green on main (owner repo step resolved 2026-08-03) |
 | M1-T1 | todo | — | — | M0-T5 | geometry + analytic tracker |
 | M1-T2 | todo | — | — | M1-T1 | ref transport (implicit capture); k_inf + leakage tests |

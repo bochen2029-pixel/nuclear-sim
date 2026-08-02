@@ -5,14 +5,17 @@
 
 ## Current
 
-- **Milestone:** M0 — Foundation
+- **Milestone:** M0 — Foundation **COMPLETE** (T1–T6 done); next is M1 — CPU reference transport + bare-sphere benchmarks
 - **VERIFY:** `cmake --preset win-x64 && cmake --build --preset win-x64-rel && ctest --preset win-x64-rel` — the `12 §2` canonical loop; falsifiable and real (configure + compile + link + **39 passing tests**). Takes ~1 min warm. Per-task probes: `ctest --preset win-x64-rel -R toolchain|constants|rng|loaders|oracle` — all five resolve.
-- **NEXT ACTION:** Execute M0-T6 — author `tools/ci/local_ci.ps1` and `tools/ci/local_ci.sh` (configure + build + ctest for the `win-x64` and `linux-x64`/`linux-cuda` presets, non-zero exit on any failure) plus `.github/workflows/ci.yml`, and get Actions green on `main`; the workflow MUST archive `artifacts/gate_reports/` as a build artifact **in addition to** the committed copy (QC-07 — the committed copy is primary); also author `.env.example` documenting `OPTIX_SDK_ROOT` with commented `S3_*`/`RUNPOD_*` stubs (`12 §5`, assigned to this task on 2026-08-02); DoD in `07-milestones.md` M0-T6.
+- **NEXT ACTION:** Run the M1 SYNC audit (`07 §SYNC`), then execute M1-T1 — implement `core/geometry` LayerStack + AnalyticSphereTracker per `spec/04-module-core.md` §4 (normative ray–sphere math: `b = p·d`, `c = |p|² − R²`, nearest positive root among the layer's inner/outer spheres; ε=1e-9 cm degeneracies nudge **along the direction of travel**, never unconditionally inward), with the `04 §7` unit tests green (axial/tangential/miss/inside-out known answers, nudge direction both ways, `locate` across all layers incl. `kOutside`, innermost inner-radius = 0, `set_radii`/`scale_radii`); register as `catch_discover_tests(test_geometry TEST_PREFIX "geometry.")` per `11 §1`; DoD in `07-milestones.md` M1-T1.
 
 ## Ready-queue (runnable now)
 
-1. **M0-T6** (recommended — NEXT ACTION) — local CI + GitHub Actions green on `main`; **closes M0**
-2. *(M1-T1 and M1-T4a become runnable once M0-T6 lands; M1-T4a technically depends only on M0-T5 and is runnable NOW in a parallel session)*
+1. **M1-T1** (recommended — NEXT ACTION) — `core/geometry` LayerStack + AnalyticSphereTracker
+2. **M1-T4a** — OPEN-literature benchmark models + the cited `fast4` xs dataset; independent of M1-T1, safe to run in parallel
+3. *(M1-T2 needs M1-T1; M4-T1 SHOULD start right after M1-T1 per ADR-009)*
+
+> **Run the M1 SYNC audit before claiming either** (`07 §SYNC`): APIs vs `04`/`05`, scenario paths vs `03 §4`, constants vs the appendix. Record as `SYNC-M1` here and in SESSIONS.
 
 **Repository:** <https://github.com/bochen2029-pixel/nuclear-sim> — public, MIT (ADR-011). Remote exists, so the full claim protocol (`README §5.3`: branch + PROGRESS edit + pushed `claim:` commit) applies from M0-T2 onward and parallel sessions are now safe.
 
@@ -41,7 +44,7 @@
 | M0-T3-b | **done** | session-2026-08-02-b | 2026-08-02 | M0-T3-a | all 6 `11 §5` sections; 9/9 tally invariants pass on the canonical example (I3 7.5e-8 independently reproduces the QC session's figure); Tier-1 endpoints exact, mass conservation 1.5e-16; §2 layer masses correctly PENDING(M2-T1); found the C-042/C-043 blanket-"~5%" wording defect |
 | M0-T4 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T2 | 3 published Random123 vectors reproduce (also at compile time); project-local vector emitted by an INDEPENDENT Python Philox, not self-recorded; fork + (ctr,sub) resume KATs; 10 tests |
 | M0-T5 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T2, M0-T3-a | xs v2 / materials / scenario loaders; positive tests parse the SPEC'S OWN examples extracted from `03` at run time; one negative test per violation class; 11 tests |
-| M0-T6 | todo | — | — | M0-T5 | local CI + Actions workflow → Actions green on main (owner repo step resolved 2026-08-03) |
+| M0-T6 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T5 | `tools/ci/local_ci.{ps1,sh}` + `.github/workflows/ci.yml`; Actions green on `main` (windows-2022 + ubuntu-latest + gate-evidence archive); `.env.example` committed |
 | M1-T1 | todo (RUNNABLE) | — | — | M0-T5 | geometry + analytic tracker |
 | M1-T2 | todo | — | — | M1-T1 | ref transport (implicit capture); k_inf + leakage tests |
 | M1-T3 | todo | — | — | M1-T2 | eigen (8³ mesh entropy, dual σ, Λ estimator) |

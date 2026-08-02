@@ -27,17 +27,6 @@ json parse_file(const std::filesystem::path& path) {
     }
 }
 
-/// Weight percent of a species within the material.
-double weight_pct(const Material& mat, std::string_view species) {
-    double numerator = 0.0;
-    for (const auto& c : mat.fracs) {
-        if (c.species == species) {
-            numerator += c.atom_fraction * c.molar_mass;
-        }
-    }
-    return 100.0 * numerator / mat.mean_molar_mass;
-}
-
 /// Weight percent of the species whose names start with `prefix` (e.g. "Ga").
 double weight_pct_prefix(const Material& mat, std::string_view prefix) {
     double numerator = 0.0;

@@ -19,6 +19,8 @@ Normative decisions D1–D9 (each has exactly one ADR in `DECISIONS.md`; `tools/
 ```
 C:\NUCLEAR/                       # THIS DIRECTORY IS THE REPO ROOT (BLK-12; git init in place, M0-T1)
   CMakeLists.txt  CMakePresets.json  vcpkg.json  vcpkg-configuration.json  .gitignore  LICENSE(MIT)  README.md
+  .env.example                    # documents required env vars; NEVER a real credential (12 §5)
+  .github/workflows/              # CI (M0-T6); 11 §3 is the normative matrix
   data/
     constants.toml                # generated (03 §1)
     xs/*.json  materials/*.json

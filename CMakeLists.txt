@@ -330,9 +330,11 @@ add_test(NAME constants.crosscheck_misuse
 # (SYNC-M4); no second implementation exists to drift from the frozen KATs.
 # ---------------------------------------------------------------------------
 if(NUKESIM_WITH_CUDA)
-    add_library(nukesim_gpu STATIC src/gpu/gpu_backend.cu)
+    add_library(nukesim_gpu STATIC src/gpu/gpu_backend.cu src/gpu/device_data.cu)
     target_include_directories(nukesim_gpu PUBLIC ${CMAKE_SOURCE_DIR}/src)
-    target_link_libraries(nukesim_gpu PUBLIC CUDA::cudart_static)
+    # nukesim_core (host) supplies the CPU LayerStack / materials / xs that the
+    # M4-T2-a device builders mirror and the parity tests compare against.
+    target_link_libraries(nukesim_gpu PUBLIC nukesim_core CUDA::cudart_static)
     # The device Philox reuses core/rng, whose Counter/Key are std::array. MSVC's
     # std::array::operator[] is constexpr __host__ (not __host__ __device__), so
     # calling it from device code needs --expt-relaxed-constexpr — the documented
@@ -347,6 +349,9 @@ if(NUKESIM_WITH_CUDA)
     add_executable(test_gpu tests/unit/test_gpu.cpp)
     target_link_libraries(test_gpu PRIVATE nukesim_gpu Catch2::Catch2WithMain)
     target_include_directories(test_gpu PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
+    # spec_examples.h (used to build toy loader inputs) references it even in the
+    # inline helpers this TU does not call, so it must be defined to compile.
+    target_compile_definitions(test_gpu PRIVATE NUKESIM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
     nukesim_strict(test_gpu)
     catch_discover_tests(test_gpu TEST_PREFIX "gpu.")
 endif()

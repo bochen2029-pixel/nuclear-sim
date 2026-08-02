@@ -16,13 +16,112 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <array>
+#include <cmath>
 #include <cstdint>
+#include <filesystem>
+#include <memory>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
+#include "core/geometry/geometry.h"
+#include "core/material/material.h"
 #include "core/rng/rng.h"
+#include "core/xs/xs.h"
+#include "gpu/device_data.h"
 #include "gpu/gpu_backend.h"
 
 #include "rng_kat.inl"
+#include "spec_examples.h"
+
+namespace {
+
+/// A toy world: a 2-isotope cross-section set and two materials, loaded through
+/// the real loaders, plus a 2-layer stack. Mirrors test_ref.cpp's World; used to
+/// feed the device material builder the same CPU objects the transport will.
+struct ToyWorld {
+    std::filesystem::path root;
+    std::unique_ptr<ns::xs::FewGroupXS> xs;
+    std::unique_ptr<ns::material::MaterialLib> materials;
+    ns::geom::LayerStack stack;
+
+    ToyWorld() {
+        namespace fs = std::filesystem;
+        using nlohmann::json;
+        static int counter = 0;
+        root = fs::temp_directory_path() / ("nukesim_gpu_mat_" + std::to_string(counter++));
+        fs::remove_all(root);
+        fs::create_directories(root / "xs");
+        fs::create_directories(root / "materials");
+
+        const auto four = [](double a, double b, double c, double d) {
+            return json::array({a, b, c, d});
+        };
+        const json identity = json::array({json::array({1.0, 0.0, 0.0, 0.0}),
+                                           json::array({0.0, 1.0, 0.0, 0.0}),
+                                           json::array({0.0, 0.0, 1.0, 0.0}),
+                                           json::array({0.0, 0.0, 0.0, 1.0})});
+        const json u235 = {{"nu", four(2.6, 2.5, 2.45, 2.44)},
+                           {"chi", four(1.0, 0.0, 0.0, 0.0)},
+                           {"sigma_f", four(1.3, 1.2, 1.1, 1.05)},
+                           {"sigma_c", four(0.5, 0.4, 0.35, 0.6)},
+                           {"sigma_s", four(4.0, 5.0, 6.0, 7.0)},
+                           {"sigma_n2n", four(0.0, 0.0, 0.0, 0.0)},
+                           {"mu_bar", four(0.1, 0.1, 0.1, 0.1)},
+                           {"beta", 0.0065},
+                           {"transfer", identity},
+                           {"cite", "synthetic test medium — not physical data"},
+                           {"status", "SIM"}};
+        const json u238 = {{"nu", four(2.5, 2.4, 0.0, 0.0)},
+                           {"chi", four(1.0, 0.0, 0.0, 0.0)},
+                           {"sigma_f", four(0.55, 0.1, 0.0, 0.0)},
+                           {"sigma_c", four(0.3, 0.25, 0.4, 0.8)},
+                           {"sigma_s", four(5.0, 6.0, 7.0, 8.0)},
+                           {"sigma_n2n", four(0.0, 0.0, 0.0, 0.0)},
+                           {"mu_bar", four(0.05, 0.05, 0.05, 0.05)},
+                           {"beta", 0.0157},
+                           {"transfer", identity},
+                           {"cite", "synthetic test medium — not physical data"},
+                           {"status", "SIM"}};
+        const json xs_doc = {{"schema_version", 2},
+                             {"name", "toy"},
+                             {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3})},
+                             {"isotopes", {{"U235", u235}, {"U238", u238}}}};
+        spec_examples::write_file(root / "xs" / "toy.json", xs_doc.dump(2));
+
+        // Two materials: mat_a mixes both isotopes, mat_b is pure U235. Sorted by
+        // name, so mat_a is material index 0 and mat_b is 1.
+        const json mat_a = {{"schema_version", 1},
+                            {"name", "mat_a"},
+                            {"density_g_cm3", 18.0},
+                            {"status", "SIM"},
+                            {"cite", "synthetic"},
+                            {"isotopes", {{"U235", 0.6}, {"U238", 0.4}}}};
+        const json mat_b = {{"schema_version", 1},
+                            {"name", "mat_b"},
+                            {"density_g_cm3", 12.0},
+                            {"status", "SIM"},
+                            {"cite", "synthetic"},
+                            {"isotopes", {{"U235", 1.0}}}};
+        spec_examples::write_file(root / "materials" / "mat_a.json", mat_a.dump(2));
+        spec_examples::write_file(root / "materials" / "mat_b.json", mat_b.dump(2));
+
+        xs = std::make_unique<ns::xs::FewGroupXS>(ns::xs::FewGroupXS::load(root / "xs" / "toy.json"));
+        materials = std::make_unique<ns::material::MaterialLib>(
+            ns::material::MaterialLib::load_dir(root / "materials", *xs));
+        stack = ns::geom::LayerStack({ns::geom::Layer{"inner", 2.0, 0, "SIM"},
+                                      ns::geom::Layer{"outer", 4.0, 1, "SIM"}});
+    }
+
+    ~ToyWorld() {
+        std::error_code ec;
+        std::filesystem::remove_all(root, ec);
+    }
+    ToyWorld(const ToyWorld&) = delete;
+    ToyWorld& operator=(const ToyWorld&) = delete;
+};
+
+}  // namespace
 
 TEST_CASE("a CUDA device is present", "[gpu]") {
     // Every other test in this file needs a device; fail loudly here rather than
@@ -129,4 +228,91 @@ TEST_CASE("progeny slot prefix-sum is correct and tiling-independent", "[gpu]") 
     std::vector<std::int64_t> empty_out;
     REQUIRE(ns::gpu::progeny_offsets(std::vector<std::int32_t>{}, 128, empty_out));
     REQUIRE(empty_out == std::vector<std::int64_t>{0});
+}
+
+TEST_CASE("device analytic tracker matches the CPU tracker (float vs double parity)", "[gpu]") {
+    // M4-T2-a: the device float tracker is a re-implementation of core/geometry's
+    // double one (04 §4). They cannot be bit-identical (float vs double) and are
+    // not required to be — G0c is statistical/parity across backends (01 §9). On
+    // clean rays (intersections well away from any boundary), locate/nudge agree
+    // exactly and the distance agrees to float precision.
+    const std::vector<float> r_outer{1.0f, 2.0f, 3.0f};
+    const ns::geom::LayerStack cpu_stack(
+        {{"a", 1.0, 0, ""}, {"b", 2.0, 0, ""}, {"c", 3.0, 0, ""}});
+    const ns::geom::AnalyticSphereTracker cpu(cpu_stack);
+
+    struct Ray {
+        std::array<float, 3> p;
+        std::array<float, 3> dir;
+        int layer;
+    };
+    const std::vector<Ray> rays{
+        {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, 0},        // axial from the centre, layer 0
+        {{0.0f, 0.0f, 1.5f}, {0.0f, 0.0f, 1.0f}, 1},        // outward in layer 1
+        {{0.0f, 0.0f, 2.5f}, {0.0f, 0.0f, -1.0f}, 2},       // inward in layer 2 (inner sphere wins)
+        {{0.5f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, 0},        // tangential-ish, layer 0
+        {{0.0f, 0.0f, 5.0f}, {0.0f, 0.0f, -1.0f}, ns::geom::kOutside},  // from outside, inbound
+        {{0.0f, 0.0f, 5.0f}, {0.0f, 0.0f, 1.0f}, ns::geom::kOutside},   // from outside, miss
+    };
+
+    std::vector<ns::gpu::TrackerQuery> q;
+    for (const auto& r : rays) {
+        q.push_back({r.p, r.dir, r.layer});
+    }
+    std::vector<ns::gpu::TrackerResult> got;
+    REQUIRE(ns::gpu::device_tracker_batch(r_outer, q, got));
+    REQUIRE(got.size() == rays.size());
+
+    for (std::size_t i = 0; i < rays.size(); ++i) {
+        INFO("ray " << i);
+        const ns::geom::Vec3 p{rays[i].p[0], rays[i].p[1], rays[i].p[2]};
+        const ns::geom::Vec3 d{rays[i].dir[0], rays[i].dir[1], rays[i].dir[2]};
+
+        REQUIRE(got[i].located == cpu.locate(p));
+        REQUIRE(got[i].nudged == cpu.nudge_and_locate(p, d));
+
+        const double cpu_dist = cpu.distance_to_boundary(p, d, rays[i].layer);
+        if (std::isinf(cpu_dist)) {
+            REQUIRE(std::isinf(got[i].distance));
+        } else {
+            REQUIRE(std::isfinite(got[i].distance));
+            REQUIRE_THAT(static_cast<double>(got[i].distance),
+                         Catch::Matchers::WithinRel(cpu_dist, 1e-4));
+        }
+    }
+}
+
+TEST_CASE("device macro cross sections match the CPU mix() (float vs double parity)", "[gpu]") {
+    // M4-T2-a: the device holds the same per-layer macro Σ the CPU mix()/LayerData
+    // computes (04 §3, 05 §1). Two checks: the uploaded macro round-trips (storage
+    // the flight sampling reads), and a device-side recompute from the per-isotope
+    // slots agrees with mix() to float precision (the collision data is sound).
+    const ToyWorld w;
+    ns::gpu::MaterialParity p;
+    REQUIRE(ns::gpu::device_materials_parity(w.stack, *w.materials, p));
+    REQUIRE(p.num_layers == w.stack.size());
+
+    for (int layer = 0; layer < w.stack.size(); ++layer) {
+        const auto& mat = w.materials->all()[static_cast<std::size_t>(
+            w.stack.layer(layer).material_id)];
+        for (int g = 0; g < 4; ++g) {
+            const auto i = static_cast<std::size_t>(layer * 4 + g);
+            const auto gi = static_cast<std::size_t>(g);
+            INFO("layer " << layer << " group " << g);
+
+            // Uploaded macro round-trip: within a float cast of the double value.
+            REQUIRE_THAT(static_cast<double>(p.stored_sigma_t[i]),
+                         Catch::Matchers::WithinRel(mat.macro.sigma_t[gi], 1e-5));
+            REQUIRE_THAT(static_cast<double>(p.stored_sigma_tr[i]),
+                         Catch::Matchers::WithinRel(mat.macro.sigma_tr[gi], 1e-5));
+
+            // Device-recomputed from the per-isotope slots (float arithmetic).
+            REQUIRE_THAT(static_cast<double>(p.recomputed_sigma_t[i]),
+                         Catch::Matchers::WithinRel(mat.macro.sigma_t[gi], 1e-4));
+            REQUIRE_THAT(static_cast<double>(p.recomputed_sigma_tr[i]),
+                         Catch::Matchers::WithinRel(mat.macro.sigma_tr[gi], 1e-4));
+            REQUIRE_THAT(static_cast<double>(p.nu_sigma_f[i]),
+                         Catch::Matchers::WithinRel(mat.macro.nu_sigma_f[gi], 1e-4));
+        }
+    }
 }

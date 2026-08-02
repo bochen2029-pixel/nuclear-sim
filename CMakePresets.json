@@ -1,0 +1,74 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 28, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+      "cacheVariables": {
+        "CMAKE_CONFIGURATION_TYPES": "Debug;Release",
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
+        "CMAKE_CUDA_ARCHITECTURES": "89-real;80-virtual;90-virtual",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "win-x64",
+      "inherits": "base",
+      "displayName": "Windows x64 (MSVC + CUDA, static CRT)",
+      "description": "Dev-machine preset. Visual Studio generator, not Ninja: it needs no developer shell, so the verify-first probe in PROGRESS.md runs from any terminal.",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" },
+      "environment": { "VCPKG_ROOT": "C:/vcpkg" },
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "x64-windows-static",
+        "VCPKG_HOST_TRIPLET": "x64-windows-static"
+      }
+    },
+    {
+      "name": "linux-x64",
+      "inherits": "base",
+      "displayName": "Linux x64 (CPU only)",
+      "description": "CPU-only build: nscore + CPU-backend tests (12 section 2). Requires VCPKG_ROOT in the environment.",
+      "generator": "Ninja Multi-Config",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
+      "cacheVariables": {
+        "NUKESIM_WITH_CUDA": "OFF",
+        "VCPKG_TARGET_TRIPLET": "x64-linux",
+        "VCPKG_HOST_TRIPLET": "x64-linux"
+      }
+    },
+    {
+      "name": "linux-cuda",
+      "inherits": "linux-x64",
+      "displayName": "Linux x64 + CUDA (container / cloud)",
+      "description": "Container and RunPod path (12 section 3). No OptiX: cloud H100/H200 have no RT cores (D2).",
+      "cacheVariables": { "NUKESIM_WITH_CUDA": "ON" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "win-x64-deb", "configurePreset": "win-x64", "configuration": "Debug" },
+    { "name": "win-x64-rel", "configurePreset": "win-x64", "configuration": "Release" },
+    { "name": "linux-x64-deb", "configurePreset": "linux-x64", "configuration": "Debug" },
+    { "name": "linux-x64-rel", "configurePreset": "linux-x64", "configuration": "Release" },
+    { "name": "linux-cuda-deb", "configurePreset": "linux-cuda", "configuration": "Debug" },
+    { "name": "linux-cuda-rel", "configurePreset": "linux-cuda", "configuration": "Release" }
+  ],
+  "testPresets": [
+    {
+      "name": "test-base",
+      "hidden": true,
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error", "stopOnFailure": false }
+    },
+    { "name": "win-x64-deb", "inherits": "test-base", "configurePreset": "win-x64", "configuration": "Debug" },
+    { "name": "win-x64-rel", "inherits": "test-base", "configurePreset": "win-x64", "configuration": "Release" },
+    { "name": "linux-x64-deb", "inherits": "test-base", "configurePreset": "linux-x64", "configuration": "Debug" },
+    { "name": "linux-x64-rel", "inherits": "test-base", "configurePreset": "linux-x64", "configuration": "Release" },
+    { "name": "linux-cuda-deb", "inherits": "test-base", "configurePreset": "linux-cuda", "configuration": "Debug" },
+    { "name": "linux-cuda-rel", "inherits": "test-base", "configurePreset": "linux-cuda", "configuration": "Release" }
+  ]
+}

@@ -6,13 +6,14 @@
 ## Current
 
 - **Milestone:** M0 — Foundation
-- **VERIFY:** `git rev-parse --git-dir >/dev/null 2>&1 && git ls-files --error-unmatch LICENSE NOTICE.md spec/README.md >/dev/null && ! git check-ignore -q artifacts/gate_reports/x.json && echo "M0-T1 verified"` — falsifiable: fails if the repo is gone, if the licence/notice/spec are untracked, or if the gate-evidence un-ignore regressed (QC-07).
-- **NEXT ACTION:** Execute M0-T2 — author `CMakeLists.txt`, `CMakePresets.json`, `vcpkg.json` + `vcpkg-configuration.json` (with a pinned `builtin-baseline` SHA) per `spec/12-deployment.md` §1, which is the single source of truth for preset naming, `CMAKE_POLICY_VERSION_MINIMUM=3.5`, `CMAKE_CUDA_ARCHITECTURES=89-real;80-virtual;90-virtual` and first-party-only warning flags (`02 §4`); **port the CMake/preset idioms from `C:\Astrophage`, which already builds C++20 + CUDA 13.1 + sm_89 + MSVC on this machine, rather than re-deriving the CMake-4/vcpkg policy friction**; DoD in `spec/07-milestones.md` M0-T2.
+- **VERIFY:** `cmake --preset win-x64 && cmake --build --preset win-x64-rel && ctest --preset win-x64-rel` — the `12 §2` canonical loop; falsifiable and real (configure + compile + link + 6 passing tests, incl. a CUDA kernel round-trip on the dev GPU). Takes ~1 min warm. Fast per-task probe: `ctest --preset win-x64-rel -R toolchain`.
+- **NEXT ACTION:** Execute M0-T3 — author `spec/appendix/constants.data.toml` (strict machine-readable sibling of the human appendix, `03 §1`: values + lo/hi, `PENDING` where unresolved) plus `tools/gen_constants` emitting `data/constants.toml`, the C++ headers and a **generated** `docs/VERIFICATION.md`; the generator must hard-error on a missing citation/status and on any material species lacking a molar mass (appendix §3 completeness rule), and `constants_roundtrip` must prove the bijection under ctest; port `C:\Astrophage\scripts\canon.py` + its `docs/VERIFICATION.md` pattern per `spec/11-testing.md` §5 rather than hand-writing the oracle; see `spec/03-data-contracts.md` §1 and `spec/appendix/constants.md`; DoD in `07-milestones.md` M0-T3.
 
 ## Ready-queue (runnable now)
 
-1. **M0-T2** (recommended — NEXT ACTION) — toolchain; unblocks M0-T3/T4/T5 and therefore everything
-2. *(nothing else — M0-T3/T4/T5 all depend on M0-T2)*
+1. **M0-T3** (recommended — NEXT ACTION) — constants + generated verification oracle; unblocks M0-T5
+2. **M0-T4** — Philox RNG per `04 §2`; independent of M0-T3, safe to run in parallel in another session
+3. *(M0-T5 needs M0-T3; M0-T6 needs M0-T5)*
 
 **Repository:** <https://github.com/bochen2029-pixel/nuclear-sim> — public, MIT (ADR-011). Remote exists, so the full claim protocol (`README §5.3`: branch + PROGRESS edit + pushed `claim:` commit) applies from M0-T2 onward and parallel sessions are now safe.
 
@@ -36,7 +37,7 @@
 | ID | Status | claimed_by | claimed_at | depends_on | Notes |
 |---|---|---|---|---|---|
 | M0-T1 | **done** | session-2026-08-03-a | 2026-08-03 | — | repo init in place (BLK-12); MIT LICENSE + NOTICE; `.gitignore` gate-evidence un-ignores verified both ways (QC-07); pushed to github.com/bochen2029-pixel/nuclear-sim |
-| M0-T2 | **in_progress** | session-2026-08-02-b | 2026-08-02 | M0-T1 | toolchain per `12 §1` (only source of truth); clean-cache build |
+| M0-T2 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T1 | canonical loop green from a clean build dir + cold vcpkg cache; 6/6 ctest incl. a real CUDA kernel round-trip. Generator `Visual Studio 17 2022` (win-x64), triplet `x64-windows-static`, baseline `d59284957…` — all recorded in `12 §1` |
 | M0-T3 | todo | — | — | M0-T2 | author `spec/appendix/constants.data.toml` + gen_constants + roundtrip |
 | M0-T4 | todo | — | — | M0-T2 | Philox per `04 §2` (layout, fork, (ctr,sub), KATs) |
 | M0-T5 | todo | — | — | M0-T2, M0-T3 | loaders incl. xs v2 semantics + negative tests |

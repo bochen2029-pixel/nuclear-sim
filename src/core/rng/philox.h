@@ -15,6 +15,8 @@
 #include <array>
 #include <cstdint>
 
+#include "core/hd.h"
+
 namespace ns::rng {
 
 using Counter = std::array<std::uint32_t, 4>;
@@ -35,14 +37,14 @@ inline constexpr int kPhiloxRounds = 10;
 
 // 32x32 -> 64 widening multiply, split. Done in uint64_t so it is exact and
 // portable; the GPU port (M4-T1) substitutes __umulhi without changing results.
-constexpr void mulhilo32(std::uint32_t a, std::uint32_t b,
+NUKESIM_HD constexpr void mulhilo32(std::uint32_t a, std::uint32_t b,
                          std::uint32_t& hi, std::uint32_t& lo) noexcept {
     const std::uint64_t product = static_cast<std::uint64_t>(a) * static_cast<std::uint64_t>(b);
     hi = static_cast<std::uint32_t>(product >> 32);
     lo = static_cast<std::uint32_t>(product);
 }
 
-constexpr Counter round(const Counter& ctr, const Key& key) noexcept {
+NUKESIM_HD constexpr Counter round(const Counter& ctr, const Key& key) noexcept {
     std::uint32_t hi0 = 0, lo0 = 0, hi1 = 0, lo1 = 0;
     mulhilo32(kPhiloxM0, ctr[0], hi0, lo0);
     mulhilo32(kPhiloxM1, ctr[2], hi1, lo1);
@@ -60,7 +62,7 @@ constexpr Counter round(const Counter& ctr, const Key& key) noexcept {
 ///
 /// constexpr so known-answer vectors can be checked at compile time and so the
 /// same source compiles for device code unchanged.
-constexpr Counter philox4x32_10(Counter ctr, Key key) noexcept {
+NUKESIM_HD constexpr Counter philox4x32_10(Counter ctr, Key key) noexcept {
     for (int r = 0; r < detail::kPhiloxRounds; ++r) {
         if (r > 0) {
             // Key bump happens BETWEEN rounds, so round 0 uses the unmodified

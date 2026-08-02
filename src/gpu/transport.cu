@@ -45,6 +45,10 @@ inline constexpr float kTwoPi = 6.28318530717958648f;
 // physical constant.
 inline constexpr unsigned long long kSourceBase = 1ull;
 
+// Base for the per-history FISSION stream (progeny-count sampling), distinct from
+// the source stream so it does not perturb the transport sequence.
+inline constexpr unsigned long long kFissionBase = 4ull;
+
 // Scan tile width. A two-level scan (per-tile then a single-block scan of the
 // tile sums) handles up to kTile*kTile ≈ 1.05e6 live particles per superstep,
 // which bounds `histories`.
@@ -286,6 +290,51 @@ __global__ void k_scatter(const int* active, const int* keep, const int* local,
     }
 }
 
+// --- Deterministic fission bank (05 §6 item 3) ------------------------------
+
+/// Integer progeny per history via stochastic rounding: ⌊production + ξ⌋, ξ from
+/// a per-history fission stream. E[m] = production (fixed source, k = 1).
+__global__ void k_progeny_count(const float* score_prod, unsigned long long seed, int n, int* m) {
+    const int stride = static_cast<int>(gridDim.x * blockDim.x);
+    for (int p = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x); p < n; p += stride) {
+        ns::rng::Stream s(seed, ns::rng::fork(kFissionBase, 0, static_cast<unsigned int>(p)));
+        m[p] = static_cast<int>(floorf(score_prod[p] + s.uniform_f()));
+    }
+}
+
+/// offset[gid] = tilebase[tile] + local[gid] — the full exclusive prefix sum.
+__global__ void k_add_base(const int* local, const int* tilebase, int n, int* offset) {
+    const int gid = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
+    if (gid < n) {
+        offset[gid] = tilebase[blockIdx.x] + local[gid];
+    }
+}
+
+/// Write each history's progeny at its reserved slots; a progeny's stream id is
+/// fork(parent stream, parent final ctr, ordinal) — parent identity, never slot.
+__global__ void k_bank(const int* m, const int* offset, const unsigned long long* ctr, int n,
+                       unsigned long long* bank) {
+    const int stride = static_cast<int>(gridDim.x * blockDim.x);
+    for (int p = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x); p < n; p += stride) {
+        const unsigned long long parent = ns::rng::fork(kSourceBase, 0, static_cast<unsigned int>(p));
+        const int base = offset[p];
+        const int count = m[p];
+        for (int o = 0; o < count; ++o) {
+            bank[base + o] = ns::rng::fork(parent, ctr[p], static_cast<unsigned int>(o));
+        }
+    }
+}
+
+/// Position-weighted checksum, so a change in slot ORDER (not just contents)
+/// shows up. atomicAdd is on a 64-bit integer — exact and order-independent.
+__global__ void k_bank_checksum(const unsigned long long* bank, int total,
+                                unsigned long long* out) {
+    const int stride = static_cast<int>(gridDim.x * blockDim.x);
+    for (int i = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x); i < total; i += stride) {
+        atomicAdd(out, bank[i] * (static_cast<unsigned long long>(i) + 1ull));
+    }
+}
+
 bool fail() {
     cudaGetLastError();
     return false;
@@ -392,6 +441,51 @@ bool gpu_fixed_source(const ns::geom::LayerStack& stack,
         ++supersteps;
     }
 
+    // --- Deterministic fission bank (05 §6 item 3): built from the per-history
+    // production and each history's final RNG cursor. Reuses the scan scratch. ---
+    int* m = nullptr;
+    int* offset = nullptr;
+    unsigned long long* d_checksum = nullptr;
+    long long bank_total = 0;
+    unsigned long long bank_checksum = 0;
+    if (ok) {
+        ok = cudaMalloc(&m, ni) == cudaSuccess && cudaMalloc(&offset, ni) == cudaSuccess
+          && cudaMalloc(&d_checksum, sizeof(unsigned long long)) == cudaSuccess;
+    }
+    if (ok) {
+        k_progeny_count<<<blocks, threads>>>(soa.score_prod, seed, n, m);
+        const int nblocks = (n + kTile - 1) / kTile;
+        k_scan_tiles<<<nblocks, kTile>>>(m, n, local, tilesums);
+        k_scan_tilesums<<<1, kTile>>>(tilesums, nblocks, tilebase);
+        k_add_base<<<nblocks, kTile>>>(local, tilebase, n, offset);
+        ok = cudaGetLastError() == cudaSuccess && cudaDeviceSynchronize() == cudaSuccess;
+        int last_off = 0;
+        int last_m = 0;
+        ok = ok
+          && cudaMemcpy(&last_off, offset + (n - 1), sizeof(int), cudaMemcpyDeviceToHost)
+                 == cudaSuccess
+          && cudaMemcpy(&last_m, m + (n - 1), sizeof(int), cudaMemcpyDeviceToHost) == cudaSuccess;
+        bank_total = static_cast<long long>(last_off) + last_m;
+    }
+    unsigned long long* bank = nullptr;
+    if (ok && bank_total > 0) {
+        ok = cudaMalloc(&bank, static_cast<std::size_t>(bank_total) * sizeof(unsigned long long))
+                 == cudaSuccess
+          && cudaMemset(d_checksum, 0, sizeof(unsigned long long)) == cudaSuccess;
+        if (ok) {
+            k_bank<<<blocks, threads>>>(m, offset, soa.ctr, n, bank);
+            k_bank_checksum<<<blocks, threads>>>(bank, static_cast<int>(bank_total), d_checksum);
+            ok = cudaGetLastError() == cudaSuccess && cudaDeviceSynchronize() == cudaSuccess;
+            ok = ok
+              && cudaMemcpy(&bank_checksum, d_checksum, sizeof(unsigned long long),
+                            cudaMemcpyDeviceToHost) == cudaSuccess;
+        }
+    }
+    cudaFree(m);
+    cudaFree(offset);
+    cudaFree(bank);
+    cudaFree(d_checksum);
+
     std::vector<float> leak(static_cast<std::size_t>(n));
     std::vector<float> prod(static_cast<std::size_t>(n));
     ok = ok && cudaMemcpy(leak.data(), soa.score_leak, nf, cudaMemcpyDeviceToHost) == cudaSuccess
@@ -426,6 +520,8 @@ bool gpu_fixed_source(const ns::geom::LayerStack& stack,
     out.k_sigma = stderr_of(prod);
     out.histories = histories;
     out.supersteps = supersteps;
+    out.fission_bank_size = bank_total;
+    out.fission_bank_checksum = bank_checksum;
     return true;
 }
 

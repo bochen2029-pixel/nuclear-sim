@@ -28,6 +28,16 @@ struct FixedSourceResult {
     std::int64_t histories = 0;
     /// Supersteps the event loop ran (diagnostic).
     int supersteps = 0;
+    /// Deterministic fission bank (05 §6 item 3): ⌊production + ξ⌋ progeny per
+    /// history banked at EXCLUSIVE-PREFIX-SUM slots (no atomic cursor), each with
+    /// an rng::fork stream from its parent's identity. `size` is the total banked;
+    /// `checksum` is a position-weighted sum of the banked stream ids, so a
+    /// non-deterministic slot order would change it. Both are bit-identical across
+    /// launch configs. In fixed source the bank is built but NOT propagated —
+    /// propagation is the eigen fission-source iteration (M4-T3); this proves the
+    /// deterministic-slot + fork mechanism on real transport output.
+    std::int64_t fission_bank_size = 0;
+    unsigned long long fission_bank_checksum = 0;
 };
 
 /// Point-isotropic source at the origin with birth spectrum `group_weights`.

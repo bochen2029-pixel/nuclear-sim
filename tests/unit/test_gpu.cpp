@@ -482,6 +482,7 @@ TEST_CASE("gpu fixed-source pure-capturer leakage matches ref (T-diff, G0c)", "[
     // No fission ⇒ zero production; a pure capturer leaks or dies in ≤ 2 events
     // (a leaker crosses the surface then leaks; an absorber collides and dies).
     REQUIRE(g.k_estimate == 0.0);
+    REQUIRE(g.fission_bank_size == 0);  // no fission ⇒ nothing to bank
     REQUIRE(g.supersteps >= 1);
     REQUIRE(g.supersteps <= 2);
 }
@@ -526,13 +527,22 @@ TEST_CASE("gpu fixed-source with scattering + fission matches ref (T-diff, G0c)"
     REQUIRE(std::abs(g.leaked_fraction - leak_ref) <= leak_bound);
     // Genuinely multi-superstep (many scatters before roulette death).
     REQUIRE(g.supersteps > 5);
+
+    // Deterministic fission bank: E[⌊production + ξ⌋] = production, so the bank
+    // size ≈ total production = k·N.
+    REQUIRE(g.fission_bank_size > 0);
+    const double expected_bank = g.k_estimate * static_cast<double>(histories);
+    REQUIRE_THAT(static_cast<double>(g.fission_bank_size),
+                 Catch::Matchers::WithinRel(expected_bank, 0.02));
 }
 
 TEST_CASE("gpu fixed-source is bit-identical across launch configs", "[gpu]") {
-    // Same-backend determinism (01 §9 / BLK-11): the result depends only on the
-    // per-particle index-keyed streams, never the launch geometry.
-    const PureCaptureWorld w;
-    const std::int64_t histories = 100000;
+    // Same-backend determinism (01 §9 / BLK-11): tallies AND the fission bank
+    // depend only on the per-particle index-keyed streams and the prefix-sum
+    // slotting, never the launch geometry. Uses the fissioning medium so the bank
+    // is non-trivial and the multi-superstep loop is exercised.
+    const FissionWorld w;
+    const std::int64_t histories = 50000;
     const std::uint64_t seed = 7;
 
     ns::gpu::FixedSourceResult a;
@@ -541,6 +551,10 @@ TEST_CASE("gpu fixed-source is bit-identical across launch configs", "[gpu]") {
                                       {1.0f, 0.0f, 0.0f, 0.0f}, 64, 128, a));
     REQUIRE(ns::gpu::gpu_fixed_source(w.stack, *w.materials, seed, histories,
                                       {1.0f, 0.0f, 0.0f, 0.0f}, 512, 256, b));
-    REQUIRE(a.leaked_fraction == b.leaked_fraction);  // bit-identical
+    REQUIRE(a.leaked_fraction == b.leaked_fraction);  // bit-identical tallies
     REQUIRE(a.leaked_sigma == b.leaked_sigma);
+    REQUIRE(a.k_estimate == b.k_estimate);
+    REQUIRE(a.fission_bank_size == b.fission_bank_size);          // deterministic slots
+    REQUIRE(a.fission_bank_checksum == b.fission_bank_checksum);  // + fork streams
+    REQUIRE(a.fission_bank_size > 0);
 }

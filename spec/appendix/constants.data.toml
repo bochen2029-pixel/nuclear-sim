@@ -432,6 +432,8 @@ status = "DECLASSIFIED"
 use = "compute"
 cite = "NWFAQ-8.1.1"
 appendix_text = "2.0"
+appendix_mass_text = "~7 g"
+mass_kg = 0.007
 
 [[constant]]
 id = "C-101"
@@ -442,6 +444,7 @@ status = "RECONSTRUCTED"
 use = "compute"
 cite = "CM"
 appendix_text = "2.1"
+appendix_mass_text = "—"
 
 [[constant]]
 id = "C-102"
@@ -453,6 +456,8 @@ use = "compute"
 cite = "LA-3067"
 note = "Authoritative pair is OD 9.17 cm + mass 6.15 kg; density is DERIVED (15.23 g/cm3 solid). The mass lives in the appendix note, and the 2.4% over-determination against the quoted delta-phase 15.6 is checked at M2-T1 where the densities exist."
 appendix_text = "9.17"
+appendix_mass_text = "6.15 kg"
+mass_kg = 6.15
 
 [[constant]]
 id = "C-103"
@@ -463,6 +468,9 @@ status = "RECONSTRUCTED"
 use = "compute"
 cite = "CM, NWFAQ-8.1.1"
 appendix_text = "22.86"
+appendix_mass_text = "108–111 kg"
+mass_lo_kg = 108.0
+mass_hi_kg = 111.0
 
 [[constant]]
 id = "C-104"
@@ -473,6 +481,7 @@ status = "DECLASSIFIED"
 use = "compute"
 cite = "NWFAQ-8.1.1"
 appendix_text = "23.50"
+appendix_mass_text = "—"
 
 [[constant]]
 id = "C-105"
@@ -483,6 +492,9 @@ status = "RECONSTRUCTED"
 use = "compute"
 cite = "CM"
 appendix_text = "46.99"
+appendix_mass_text = "128–130 kg"
+mass_lo_kg = 128.0
+mass_hi_kg = 130.0
 
 [[constant]]
 id = "C-106"
@@ -493,6 +505,8 @@ status = "RECONSTRUCTED"
 use = "compute"
 cite = "CM"
 appendix_text = "92.075"
+appendix_mass_text = "~608 kg"
+mass_kg = 608.0
 
 [[constant]]
 id = "C-107"
@@ -503,6 +517,9 @@ status = "DECLASSIFIED"
 use = "compute"
 cite = "NWFAQ-8.1.1"
 appendix_text = "137.8"
+appendix_mass_text = "~1.8–1.9 t"
+mass_lo_kg = 1800.0
+mass_hi_kg = 1900.0
 
 [[constant]]
 id = "C-108"
@@ -513,6 +530,7 @@ status = "RECONSTRUCTED"
 use = "compute"
 cite = "CM"
 appendix_text = "140.3"
+appendix_mass_text = "—"
 
 [[constant]]
 id = "C-109"
@@ -523,6 +541,7 @@ status = "RECONSTRUCTED"
 use = "compute"
 cite = "CM"
 appendix_text = "145.4"
+appendix_mass_text = "—"
 
 # ===========================================================================
 # 3. Molar masses & exact constants (appendix §3)

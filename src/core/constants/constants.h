@@ -105,27 +105,36 @@ inline constexpr double he_assembly_symmetry_tolerance = 5.0;
 
 // C-100 — DECLASSIFIED; cite: NWFAQ-8.1.1
 inline constexpr double od_urchin_initiator = 2.0;
+inline constexpr double od_urchin_initiator_mass_kg = 0.007;
 
 // C-101 — RECONSTRUCTED; cite: CM
 inline constexpr double od_initiator_cavity = 2.1;
 
 // C-102 — DECLASSIFIED; cite: LA-3067
 inline constexpr double od_pu_ga_core = 9.17;
+inline constexpr double od_pu_ga_core_mass_kg = 6.15;
 
 // C-103 — RECONSTRUCTED; cite: CM, NWFAQ-8.1.1
 inline constexpr double od_natural_u_tamper = 22.86;
+inline constexpr double od_natural_u_tamper_mass_lo_kg = 108.0;
+inline constexpr double od_natural_u_tamper_mass_hi_kg = 111.0;
 
 // C-104 — DECLASSIFIED; cite: NWFAQ-8.1.1
 inline constexpr double od_b10_acrylic_shell = 23.5;
 
 // C-105 — RECONSTRUCTED; cite: CM
 inline constexpr double od_aluminum_pusher = 46.99;
+inline constexpr double od_aluminum_pusher_mass_lo_kg = 128.0;
+inline constexpr double od_aluminum_pusher_mass_hi_kg = 130.0;
 
 // C-106 — RECONSTRUCTED; cite: CM
 inline constexpr double od_inner_he_booster = 92.075;
+inline constexpr double od_inner_he_booster_mass_kg = 608.0;
 
 // C-107 — DECLASSIFIED; cite: NWFAQ-8.1.1
 inline constexpr double od_lens_he_layer = 137.8;
+inline constexpr double od_lens_he_layer_mass_lo_kg = 1800.0;
+inline constexpr double od_lens_he_layer_mass_hi_kg = 1900.0;
 
 // C-108 — RECONSTRUCTED; cite: CM
 inline constexpr double od_cork_liner = 140.3;

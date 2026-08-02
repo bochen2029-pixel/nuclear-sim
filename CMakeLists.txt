@@ -250,6 +250,13 @@ add_test(NAME rng.kat_independent_reference
          COMMAND ${Python3_EXECUTABLE}
                  ${CMAKE_SOURCE_DIR}/tools/verify/rng_kat_gen.py --check)
 
+# 11 §5's first-principles oracle. --strict means a numerical discrepancy fails
+# the build, not just a stale file: the whole point is that the spec's own
+# numbers get checked by arithmetic, and a finding nobody sees is worth nothing.
+add_test(NAME oracle.verification_current
+         COMMAND ${Python3_EXECUTABLE}
+                 ${CMAKE_SOURCE_DIR}/tools/verify/oracle.py --check --strict)
+
 # 01 §8.3 / 11 §4: no compute-path source may reference a crosscheck constant.
 # The ns::consts::crosscheck namespace exists so this grep is possible (04 §1).
 add_test(NAME constants.crosscheck_misuse

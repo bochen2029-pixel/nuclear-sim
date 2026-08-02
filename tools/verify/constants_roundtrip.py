@@ -34,7 +34,7 @@ MATERIALS = ROOT / "data" / "materials"
 # None means "the appendix does not carry that column here".
 SECTION_COLUMNS = {
     1: {"value": 2, "unit": 3, "status": 4, "cite": 6},
-    2: {"value": 2, "unit": None, "status": 4, "cite": 5},
+    2: {"value": 2, "unit": None, "status": 4, "cite": 5, "mass": 3},
     3: {"value": 2, "unit": 3, "status": 4, "cite": 5},
     4: {"value": 2, "unit": None, "status": None, "cite": None},
     5: {"value": 2, "unit": None, "status": None, "cite": 3},
@@ -77,6 +77,7 @@ def parse_appendix() -> dict[str, dict]:
             "unit": cells[cols["unit"]] if cols["unit"] is not None else None,
             "status": cells[cols["status"]] if cols["status"] is not None else None,
             "cite": cells[cols["cite"]] if cols["cite"] is not None else None,
+            "mass_text": cells[cols["mass"]] if cols.get("mass") is not None else None,
         }
     return rows
 
@@ -169,6 +170,17 @@ def main() -> int:
                     f"{cid}: cite drift\n    appendix: {normalise(row['cite'])!r}"
                     f"\n    strict:   {normalise(str(entry['cite']))!r}"
                 )
+
+        # Appendix §2 carries a Mass column alongside the OD. It is tabular data,
+        # not prose, so it gets the same verbatim drift check — the pit's 6.15 kg
+        # is a DECLASSIFIED authoritative value that invariant 4 depends on.
+        if row.get("mass_text") is not None:
+            want_mass = normalise(row["mass_text"])
+            got_mass = normalise(str(entry.get("appendix_mass_text", "")))
+            if want_mass != got_mass:
+                problems.append(
+                    f"{cid}: appendix mass drift\n    appendix: {want_mass!r}"
+                    f"\n    strict:   {got_mass!r}")
 
         if entry["_kind"] not in ("constant", "band") or entry.get("derived"):
             continue  # registries are text-compared; derived is checked by the generator

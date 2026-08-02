@@ -36,7 +36,7 @@
 | ID | Status | claimed_by | claimed_at | depends_on | Notes |
 |---|---|---|---|---|---|
 | M0-T1 | **done** | session-2026-08-03-a | 2026-08-03 | — | repo init in place (BLK-12); MIT LICENSE + NOTICE; `.gitignore` gate-evidence un-ignores verified both ways (QC-07); pushed to github.com/bochen2029-pixel/nuclear-sim |
-| M0-T2 | todo | — | — | M0-T1 | toolchain per `12 §1` (only source of truth); clean-cache build |
+| M0-T2 | **in_progress** | session-2026-08-02-b | 2026-08-02 | M0-T1 | toolchain per `12 §1` (only source of truth); clean-cache build |
 | M0-T3 | todo | — | — | M0-T2 | author `spec/appendix/constants.data.toml` + gen_constants + roundtrip |
 | M0-T4 | todo | — | — | M0-T2 | Philox per `04 §2` (layout, fork, (ctr,sub), KATs) |
 | M0-T5 | todo | — | — | M0-T2, M0-T3 | loaders incl. xs v2 semantics + negative tests |

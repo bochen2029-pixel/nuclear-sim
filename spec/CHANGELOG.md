@@ -24,4 +24,6 @@
 
 2026-08-02 — 04-module-core (§3 `mix()` relocated to `core/material` with the reason; §5 `Material` gains `status`/`cite`/`mean_molar_mass` and `fracs` becomes a named `Constituent` struct) — **SYNC-M1 audit** before claiming M1's first task (`07 §SYNC`). Clarification class, no ADR: the implemented shape is strictly richer and the spec's shape could not carry a species that has a molar mass but no cross sections, which appendix §3 requires — session-2026-08-02-b.
 
+2026-08-02 — PROGRESS, SESSIONS, CHANGELOG — M1-T1 executed (geometry + analytic tracker + `canonical_hash()`). No spec change: `04 §4`/`§6` were implementable as written, which after M0-T2/T3/T5 each needing an amendment is worth recording. SHA-256 added in-tree rather than as a vcpkg dependency — `02 §4` makes a new dependency an ADR, and an in-tree implementation checked against the published NIST vectors avoids one — session-2026-08-02-b.
+
 2026-08-03 — 07-milestones, DECISIONS, PROGRESS — ADR-014: repository created under owner direction; M0-T6 loses its owner gate and becomes a single task; publication authority clarified (per-action owner instruction; pushing to this repo's main is ordinary work, new public repos / visibility changes / releases / other remotes each need fresh instruction; secret scan required before any first push to a public remote) — ADR-014 — session-2026-08-03-a.

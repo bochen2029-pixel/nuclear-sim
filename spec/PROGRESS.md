@@ -5,17 +5,16 @@
 
 ## Current
 
-- **Milestone:** M0 — Foundation **COMPLETE** (T1–T6 done); next is M1 — CPU reference transport + bare-sphere benchmarks
-- **VERIFY:** `cmake --preset win-x64 && cmake --build --preset win-x64-rel && ctest --preset win-x64-rel` — the `12 §2` canonical loop; falsifiable and real (configure + compile + link + **39 passing tests**). Takes ~1 min warm. Per-task probes: `ctest --preset win-x64-rel -R toolchain|constants|rng|loaders|oracle` — all five resolve.
-- **NEXT ACTION:** Run the M1 SYNC audit (`07 §SYNC`), then execute M1-T1 — implement `core/geometry` LayerStack + AnalyticSphereTracker per `spec/04-module-core.md` §4 (normative ray–sphere math: `b = p·d`, `c = |p|² − R²`, nearest positive root among the layer's inner/outer spheres; ε=1e-9 cm degeneracies nudge **along the direction of travel**, never unconditionally inward), with the `04 §7` unit tests green (axial/tangential/miss/inside-out known answers, nudge direction both ways, `locate` across all layers incl. `kOutside`, innermost inner-radius = 0, `set_radii`/`scale_radii`); register as `catch_discover_tests(test_geometry TEST_PREFIX "geometry.")` per `11 §1`; DoD in `07-milestones.md` M1-T1.
+- **Milestone:** M1 — CPU reference transport + bare-sphere benchmarks (M0 complete; SYNC-M1 run; M1-T1 done)
+- **VERIFY:** `cmake --preset win-x64 && cmake --build --preset win-x64-rel && ctest --preset win-x64-rel` — the `12 §2` canonical loop; falsifiable and real (configure + compile + link + **54 passing tests**). Takes ~1 min warm. Per-task probes: `ctest --preset win-x64-rel -R toolchain|constants|rng|loaders|geometry|oracle` — all six resolve.
+- **NEXT ACTION:** Execute M1-T2 — implement `src/ref/` history-based transport per `spec/05-module-transport.md` §1 (E1a–E1e with **full implicit capture**, ADR-012 item 1 — the analog-with-implicit-absorption variant was explicitly rejected) plus the fixed-source path driven by `SourceSpec`; the DoD is two physics checks, not a smoke test: a pure-capturer point-source leakage of `exp(−Σ_c·R)` within 1σ at three optical depths (**requires Σ_f = Σ_s = 0**, QC-09) AND infinite-medium `k_inf = ν̄Σ_f/(Σ_c+Σ_f)` within 3σ; use `ns::rng::Stream` with the C-907 stream ids and `ns::geom::AnalyticSphereTracker`; register as `catch_discover_tests(test_ref TEST_PREFIX "ref.")` per `11 §1`; DoD in `07-milestones.md` M1-T2.
 
 ## Ready-queue (runnable now)
 
-1. **M1-T1** (recommended — NEXT ACTION) — `core/geometry` LayerStack + AnalyticSphereTracker
-2. **M1-T4a** — OPEN-literature benchmark models + the cited `fast4` xs dataset; independent of M1-T1, safe to run in parallel
-3. *(M1-T2 needs M1-T1; M4-T1 SHOULD start right after M1-T1 per ADR-009)*
-
-> **Run the M1 SYNC audit before claiming either** (`07 §SYNC`): APIs vs `04`/`05`, scenario paths vs `03 §4`, constants vs the appendix. Record as `SYNC-M1` here and in SESSIONS.
+1. **M1-T2** (recommended — NEXT ACTION) — `src/ref/` history-based transport with implicit capture
+2. **M1-T4a** — OPEN-literature benchmark models + the cited `fast4` xs dataset; independent, safe to run in parallel
+3. **M4-T1** — GPU buffers + device Philox; **ADR-009 says it SHOULD start now**, in parallel with M1/M2/M3
+4. *(M1-T3 needs M1-T2)*
 
 **Repository:** <https://github.com/bochen2029-pixel/nuclear-sim> — public, MIT (ADR-011). Remote exists, so the full claim protocol (`README §5.3`: branch + PROGRESS edit + pushed `claim:` commit) applies from M0-T2 onward and parallel sessions are now safe.
 
@@ -45,7 +44,7 @@
 | M0-T4 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T2 | 3 published Random123 vectors reproduce (also at compile time); project-local vector emitted by an INDEPENDENT Python Philox, not self-recorded; fork + (ctr,sub) resume KATs; 10 tests |
 | M0-T5 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T2, M0-T3-a | xs v2 / materials / scenario loaders; positive tests parse the SPEC'S OWN examples extracted from `03` at run time; one negative test per violation class; 11 tests |
 | M0-T6 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T5 | `tools/ci/local_ci.{ps1,sh}` + `.github/workflows/ci.yml`; Actions green on `main` (windows-2022 + ubuntu-latest + gate-evidence archive); `.env.example` committed |
-| M1-T1 | todo (RUNNABLE) | — | — | M0-T5 | geometry + analytic tracker |
+| M1-T1 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T5 | LayerStack + AnalyticSphereTracker + in-tree SHA-256 + `canonical_hash()` (carried per SYNC-M1); 16 tests incl. the nudge-direction pair and the `04 §6` stability matrix |
 | M1-T2 | todo | — | — | M1-T1 | ref transport (implicit capture); k_inf + leakage tests |
 | M1-T3 | todo | — | — | M1-T2 | eigen (8³ mesh entropy, dual σ, Λ estimator) |
 | M1-T4a | todo (RUNNABLE) | — | — | M0-T5 | OPEN-literature benchmark models; one ADR per benchmark; xs dataset |

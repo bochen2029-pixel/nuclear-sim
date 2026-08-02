@@ -122,6 +122,19 @@ struct Scenario {
     /// section.key. Any other prefix is rejected.
     void apply_overrides(const std::vector<std::pair<std::string, ParamValue>>& items);
 
+    /// Stable identity of this scenario AND the data it resolves to (04 §6).
+    ///
+    /// Serialized from the PARSED struct rather than the source text, so every
+    /// stability property 04 §6 requires holds by construction: key order,
+    /// comments, CRLF vs LF and equivalent float spellings all vanish at parse
+    /// time, and schema defaults are already materialized. Floats use
+    /// std::to_chars shortest round-trip, so parse(emit(x)) == x exactly.
+    std::string canonical_hash() const;
+
+    /// The canonical byte string the hash is taken over. Exposed because a
+    /// hash mismatch is useless without a diff.
+    std::string canonical_form() const;
+
     /// True when any override touched a PUBLIC/DECLASSIFIED value. Such runs are
     /// marked non_canonical and MUST NOT be used as gate evidence (03 §4).
     bool non_canonical = false;

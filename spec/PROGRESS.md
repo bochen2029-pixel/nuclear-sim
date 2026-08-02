@@ -35,12 +35,12 @@
 
 | ID | Status | claimed_by | claimed_at | depends_on | Notes |
 |---|---|---|---|---|---|
-| M0-T1 | todo | — | — | — | repo init IN PLACE at C:\NUCLEAR (BLK-12); MIT LICENSE (ADR-011) |
+| M0-T1 | **done** | session-2026-08-03-a | 2026-08-03 | — | repo init in place (BLK-12); MIT LICENSE + NOTICE; `.gitignore` gate-evidence un-ignores verified both ways (QC-07); pushed to github.com/bochen2029-pixel/nuclear-sim |
 | M0-T2 | todo | — | — | M0-T1 | toolchain per `12 §1` (only source of truth); clean-cache build |
 | M0-T3 | todo | — | — | M0-T2 | author `spec/appendix/constants.data.toml` + gen_constants + roundtrip |
 | M0-T4 | todo | — | — | M0-T2 | Philox per `04 §2` (layout, fork, (ctr,sub), KATs) |
 | M0-T5 | todo | — | — | M0-T2, M0-T3 | loaders incl. xs v2 semantics + negative tests |
-| M0-T6 | todo | — | — | M0-T5 | (a) local CI + workflows; (b) **owner creates public repo** → push → Actions green |
+| M0-T6 | todo | — | — | M0-T5 | local CI + Actions workflow → Actions green on main (owner repo step resolved 2026-08-03) |
 | M1-T1 | todo | — | — | M0-T5 | geometry + analytic tracker |
 | M1-T2 | todo | — | — | M1-T1 | ref transport (implicit capture); k_inf + leakage tests |
 | M1-T3 | todo | — | — | M1-T2 | eigen (8³ mesh entropy, dual σ, Λ estimator) |
@@ -83,5 +83,5 @@ Before claiming the first task of a new milestone: run the SYNC audit (`07-miles
 
 ## Blockers
 
-- **M0-T6-b:** owner creates the public GitHub repo (ADR-011). Until then M0-T6-a delivers local CI + committed workflows.
+- ~~**M0-T6-b:** owner creates the public GitHub repo (ADR-011).~~ **RESOLVED 2026-08-03** — repo live at <https://github.com/bochen2029-pixel/nuclear-sim> (public, MIT). M0-T6 collapses to a single task: local CI + Actions workflow, then Actions green on main.
 - **M1-T4b (optional):** owner ICSBEP access decision. Not required — M1-T4a (open literature) is the default path.

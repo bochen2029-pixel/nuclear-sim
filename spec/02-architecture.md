@@ -37,6 +37,7 @@ C:\NUCLEAR/                       # THIS DIRECTORY IS THE REPO ROOT (BLK-12; git
     app/       nukebench/ nukefarm/samplers/ nukestudio/ nukecinema/
   scripts/     build.ps1 — developer wrappers around the 12 §2 canonical loop (M0-T2)
   tools/       gen_constants/ verify/ sync_artifacts/ make_film/ ci/ xs_prep(optional)/
+  docs/        VERIFICATION.md — GENERATED first-principles oracle (11 §5, M0-T3) + design notes
   deploy/      Dockerfile, runpod.md                     # M5-T5
   tests/       unit/ golden/ differential/ perf/
   artifacts/   run bundles (gitignored) — EXCEPT:
@@ -92,7 +93,7 @@ emit run.json + tally.json (+ checkpoint per D9; + fields if enabled)
 ## 4. Engineering policies
 
 - **Language/standards:** C++20. Version pins live ONLY in `12-deployment.md` §1 (single source of truth — do not restate versions here or anywhere else). `12 §1` also owns preset naming and `CMAKE_CUDA_ARCHITECTURES`.
-- **Warnings:** `-Wall -Wextra -Werror` (MSVC `/W4 /WX`) apply to **first-party targets only**, set per-target via `target_compile_options`, never globally. Third-party headers via `SYSTEM` includes. CUDA host flags routed with `-Xcompiler`; device `-Werror all-warnings` only on first-party `.cu`.
+- **Warnings:** `-Wall -Wextra -Werror` (MSVC `/W4 /WX`) apply to **first-party targets only**, set per-target via `target_compile_options`, never globally. Third-party headers via `SYSTEM` includes. Device warnings: `-Werror all-warnings`, first-party `.cu` only. **CUDA host flags (corrected M0-T2 against the emitted nvcc command line):** on GCC/Clang they are routed explicitly with `-Xcompiler`; on MSVC they are *not*, because the VS generator already hoists `/W4` onto the CUDA host pass and delivers `/WX` through MSBuild's project-level `TreatWarningAsError` property — so first-party `.cu` host code compiles at the same `/W4 /WX` as `.cpp`, and no routing is needed. Do not try to soften it with `-Xcompiler=/W3`: that raises D9025, which the same inherited property promotes to an error. **Known hole, deliberately accepted:** nvcc compiles its own generated `tmpxft_*.cudafe1.stub.c` inside every `.cu` translation unit and that stub trips C4211 at `/W4`, so the build suppresses C4211 there via `-Xcompiler=/wd4211` — which unavoidably also suppresses it for first-party code in the same TU. C4211 ("redefined extern to static") is the one warning `.cu` files are not protected against.
 - **Dependencies:** vcpkg manifest mode with a committed builtin-registry baseline SHA, pinned in `vcpkg-configuration.json` as `default-registry.baseline` (`12 §1`); baseline changes require an ADR. New dependency ⇒ ADR first. Baseline set: fmt, tomlplusplus, nlohmann-json, Catch2, CLI11, SQLite3; M7 adds glfw3, glad, imgui[docking-experimental], implot, tinyexr.
 - **Error handling:** loaders validate and fail with precise diagnostics (file, field, constraint). No silent physics defaults.
 - **Logging:** fmt-based; ERROR/WARN/INFO/DEBUG; headless runs log `run.log` in the artifact bundle.

@@ -4,7 +4,11 @@
 
 #pragma once
 
-namespace nukesim::constants {
+#include <stdexcept>
+#include <string>
+#include <string_view>
+
+namespace ns::consts {
 
 // C-010 — PUBLIC; cite: ENDF, Primer
 inline constexpr double sigma_f_pu239_fast = 1.8;
@@ -17,10 +21,6 @@ inline constexpr double sigma_f_u235_fast = 1.2;
 
 // C-012 — PUBLIC; cite: ENDF
 inline constexpr double sigma_f_u238_fast = 0.5;
-
-// C-013 — PUBLIC; cite: ENDF
-// use=crosscheck: MUST NOT enter tallies or gates (MAJ-11).
-inline constexpr double sigma_f_pu239_thermal = 750.0;
 
 // C-020 — PUBLIC; cite: NWFAQ-8
 inline constexpr double nu_bar_pu239_total = 2.9;
@@ -58,34 +58,11 @@ inline constexpr double neutron_speed_1mev = 1400000000.0;
 // C-032 — DECLASSIFIED; cite: Primer
 inline constexpr double fission_mfp_pu_normal_density = 12.7;
 
-// C-033 — DECLASSIFIED; cite: Primer
-// use=crosscheck: MUST NOT enter tallies or gates (MAJ-11).
-inline constexpr double scattering_mfp = 2.5;
-
 // C-040 — PUBLIC; cite: Primer
 inline constexpr double e_f_prompt_deposited = 180.0;
 
 // C-041 — PUBLIC; cite: derived
 inline constexpr double phi_kt_fissions_per_kiloton = 1.4508041093079906e+23;
-
-// C-042 — PUBLIC; cite: NP-1771
-// use=crosscheck: MUST NOT enter tallies or gates (MAJ-11).
-inline constexpr double kt_per_kg_pu239_sherbeck = 18.29;
-
-// C-043 — PUBLIC; cite: NP-1771
-// use=crosscheck: MUST NOT enter tallies or gates (MAJ-11).
-inline constexpr double kt_per_kg_u235_sherbeck = 17.74;
-
-// C-050 — DECLASSIFIED; cite: Wellerstein-2015
-// use=crosscheck: MUST NOT enter tallies or gates (MAJ-11).
-inline constexpr double critical_mass_bare_pu239_alpha = 10.0;
-
-// C-050b — PUBLIC; cite: Jezebel PMF-001
-// use=crosscheck: MUST NOT enter tallies or gates (MAJ-11).
-inline constexpr double critical_mass_bare_pu_delta = 16.5;
-inline constexpr double critical_mass_bare_pu_delta_lo = 16.0;
-inline constexpr double critical_mass_bare_pu_delta_hi = 17.0;
-static_assert(critical_mass_bare_pu_delta_lo <= critical_mass_bare_pu_delta && critical_mass_bare_pu_delta <= critical_mass_bare_pu_delta_hi, "C-050b: value outside its declared band");
 
 // C-051 — DECLASSIFIED; cite: NWFAQ-8.1.1
 inline constexpr double urchin_initiator_output = 150000000.0;
@@ -125,35 +102,6 @@ inline constexpr double x_unit_detonation_simultaneity = 10.0;
 
 // C-072 — DECLASSIFIED; cite: NWFAQ-8.1.1
 inline constexpr double he_assembly_symmetry_tolerance = 5.0;
-
-// C-090 — PUBLIC; cite: Wellerstein-2013
-// use=crosscheck: MUST NOT enter tallies or gates (MAJ-11).
-inline constexpr double trinity_pu_burnup = 0.16;
-inline constexpr double trinity_pu_burnup_lo = 0.15;
-inline constexpr double trinity_pu_burnup_hi = 0.17;
-static_assert(trinity_pu_burnup_lo <= trinity_pu_burnup && trinity_pu_burnup <= trinity_pu_burnup_hi, "C-090: value outside its declared band");
-
-// C-091 — PUBLIC; cite: Selby-2021
-// use=crosscheck: MUST NOT enter tallies or gates (MAJ-11).
-inline constexpr double trinity_yield_radiochemistry_1945 = 18.6;
-
-// C-092 — PUBLIC; cite: DOE
-// use=crosscheck: MUST NOT enter tallies or gates (MAJ-11).
-inline constexpr double trinity_yield_doe_official = 21.0;
-
-// C-093 — PUBLIC; cite: Selby-2021
-// use=crosscheck: MUST NOT enter tallies or gates (MAJ-11).
-inline constexpr double trinity_yield_selby_2021 = 24.8;
-inline constexpr double trinity_yield_selby_2021_lo = 22.8;
-inline constexpr double trinity_yield_selby_2021_hi = 26.8;
-static_assert(trinity_yield_selby_2021_lo <= trinity_yield_selby_2021 && trinity_yield_selby_2021 <= trinity_yield_selby_2021_hi, "C-093: value outside its declared band");
-
-// C-094 — DECLASSIFIED; cite: NWFAQ-8.1.1
-// use=crosscheck: MUST NOT enter tallies or gates (MAJ-11).
-inline constexpr double u238_tamper_yield_share = 0.2;
-inline constexpr double u238_tamper_yield_share_lo = 0.1;
-inline constexpr double u238_tamper_yield_share_hi = 0.3;
-static_assert(u238_tamper_yield_share_lo <= u238_tamper_yield_share && u238_tamper_yield_share <= u238_tamper_yield_share_hi, "C-094: value outside its declared band");
 
 // C-100 — DECLASSIFIED; cite: NWFAQ-8.1.1
 inline constexpr double od_urchin_initiator = 2.0;
@@ -199,10 +147,6 @@ inline constexpr double molar_mass_u238 = 238.0508;
 
 // C-914 — PUBLIC; cite: NNDC/AME2020
 inline constexpr double molar_mass_u234 = 234.041;
-
-// C-915 — PUBLIC; cite: IUPAC
-// use=crosscheck: MUST NOT enter tallies or gates (MAJ-11).
-inline constexpr double molar_mass_ga_natural = 69.723;
 
 // C-915a — PUBLIC; cite: NNDC/AME2020
 inline constexpr double molar_mass_ga69 = 68.9256;
@@ -409,4 +353,197 @@ inline constexpr double warn = 0.02;
 inline constexpr double conditional = 0.05;
 }  // namespace q_validity_thresholds
 
-}  // namespace nukesim::constants
+// ---------------------------------------------------------------------
+// use = crosscheck (04 §1). Readouts and comparisons ONLY.
+// A compute-path source referencing ns::consts::crosscheck:: is a defect,
+// and 11 §4's static check greps for exactly that qualifier (01 §8.3).
+// ---------------------------------------------------------------------
+namespace crosscheck {
+
+// C-013 — PUBLIC; cite: ENDF
+inline constexpr double sigma_f_pu239_thermal = 750.0;
+
+// C-033 — DECLASSIFIED; cite: Primer
+inline constexpr double scattering_mfp = 2.5;
+
+// C-042 — PUBLIC; cite: NP-1771
+inline constexpr double kt_per_kg_pu239_sherbeck = 18.29;
+
+// C-043 — PUBLIC; cite: NP-1771
+inline constexpr double kt_per_kg_u235_sherbeck = 17.74;
+
+// C-050 — DECLASSIFIED; cite: Wellerstein-2015
+inline constexpr double critical_mass_bare_pu239_alpha = 10.0;
+
+// C-050b — PUBLIC; cite: Jezebel PMF-001
+inline constexpr double critical_mass_bare_pu_delta = 16.5;
+inline constexpr double critical_mass_bare_pu_delta_lo = 16.0;
+inline constexpr double critical_mass_bare_pu_delta_hi = 17.0;
+static_assert(critical_mass_bare_pu_delta_lo <= critical_mass_bare_pu_delta && critical_mass_bare_pu_delta <= critical_mass_bare_pu_delta_hi, "C-050b: value outside its declared band");
+
+// C-090 — PUBLIC; cite: Wellerstein-2013
+inline constexpr double trinity_pu_burnup = 0.16;
+inline constexpr double trinity_pu_burnup_lo = 0.15;
+inline constexpr double trinity_pu_burnup_hi = 0.17;
+static_assert(trinity_pu_burnup_lo <= trinity_pu_burnup && trinity_pu_burnup <= trinity_pu_burnup_hi, "C-090: value outside its declared band");
+
+// C-091 — PUBLIC; cite: Selby-2021
+inline constexpr double trinity_yield_radiochemistry_1945 = 18.6;
+
+// C-092 — PUBLIC; cite: DOE
+inline constexpr double trinity_yield_doe_official = 21.0;
+
+// C-093 — PUBLIC; cite: Selby-2021
+inline constexpr double trinity_yield_selby_2021 = 24.8;
+inline constexpr double trinity_yield_selby_2021_lo = 22.8;
+inline constexpr double trinity_yield_selby_2021_hi = 26.8;
+static_assert(trinity_yield_selby_2021_lo <= trinity_yield_selby_2021 && trinity_yield_selby_2021 <= trinity_yield_selby_2021_hi, "C-093: value outside its declared band");
+
+// C-094 — DECLASSIFIED; cite: NWFAQ-8.1.1
+inline constexpr double u238_tamper_yield_share = 0.2;
+inline constexpr double u238_tamper_yield_share_lo = 0.1;
+inline constexpr double u238_tamper_yield_share_hi = 0.3;
+static_assert(u238_tamper_yield_share_lo <= u238_tamper_yield_share && u238_tamper_yield_share <= u238_tamper_yield_share_hi, "C-094: value outside its declared band");
+
+// C-915 — PUBLIC; cite: IUPAC
+inline constexpr double molar_mass_ga_natural = 69.723;
+
+}  // namespace crosscheck
+
+// Runtime lookup by constant id (04 §1). Tests and diagnostics use this;
+// hot paths use the constexpr names above.
+inline double get(std::string_view id) {
+    if (id == "C-010") return sigma_f_pu239_fast;
+    if (id == "C-011") return sigma_f_u235_fast;
+    if (id == "C-012") return sigma_f_u238_fast;
+    if (id == "C-013") return crosscheck::sigma_f_pu239_thermal;
+    if (id == "C-020") return nu_bar_pu239_total;
+    if (id == "C-021") return nu_bar_u235_total;
+    if (id == "C-021b") return nu_bar_u238_total;
+    if (id == "C-022") return beta_pu239;
+    if (id == "C-022b") return beta_u235;
+    if (id == "C-022c") return beta_u238;
+    if (id == "C-022d") return beta_pu240;
+    if (id == "C-022e") return beta_pu241;
+    if (id == "C-030") return generation_time_uncompressed;
+    if (id == "C-031") return neutron_speed_1mev;
+    if (id == "C-032") return fission_mfp_pu_normal_density;
+    if (id == "C-033") return crosscheck::scattering_mfp;
+    if (id == "C-040") return e_f_prompt_deposited;
+    if (id == "C-041") return phi_kt_fissions_per_kiloton;
+    if (id == "C-042") return crosscheck::kt_per_kg_pu239_sherbeck;
+    if (id == "C-043") return crosscheck::kt_per_kg_u235_sherbeck;
+    if (id == "C-050") return crosscheck::critical_mass_bare_pu239_alpha;
+    if (id == "C-050b") return crosscheck::critical_mass_bare_pu_delta;
+    if (id == "C-051") return urchin_initiator_output;
+    if (id == "C-052") return pit_criticality_fraction_uncompressed_tamped;
+    if (id == "C-053") return critical_masses_at_2x_compression;
+    if (id == "C-060") return compression_ratio;
+    if (id == "C-061") return comp_b_detonation_velocity;
+    if (id == "C-062") return baratol_detonation_velocity;
+    if (id == "C-070") return guderley_alpha_spherical_gamma_5_3;
+    if (id == "C-071") return x_unit_detonation_simultaneity;
+    if (id == "C-072") return he_assembly_symmetry_tolerance;
+    if (id == "C-090") return crosscheck::trinity_pu_burnup;
+    if (id == "C-091") return crosscheck::trinity_yield_radiochemistry_1945;
+    if (id == "C-092") return crosscheck::trinity_yield_doe_official;
+    if (id == "C-093") return crosscheck::trinity_yield_selby_2021;
+    if (id == "C-094") return crosscheck::u238_tamper_yield_share;
+    if (id == "C-100") return od_urchin_initiator;
+    if (id == "C-101") return od_initiator_cavity;
+    if (id == "C-102") return od_pu_ga_core;
+    if (id == "C-103") return od_natural_u_tamper;
+    if (id == "C-104") return od_b10_acrylic_shell;
+    if (id == "C-105") return od_aluminum_pusher;
+    if (id == "C-106") return od_inner_he_booster;
+    if (id == "C-107") return od_lens_he_layer;
+    if (id == "C-108") return od_cork_liner;
+    if (id == "C-109") return od_duralumin_case;
+    if (id == "C-910") return molar_mass_pu239;
+    if (id == "C-911") return molar_mass_pu240;
+    if (id == "C-912") return molar_mass_u235;
+    if (id == "C-913") return molar_mass_u238;
+    if (id == "C-914") return molar_mass_u234;
+    if (id == "C-915") return crosscheck::molar_mass_ga_natural;
+    if (id == "C-915a") return molar_mass_ga69;
+    if (id == "C-915b") return molar_mass_ga71;
+    if (id == "C-916") return avogadro_constant;
+    if (id == "C-917") return mev_to_joule;
+    if (id == "C-918") return kiloton_tnt_to_joule;
+    if (id == "C-919") return molar_mass_pu241;
+    if (id == "C-920") return molar_mass_b10;
+    if (id == "C-921") return molar_mass_b11;
+    if (id == "C-922") return molar_mass_c12;
+    if (id == "C-923") return molar_mass_h1;
+    if (id == "C-924") return molar_mass_o16;
+    if (id == "C-925") return molar_mass_n14;
+    if (id == "C-926") return molar_mass_al27;
+    if (id == "C-927") return molar_mass_be9;
+    if (id == "C-928") return molar_mass_po210;
+    if (id == "C-929") return molar_mass_w_natural;
+    if (id == "C-903") return alpha_mode_eigen_refresh_interval;
+    if (id == "C-904") return population_renormalization_ceiling;
+    if (id == "C-905") throw std::runtime_error("C-905 is PENDING (resolved_by M7-T2) and must not be read");
+    if (id == "C-906") throw std::runtime_error("C-906 is PENDING (resolved_by M6-T3) and must not be read");
+    if (id == "C-909") return quench_epsilon;
+    if (id == "C-909b") return eigen_refresh_dr_frac;
+    if (id == "C-930") return g0_k_deviation_tolerance;
+    if (id == "C-931") return g0_sigma_ceiling;
+    if (id == "C-932") return g0c_absolute_equivalence_bound;
+    if (id == "C-945") throw std::runtime_error("C-945 is PENDING (resolved_by M4-T4) and must not be read");
+    if (id == "C-933") throw std::runtime_error("C-933 is a band with no nominal (ADR-015); use get_lo/get_hi");
+    if (id == "C-934") throw std::runtime_error("C-934 is a band with no nominal (ADR-015); use get_lo/get_hi");
+    if (id == "C-935") throw std::runtime_error("C-935 is a band with no nominal (ADR-015); use get_lo/get_hi");
+    if (id == "C-936") throw std::runtime_error("C-936 is a band with no nominal (ADR-015); use get_lo/get_hi");
+    if (id == "C-937") throw std::runtime_error("C-937 is a band with no nominal (ADR-015); use get_lo/get_hi");
+    if (id == "C-940") throw std::runtime_error("C-940 is a band with no nominal (ADR-015); use get_lo/get_hi");
+    if (id == "C-941") throw std::runtime_error("C-941 is a band with no nominal (ADR-015); use get_lo/get_hi");
+    if (id == "C-942") throw std::runtime_error("C-942 is a band with no nominal (ADR-015); use get_lo/get_hi");
+    throw std::runtime_error("unknown constant id: " + std::string(id));
+}
+
+inline double get_lo(std::string_view id) {
+    if (id == "C-010") return sigma_f_pu239_fast_lo;
+    if (id == "C-021b") return nu_bar_u238_total_lo;
+    if (id == "C-050b") return crosscheck::critical_mass_bare_pu_delta_lo;
+    if (id == "C-051") return urchin_initiator_output_lo;
+    if (id == "C-052") return pit_criticality_fraction_uncompressed_tamped_lo;
+    if (id == "C-053") return critical_masses_at_2x_compression_lo;
+    if (id == "C-060") return compression_ratio_lo;
+    if (id == "C-090") return crosscheck::trinity_pu_burnup_lo;
+    if (id == "C-093") return crosscheck::trinity_yield_selby_2021_lo;
+    if (id == "C-094") return crosscheck::u238_tamper_yield_share_lo;
+    if (id == "C-933") return g1a_mass_fraction_band_lo;
+    if (id == "C-934") return g1a_derived_k_band_lo;
+    if (id == "C-935") return g1b_critical_masses_at_2rho0_lo;
+    if (id == "C-936") return g1b_k_at_2x_band_lo;
+    if (id == "C-937") return g1b_k_ratio_band_lo;
+    if (id == "C-940") return g2_yield_band_lo;
+    if (id == "C-941") return g2_pu_burnup_band_lo;
+    if (id == "C-942") return g2_tamper_yield_band_lo;
+    throw std::runtime_error("no lo bound for constant id: " + std::string(id));
+}
+
+inline double get_hi(std::string_view id) {
+    if (id == "C-010") return sigma_f_pu239_fast_hi;
+    if (id == "C-021b") return nu_bar_u238_total_hi;
+    if (id == "C-050b") return crosscheck::critical_mass_bare_pu_delta_hi;
+    if (id == "C-051") return urchin_initiator_output_hi;
+    if (id == "C-052") return pit_criticality_fraction_uncompressed_tamped_hi;
+    if (id == "C-053") return critical_masses_at_2x_compression_hi;
+    if (id == "C-060") return compression_ratio_hi;
+    if (id == "C-090") return crosscheck::trinity_pu_burnup_hi;
+    if (id == "C-093") return crosscheck::trinity_yield_selby_2021_hi;
+    if (id == "C-094") return crosscheck::u238_tamper_yield_share_hi;
+    if (id == "C-933") return g1a_mass_fraction_band_hi;
+    if (id == "C-934") return g1a_derived_k_band_hi;
+    if (id == "C-935") return g1b_critical_masses_at_2rho0_hi;
+    if (id == "C-936") return g1b_k_at_2x_band_hi;
+    if (id == "C-937") return g1b_k_ratio_band_hi;
+    if (id == "C-940") return g2_yield_band_hi;
+    if (id == "C-941") return g2_pu_burnup_band_hi;
+    if (id == "C-942") return g2_tamper_yield_band_hi;
+    throw std::runtime_error("no hi bound for constant id: " + std::string(id));
+}
+
+}  // namespace ns::consts

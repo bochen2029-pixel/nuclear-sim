@@ -187,8 +187,8 @@ set(NUKESIM_CONSTANTS_STRICT ${CMAKE_SOURCE_DIR}/spec/appendix/constants.data.to
 set(NUKESIM_GEN_CONSTANTS ${CMAKE_SOURCE_DIR}/tools/gen_constants/gen_constants.py)
 set(NUKESIM_CONSTANTS_GENERATED
     ${CMAKE_SOURCE_DIR}/data/constants.toml
-    ${CMAKE_SOURCE_DIR}/src/core/constants/constants_generated.h
-    ${CMAKE_SOURCE_DIR}/src/core/constants/constants_generated.cuh)
+    ${CMAKE_SOURCE_DIR}/src/core/constants/constants.h
+    ${CMAKE_SOURCE_DIR}/src/core/constants/constants.cuh)
 
 add_custom_command(
     OUTPUT ${NUKESIM_CONSTANTS_GENERATED}
@@ -237,6 +237,11 @@ add_test(NAME constants.generated_current
 add_test(NAME constants.generator_rejects_missing_provenance
          COMMAND ${Python3_EXECUTABLE}
                  ${CMAKE_SOURCE_DIR}/tools/verify/constants_negative.py)
+# 01 §8.3 / 11 §4: no compute-path source may reference a crosscheck constant.
+# The ns::consts::crosscheck namespace exists so this grep is possible (04 §1).
+add_test(NAME constants.crosscheck_misuse
+         COMMAND ${Python3_EXECUTABLE}
+                 ${CMAKE_SOURCE_DIR}/tools/verify/crosscheck_misuse.py)
 
 # ---------------------------------------------------------------------------
 message(STATUS "nuclear-sim ${PROJECT_VERSION}")

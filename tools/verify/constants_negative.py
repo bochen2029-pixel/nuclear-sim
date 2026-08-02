@@ -55,6 +55,9 @@ CASES: list[tuple[str, dict, bool]] = [
     ("missing cite is rejected", doc(without("cite")), True),
     ("missing status is rejected", doc(without("status")), True),
     ("empty cite is rejected", doc(with_(cite="")), True),
+    # 04 §1 lists unit alongside cite and status. A dimensionless entry writes
+    # "-" explicitly, so an omitted unit is always a defect.
+    ("missing unit is rejected", doc(without("unit")), True),
 
     ("unknown status is rejected", doc(with_(status="PROBABLY")), True),
     ("unknown use is rejected", doc(with_(use="vibes")), True),
@@ -86,7 +89,10 @@ CASES: list[tuple[str, dict, bool]] = [
           "status": "SIM", "cite": "x", "appendix_text": "[2.0, 2.0]"}, kind="band"), True),
     ("well-formed band passes",
      doc({"id": "C-900", "name": "b", "lo": 1.0, "hi": 2.0,
-          "status": "SIM", "cite": "x", "appendix_text": "[1.0, 2.0]"}, kind="band"), False),
+          "unit": "-", "status": "SIM", "cite": "x", "appendix_text": "[1.0, 2.0]"}, kind="band"), False),
+    ("band without a unit is rejected",
+     doc({"id": "C-900", "name": "b", "lo": 1.0, "hi": 2.0,
+          "status": "SIM", "cite": "x", "appendix_text": "[1.0, 2.0]"}, kind="band"), True),
 
     ("registry without entries is rejected",
      doc({"id": "C-907", "name": "r", "status": "SIM", "cite": "x",

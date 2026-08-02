@@ -8,9 +8,33 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
-#include "core/constants/constants_generated.h"
+#include "core/constants/constants.h"
 
-namespace k = nukesim::constants;
+namespace k = ns::consts;
+
+TEST_CASE("runtime lookup resolves, and refuses what it must", "[constants]") {
+    // 04 §1's get(id). Used by tests and diagnostics; hot paths use the
+    // constexpr names.
+    REQUIRE(k::get("C-040") == k::e_f_prompt_deposited);
+    REQUIRE(k::get("C-060") == k::compression_ratio);
+    REQUIRE(k::get_lo("C-060") == k::compression_ratio_lo);
+    REQUIRE(k::get_hi("C-060") == k::compression_ratio_hi);
+
+    // Crosscheck constants are reachable by id — the namespace stops accidental
+    // *compilation* against them, not deliberate readout.
+    REQUIRE(k::get("C-042") == k::crosscheck::kt_per_kg_pu239_sherbeck);
+
+    // 03 §1: a PENDING constant must raise if read.
+    REQUIRE_THROWS_AS(k::get("C-905"), std::runtime_error);  // resolved_by M7-T2
+    REQUIRE_THROWS_AS(k::get("C-906"), std::runtime_error);  // resolved_by M6-T3
+
+    // ADR-015: a band has no nominal, so asking for one is an error rather than
+    // a silently-invented midpoint.
+    REQUIRE_THROWS_AS(k::get("C-940"), std::runtime_error);
+    REQUIRE(k::get_lo("C-940") == k::g2_yield_band_lo);
+
+    REQUIRE_THROWS_AS(k::get("C-000"), std::runtime_error);
+}
 
 TEST_CASE("derived Phi_kt is recomputed, not transcribed", "[constants]") {
     // C-041 is the only constant converting fissions to yield (E6). Recompute
@@ -67,11 +91,11 @@ TEST_CASE("critical mass scales as rho^-2 across the phase pair", "[constants]")
     // than repeating it: 10 * (19.8/15.6)^2 ~ 16.1 kg, inside C-050b's band.
     constexpr double rho_alpha = 19.8;
     constexpr double rho_delta = 15.6;
-    const double scaled = k::critical_mass_bare_pu239_alpha
+    const double scaled = k::crosscheck::critical_mass_bare_pu239_alpha
                         * (rho_alpha / rho_delta) * (rho_alpha / rho_delta);
 
-    REQUIRE(scaled > k::critical_mass_bare_pu_delta_lo);
-    REQUIRE(scaled < k::critical_mass_bare_pu_delta_hi);
+    REQUIRE(scaled > k::crosscheck::critical_mass_bare_pu_delta_lo);
+    REQUIRE(scaled < k::crosscheck::critical_mass_bare_pu_delta_hi);
 }
 
 TEST_CASE("RNG stream ids are the seven distinct values 04 section 2 fixes", "[constants]") {
@@ -91,8 +115,8 @@ TEST_CASE("RNG stream ids are the seven distinct values 04 section 2 fixes", "[c
 TEST_CASE("gate bands are ordered and the G2 yield band spans the estimates", "[constants]") {
     // C-940 is the envelope of C-091/092/093 including Selby's +/-2. If a band
     // edge is edited without re-deriving it, the published estimates fall out.
-    REQUIRE(k::g2_yield_band_lo <= k::trinity_yield_radiochemistry_1945);
-    REQUIRE(k::g2_yield_band_hi >= k::trinity_yield_selby_2021_hi);
-    REQUIRE(k::g2_yield_band_lo < k::trinity_yield_doe_official);
-    REQUIRE(k::trinity_yield_doe_official < k::g2_yield_band_hi);
+    REQUIRE(k::g2_yield_band_lo <= k::crosscheck::trinity_yield_radiochemistry_1945);
+    REQUIRE(k::g2_yield_band_hi >= k::crosscheck::trinity_yield_selby_2021_hi);
+    REQUIRE(k::g2_yield_band_lo < k::crosscheck::trinity_yield_doe_official);
+    REQUIRE(k::crosscheck::trinity_yield_doe_official < k::g2_yield_band_hi);
 }

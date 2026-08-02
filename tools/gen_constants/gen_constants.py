@@ -3,8 +3,8 @@
 
 Input  : spec/appendix/constants.data.toml   (hand-authored, 03 §1)
 Outputs: data/constants.toml
-         src/core/constants/constants_generated.h
-         src/core/constants/constants_generated.cuh
+         src/core/constants/constants.h      (namespace ns::consts, 04 §1)
+         src/core/constants/constants.cuh
 
 Nothing downstream may hand-edit those outputs — 01 §8 makes this file the
 single source of truth for every number in the project.
@@ -89,6 +89,10 @@ def validate(doc: dict) -> None:
 
 
 def _validate_constant(entry: dict, cid: str, status: str) -> None:
+    # 04 §1: "MUST fail on missing id/value(when required)/unit/status/cite".
+    # A dimensionless entry still declares "-" explicitly, so that an omitted
+    # unit is always a defect rather than an ambiguous claim of dimensionless.
+    _require(entry, "unit", "constant")
     use = str(_require(entry, "use", "constant"))
     if use not in VALID_USE:
         raise GenError(f"{cid}: use {use!r} not in {sorted(VALID_USE)}")
@@ -114,6 +118,7 @@ def _validate_constant(entry: dict, cid: str, status: str) -> None:
 
 
 def _validate_band(entry: dict, cid: str) -> None:
+    _require(entry, "unit", "band")
     lo, hi = _require(entry, "lo", "band"), _require(entry, "hi", "band")
     if lo >= hi:
         raise GenError(f"{cid}: band requires lo < hi, got [{lo}, {hi}]")
@@ -241,39 +246,96 @@ def emit_runtime_toml(doc: dict) -> str:
     return "\n".join(out).rstrip("\n") + "\n"
 
 
+def _emit_constant(entry: dict, out: list[str]) -> None:
+    cid, name = entry["id"], entry["name"]
+    out.append(f"// {cid} — {entry['status']}; cite: {entry['cite']}")
+    if entry["status"] == "PENDING":
+        out.append(f"// PENDING, resolved_by {entry['resolved_by']}. 03 §1 requires that")
+        out.append("// reading it fail; referencing this deleted function is a compile error.")
+        out.append(f"double {name}() = delete;")
+        out.append("")
+        return
+    out.append(f"inline constexpr double {name} = {_num(entry['value'])};")
+    if "lo" in entry:
+        out.append(f"inline constexpr double {name}_lo = {_num(entry['lo'])};")
+        out.append(f"inline constexpr double {name}_hi = {_num(entry['hi'])};")
+        # 03 §1 requires a unit test asserting lo <= value <= hi. Generating it
+        # as a static_assert is strictly stronger: it cannot be forgotten for a
+        # new constant, and it fails at compile time rather than at ctest time.
+        out.append(
+            f"static_assert({name}_lo <= {name} && {name} <= {name}_hi,"
+            f' "{cid}: value outside its declared band");'
+        )
+    out.append("")
+
+
+def _emit_lookup(doc: dict, out: list[str]) -> None:
+    """Runtime id -> value lookup (04 §1). PENDING ids raise, per 03 §1."""
+    constants = doc.get("constant", [])
+    bands = doc.get("band", [])
+    banded = [c for c in constants if "lo" in c and c["status"] != "PENDING"]
+
+    out += [
+        "// Runtime lookup by constant id (04 §1). Tests and diagnostics use this;",
+        "// hot paths use the constexpr names above.",
+        "inline double get(std::string_view id) {",
+    ]
+    for entry in constants:
+        if entry["status"] == "PENDING":
+            out.append(
+                f'    if (id == "{entry["id"]}") throw std::runtime_error('
+                f'"{entry["id"]} is PENDING (resolved_by {entry["resolved_by"]}) '
+                f'and must not be read");'
+            )
+        else:
+            qualified = (
+                f"crosscheck::{entry['name']}" if entry.get("use") == "crosscheck" else entry["name"]
+            )
+            out.append(f'    if (id == "{entry["id"]}") return {qualified};')
+    for entry in bands:
+        out.append(
+            f'    if (id == "{entry["id"]}") throw std::runtime_error('
+            f'"{entry["id"]} is a band with no nominal (ADR-015); use get_lo/get_hi");'
+        )
+    out += [
+        '    throw std::runtime_error("unknown constant id: " + std::string(id));',
+        "}",
+        "",
+    ]
+
+    for suffix in ("lo", "hi"):
+        out.append(f"inline double get_{suffix}(std::string_view id) {{")
+        for entry in banded:
+            qualified = (
+                f"crosscheck::{entry['name']}" if entry.get("use") == "crosscheck" else entry["name"]
+            )
+            out.append(f'    if (id == "{entry["id"]}") return {qualified}_{suffix};')
+        for entry in bands:
+            out.append(f'    if (id == "{entry["id"]}") return {entry["name"]}_{suffix};')
+        out += [
+            f'    throw std::runtime_error("no {suffix} bound for constant id: " + std::string(id));',
+            "}",
+            "",
+        ]
+
+
 def emit_header(doc: dict) -> str:
     out = [
         BANNER,
         "#pragma once",
         "",
-        "namespace nukesim::constants {",
+        "#include <stdexcept>",
+        "#include <string>",
+        "#include <string_view>",
+        "",
+        "namespace ns::consts {",
         "",
     ]
 
     for entry in doc.get("constant", []):
-        cid, name = entry["id"], entry["name"]
-        out.append(f"// {cid} — {entry['status']}; cite: {entry['cite']}")
-        if entry["status"] == "PENDING":
-            out.append(f"// PENDING, resolved_by {entry['resolved_by']}. 03 §1 requires that")
-            out.append("// reading it fail; referencing this deleted function is a compile error.")
-            out.append(f"double {name}() = delete;")
-            out.append("")
-            continue
         if entry.get("use") == "crosscheck":
-            out.append("// use=crosscheck: MUST NOT enter tallies or gates (MAJ-11).")
-        out.append(f"inline constexpr double {name} = {_num(entry['value'])};")
-        if "lo" in entry:
-            out.append(f"inline constexpr double {name}_lo = {_num(entry['lo'])};")
-            out.append(f"inline constexpr double {name}_hi = {_num(entry['hi'])};")
-            # 03 §1 requires a unit test asserting lo <= value <= hi. Generating
-            # it as a static_assert is strictly stronger: it cannot be forgotten
-            # for a new constant, and it fails at compile time rather than at
-            # ctest time.
-            out.append(
-                f"static_assert({name}_lo <= {name} && {name} <= {name}_hi,"
-                f' "{cid}: value outside its declared band");'
-            )
-        out.append("")
+            continue  # emitted in the crosscheck namespace below
+        _emit_constant(entry, out)
 
     for entry in doc.get("band", []):
         out.append(f"// {entry['id']} — {entry['status']}; cite: {entry['cite']}")
@@ -300,7 +362,27 @@ def emit_header(doc: dict) -> str:
         out.append(f"}}  // namespace {entry['name']}")
         out.append("")
 
-    out.append("}  // namespace nukesim::constants")
+    # 04 §1: crosscheck constants live in their own namespace so 11 §4's static
+    # misuse check can grep for the qualifier. C-042/C-043 in particular use a
+    # ~5% different energy basis and MUST NOT enter any tally or gate (01 §8.3).
+    crosscheck = [c for c in doc.get("constant", []) if c.get("use") == "crosscheck"]
+    if crosscheck:
+        out += [
+            "// ---------------------------------------------------------------------",
+            "// use = crosscheck (04 §1). Readouts and comparisons ONLY.",
+            "// A compute-path source referencing ns::consts::crosscheck:: is a defect,",
+            "// and 11 §4's static check greps for exactly that qualifier (01 §8.3).",
+            "// ---------------------------------------------------------------------",
+            "namespace crosscheck {",
+            "",
+        ]
+        for entry in crosscheck:
+            _emit_constant(entry, out)
+        out += ["}  // namespace crosscheck", ""]
+
+    _emit_lookup(doc, out)
+
+    out.append("}  // namespace ns::consts")
     return "\n".join(out) + "\n"
 
 
@@ -313,7 +395,7 @@ def emit_cuh() -> str:
         + "\n"
         + "// Device-side view. constexpr is usable from __device__ code, so there is\n"
         + "// deliberately no duplicated table here — one definition, one source.\n"
-        + '#include "constants_generated.h"\n'
+        + '#include "constants.h"\n'
     )
 
 
@@ -321,8 +403,8 @@ def emit_cuh() -> str:
 
 OUTPUTS = {
     "data/constants.toml": emit_runtime_toml,
-    "src/core/constants/constants_generated.h": emit_header,
-    "src/core/constants/constants_generated.cuh": lambda _doc: emit_cuh(),
+    "src/core/constants/constants.h": emit_header,
+    "src/core/constants/constants.cuh": lambda _doc: emit_cuh(),
 }
 
 

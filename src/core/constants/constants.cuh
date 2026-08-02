@@ -5,4 +5,4 @@
 
 // Device-side view. constexpr is usable from __device__ code, so there is
 // deliberately no duplicated table here — one definition, one source.
-#include "constants_generated.h"
+#include "constants.h"

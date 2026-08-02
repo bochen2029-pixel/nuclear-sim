@@ -39,7 +39,8 @@ C:\NUCLEAR/                       # THIS DIRECTORY IS THE REPO ROOT (BLK-12; git
     app/       nukebench/ nukefarm/samplers/ nukestudio/ nukecinema/
   scripts/     build.ps1 — developer wrappers around the 12 §2 canonical loop (M0-T2)
   tools/       gen_constants/ verify/ sync_artifacts/ make_film/ ci/ xs_prep(optional)/
-  docs/        VERIFICATION.md — GENERATED first-principles oracle (11 §5, M0-T3) + design notes
+  docs/        VERIFICATION.md — GENERATED first-principles oracle (11 §5, M0-T3)
+               ONBOARDING.md — practical session context; supplementary to README §9, never a second prompt
   deploy/      Dockerfile, runpod.md                     # M5-T5
   tests/       unit/ golden/ differential/ perf/
   artifacts/   run bundles (gitignored) — EXCEPT:

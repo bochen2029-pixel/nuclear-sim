@@ -105,12 +105,19 @@ Rules: a VERIFY command **MUST be falsifiable** — `echo`, `true`, and comments
 You are continuing the NUCLEAR-SIM implementation at C:\NUCLEAR.
 Read spec/README.md fully and follow its read order (§3): spec/PROGRESS.md,
 spec/SESSIONS.md (last 3 entries), spec/DECISIONS.md (skim — respect logged ADRs).
-Check spec/wip/ for orphaned journals. Follow the session protocol in
-spec/README.md §5 exactly. Verify state with the VERIFY command in PROGRESS.md,
-then pick from the ready-queue (recommended: the NEXT ACTION).
+Check spec/wip/ for orphaned journals. Then read docs/ONBOARDING.md — it carries
+the accumulated practical context and the traps that have already cost time.
+Follow the session protocol in spec/README.md §5 exactly. Verify state with the
+VERIFY command in PROGRESS.md, then pick from the ready-queue (recommended: the
+NEXT ACTION).
 ```
 
 (Canonical copy lives HERE; SESSIONS.md points at this section — do not duplicate the text.)
+
+`docs/ONBOARDING.md` is **supplementary, never a second prompt**: it holds what is true
+about the repository but not derivable from the spec (the build/verify loop, module
+gotchas, recurring failure patterns, standing obligations owed by future tasks). This
+section remains the only place the prompt text lives.
 
 ## 10. Spec status
 

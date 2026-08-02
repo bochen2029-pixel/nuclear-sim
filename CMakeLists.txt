@@ -237,6 +237,27 @@ add_test(NAME constants.generated_current
 add_test(NAME constants.generator_rejects_missing_provenance
          COMMAND ${Python3_EXECUTABLE}
                  ${CMAKE_SOURCE_DIR}/tools/verify/constants_negative.py)
+# ---------------------------------------------------------------------------
+# nscore loaders (M0-T5). GUI-free and deterministic by construction (D7).
+# ---------------------------------------------------------------------------
+add_library(nukesim_core STATIC
+    src/core/xs/xs.cpp
+    src/core/material/material.cpp
+    src/core/scenario/scenario.cpp)
+target_link_libraries(nukesim_core PUBLIC nukesim_core_constants nukesim_deps)
+target_include_directories(nukesim_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
+nukesim_strict(nukesim_core)
+
+add_executable(test_loaders tests/unit/test_loaders.cpp)
+target_link_libraries(test_loaders PRIVATE nukesim_core Catch2::Catch2WithMain)
+target_include_directories(test_loaders PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
+# The tests read the canonical examples out of the spec markdown itself, so they
+# need to find the source tree at run time.
+target_compile_definitions(test_loaders PRIVATE
+    NUKESIM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+nukesim_strict(test_loaders)
+catch_discover_tests(test_loaders TEST_PREFIX "loaders.")
+
 add_executable(test_rng tests/unit/test_rng.cpp)
 target_link_libraries(test_rng PRIVATE nukesim_core_constants Catch2::Catch2WithMain)
 target_include_directories(test_rng PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)

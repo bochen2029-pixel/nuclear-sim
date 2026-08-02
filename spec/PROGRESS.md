@@ -6,13 +6,13 @@
 ## Current
 
 - **Milestone:** M0 — Foundation
-- **VERIFY:** `cmake --preset win-x64 && cmake --build --preset win-x64-rel && ctest --preset win-x64-rel` — the `12 §2` canonical loop; falsifiable and real (configure + compile + link + **28 passing tests**). Takes ~1 min warm. Per-task probes: `ctest --preset win-x64-rel -R toolchain|constants|rng|oracle`.
-- **NEXT ACTION:** Execute M0-T5 — implement the xs / materials / scenario loaders in `src/core/` per `spec/04-module-core.md` §3–§6 and `spec/03-data-contracts.md` §2–§4, with the full negative-test set (xs v2: reject `sigma_a`, reject `sigma_t` in-file, reject null transfer for non-SIM sets, reject upscatter, reject missing `mu_bar`, reject non-descending bounds, compute `sigma_t` and `sigma_tr`; scenario: `[data]` resolution, `[ui.*]` ranges, override grammar, `mode="td"` rejection, `[source]` rules) and precise file/field/constraint diagnostics; canonical example files must parse verbatim; register as `catch_discover_tests(test_loaders TEST_PREFIX "loaders.")` per `11 §1`; DoD in `07-milestones.md` M0-T5.
+- **VERIFY:** `cmake --preset win-x64 && cmake --build --preset win-x64-rel && ctest --preset win-x64-rel` — the `12 §2` canonical loop; falsifiable and real (configure + compile + link + **39 passing tests**). Takes ~1 min warm. Per-task probes: `ctest --preset win-x64-rel -R toolchain|constants|rng|loaders|oracle` — all five resolve.
+- **NEXT ACTION:** Execute M0-T6 — author `tools/ci/local_ci.ps1` and `tools/ci/local_ci.sh` (configure + build + ctest for the `win-x64` and `linux-x64`/`linux-cuda` presets, non-zero exit on any failure) plus `.github/workflows/ci.yml`, and get Actions green on `main`; the workflow MUST archive `artifacts/gate_reports/` as a build artifact **in addition to** the committed copy (QC-07 — the committed copy is primary); also author `.env.example` documenting `OPTIX_SDK_ROOT` with commented `S3_*`/`RUNPOD_*` stubs (`12 §5`, assigned to this task on 2026-08-02); DoD in `07-milestones.md` M0-T6.
 
 ## Ready-queue (runnable now)
 
-1. **M0-T5** (recommended — NEXT ACTION) — loaders; the last thing blocking M0-T6 and all of M1
-2. *(M0-T6 needs M0-T5; M0-T1…T4 and M0-T3-a/-b are done)*
+1. **M0-T6** (recommended — NEXT ACTION) — local CI + GitHub Actions green on `main`; **closes M0**
+2. *(M1-T1 and M1-T4a become runnable once M0-T6 lands; M1-T4a technically depends only on M0-T5 and is runnable NOW in a parallel session)*
 
 **Repository:** <https://github.com/bochen2029-pixel/nuclear-sim> — public, MIT (ADR-011). Remote exists, so the full claim protocol (`README §5.3`: branch + PROGRESS edit + pushed `claim:` commit) applies from M0-T2 onward and parallel sessions are now safe.
 
@@ -40,12 +40,12 @@
 | M0-T3-a | **done** | session-2026-08-02-b | 2026-08-02 | M0-T2 | 96 strict entries ↔ 96 appendix rows, bijective; `[[band]]` added (ADR-015); Φ_kt recomputed = 1.4508041e23; 26 validator guards; 15/15 ctest |
 | M0-T3-b | **done** | session-2026-08-02-b | 2026-08-02 | M0-T3-a | all 6 `11 §5` sections; 9/9 tally invariants pass on the canonical example (I3 7.5e-8 independently reproduces the QC session's figure); Tier-1 endpoints exact, mass conservation 1.5e-16; §2 layer masses correctly PENDING(M2-T1); found the C-042/C-043 blanket-"~5%" wording defect |
 | M0-T4 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T2 | 3 published Random123 vectors reproduce (also at compile time); project-local vector emitted by an INDEPENDENT Python Philox, not self-recorded; fork + (ctr,sub) resume KATs; 10 tests |
-| M0-T5 | todo | — | — | M0-T2, M0-T3-a | loaders incl. xs v2 semantics + negative tests (needs the constants pipeline, not the oracle) |
+| M0-T5 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T2, M0-T3-a | xs v2 / materials / scenario loaders; positive tests parse the SPEC'S OWN examples extracted from `03` at run time; one negative test per violation class; 11 tests |
 | M0-T6 | todo | — | — | M0-T5 | local CI + Actions workflow → Actions green on main (owner repo step resolved 2026-08-03) |
-| M1-T1 | todo | — | — | M0-T5 | geometry + analytic tracker |
+| M1-T1 | todo (RUNNABLE) | — | — | M0-T5 | geometry + analytic tracker |
 | M1-T2 | todo | — | — | M1-T1 | ref transport (implicit capture); k_inf + leakage tests |
 | M1-T3 | todo | — | — | M1-T2 | eigen (8³ mesh entropy, dual σ, Λ estimator) |
-| M1-T4a | todo | — | — | M0-T5 | OPEN-literature benchmark models; one ADR per benchmark; xs dataset |
+| M1-T4a | todo (RUNNABLE) | — | — | M0-T5 | OPEN-literature benchmark models; one ADR per benchmark; xs dataset |
 | M1-T4b | blocked | owner | — | owner ICSBEP access | OPTIONAL, owner-gated; autonomous sessions MUST NOT claim |
 | M1-T5 | todo | — | — | M1-T3, M1-T4a | nukebench + gen_gates → gates.toml |
 | M2-T1 | todo | — | — | M1-T4a | materials + trinity_canonical.toml |

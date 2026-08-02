@@ -511,6 +511,37 @@ inline double get(std::string_view id) {
     throw std::runtime_error("unknown constant id: " + std::string(id));
 }
 
+// Molar mass by species name (appendix §3). Throws for an unknown species:
+// a missing molar mass silently corrupts every macroscopic cross section,
+// so it must never fall back to a default.
+inline double molar_mass(std::string_view species) {
+    if (species == "Pu239") return molar_mass_pu239;
+    if (species == "Pu240") return molar_mass_pu240;
+    if (species == "U235") return molar_mass_u235;
+    if (species == "U238") return molar_mass_u238;
+    if (species == "U234") return molar_mass_u234;
+    if (species == "Ga") return crosscheck::molar_mass_ga_natural;
+    if (species == "Ga69") return molar_mass_ga69;
+    if (species == "Ga71") return molar_mass_ga71;
+    if (species == "Pu241") return molar_mass_pu241;
+    if (species == "B10") return molar_mass_b10;
+    if (species == "B11") return molar_mass_b11;
+    if (species == "C12") return molar_mass_c12;
+    if (species == "H1") return molar_mass_h1;
+    if (species == "O16") return molar_mass_o16;
+    if (species == "N14") return molar_mass_n14;
+    if (species == "Al27") return molar_mass_al27;
+    if (species == "Be9") return molar_mass_be9;
+    if (species == "Po210") return molar_mass_po210;
+    if (species == "W") return molar_mass_w_natural;
+    throw std::runtime_error("no molar mass for species: " + std::string(species) + " (appendix §3 completeness rule)");
+}
+
+/// True if the species has a molar mass, without throwing.
+inline bool has_molar_mass(std::string_view species) {
+    return species == "Pu239" || species == "Pu240" || species == "U235" || species == "U238" || species == "U234" || species == "Ga" || species == "Ga69" || species == "Ga71" || species == "Pu241" || species == "B10" || species == "B11" || species == "C12" || species == "H1" || species == "O16" || species == "N14" || species == "Al27" || species == "Be9" || species == "Po210" || species == "W";
+}
+
 inline double get_lo(std::string_view id) {
     if (id == "C-010") return sigma_f_pu239_fast_lo;
     if (id == "C-021b") return nu_bar_u238_total_lo;

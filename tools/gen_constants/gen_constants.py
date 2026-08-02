@@ -307,6 +307,34 @@ def _emit_lookup(doc: dict, out: list[str]) -> None:
         "",
     ]
 
+    # Species -> molar mass (04 §5 number densities). The appendix §3
+    # completeness rule makes a missing species a HARD error: without a molar
+    # mass the number density is silently wrong, and so is every macroscopic
+    # cross section derived from it (04 §5).
+    species = [c for c in constants if "species" in c and c["status"] != "PENDING"]
+    out += [
+        "// Molar mass by species name (appendix §3). Throws for an unknown species:",
+        "// a missing molar mass silently corrupts every macroscopic cross section,",
+        "// so it must never fall back to a default.",
+        "inline double molar_mass(std::string_view species) {",
+    ]
+    for entry in species:
+        qualified = (
+            f"crosscheck::{entry['name']}" if entry.get("use") == "crosscheck" else entry["name"]
+        )
+        out.append(f'    if (species == "{entry["species"]}") return {qualified};')
+    out += [
+        '    throw std::runtime_error("no molar mass for species: " + std::string(species)'
+        ' + " (appendix §3 completeness rule)");',
+        "}",
+        "",
+        "/// True if the species has a molar mass, without throwing.",
+        "inline bool has_molar_mass(std::string_view species) {",
+        "    return " + " || ".join(f'species == "{e["species"]}"' for e in species) + ";",
+        "}",
+        "",
+    ]
+
     for suffix in ("lo", "hi"):
         out.append(f"inline double get_{suffix}(std::string_view id) {{")
         for entry in banded:

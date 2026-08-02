@@ -87,11 +87,10 @@ name = "trinity_canonical"
 seed = 12345                    # required; effective seed recorded in run.json
 mode = "alpha"                  # alpha | eigen_only | fixed_source   ("td" is a v1 VALIDATION ERROR: stretch scope, ADR-003)
 
-[data]                          # required: which datasets to load
-xs_set        = "fast4"         # resolves to data/xs/fast4.json; its "name" MUST equal xs_set
-materials_dir = "data/materials"
-
-layers = [                      # center outward; first layer inner radius = 0
+layers = [                      # TOP-LEVEL (M0-T5): in TOML a bare key after a table header
+                                # joins that table, so this array must precede [data] or it
+                                # silently becomes data.layers. Center outward; first layer
+                                # inner radius = 0
   { id = "initiator", r_outer_cm = 1.00,   material = "be_po_urchin", status = "DECLASSIFIED" },
   { id = "pit",       r_outer_cm = 4.585,  material = "pu_ga_delta",  status = "DECLASSIFIED" },
   { id = "tamper",    r_outer_cm = 11.43,  material = "u_natural",    status = "RECONSTRUCTED" },
@@ -100,6 +99,10 @@ layers = [                      # center outward; first layer inner radius = 0
 ]
 # Layers up to and INCLUDING pusher (r_outer = 23.495 cm) are the M2 canonical assembly.
 # HE/lens layers are added at M6 (Stage 3).
+
+[data]                          # required: which datasets to load
+xs_set        = "fast4"         # resolves to data/xs/fast4.json; its "name" MUST equal xs_set
+materials_dir = "data/materials"
 
 [time]
 t_zero = "he_initiation"        # normative: t=0 is outermost-HE initiation; initiator.t_fire_s is
@@ -175,7 +178,7 @@ display_scale = 1.0e9
 status = "DECLASSIFIED"
 ```
 
-Validation rules: layers strictly increasing radii; every `material` resolves under `[data].materials_dir`; `xs_set` resolves and names match; every value within its `[ui.*].range` for gate runs; `seed` required; `mode = "td"` rejected in v1; unknown keys hard-error; `layers.<id>.field` selects **by `id`** (override grammar: `layers.<id>.field`, `materials.<name>.<field>`, `xs.<iso>.<field>`, `section.key`; positional `layers[<int>]` accepted but not recommended).
+Validation rules: `layers` is TOP-LEVEL and the loader rejects it under `[data]` with a diagnostic (M0-T5 — the array previously sat below the `[data]` header, which TOML reparents); layers strictly increasing radii; every `material` resolves under `[data].materials_dir`; `xs_set` resolves and names match; every value within its `[ui.*].range` for gate runs; `seed` required; `mode = "td"` rejected in v1; unknown keys hard-error; `layers.<id>.field` selects **by `id`** (override grammar: `layers.<id>.field`, `materials.<name>.<field>`, `xs.<iso>.<field>`, `section.key`; positional `layers[<int>]` accepted but not recommended).
 
 ## 5. `tally.json` — run output (schema v1)
 

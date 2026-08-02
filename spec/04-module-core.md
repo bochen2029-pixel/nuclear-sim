@@ -40,7 +40,9 @@ uint64_t fork(uint64_t parent_stream, uint64_t parent_ctr, uint32_t progeny_ordi
 ```cpp
 struct GroupData { double nu, chi, sigma_f, sigma_c, sigma_s, sigma_n2n, mu_bar; };
 using Transfer = std::array<std::array<double,4>,4>;   // [from][to], probability, rows sum to 1
-struct IsotopeXS { std::string name; std::vector<GroupData> g; Transfer transfer; };
+struct IsotopeXS { std::string name; std::vector<GroupData> g; Transfer transfer;
+                   double beta;              // REQUIRED per isotope (ADR-013) — 03 §2
+                   std::string cite, status; };  // every value carries cite/status — 03 §2
 class FewGroupXS {
 public:
   static FewGroupXS load(const std::filesystem::path& json);   // 03 §2 semantics enforced

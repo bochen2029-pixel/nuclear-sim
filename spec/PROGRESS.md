@@ -46,7 +46,8 @@
 | M1-T1 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T5 | LayerStack + AnalyticSphereTracker + in-tree SHA-256 + `canonical_hash()` (carried per SYNC-M1); 16 tests incl. the nudge-direction pair and the `04 §6` stability matrix |
 | M1-T2 | **done** | session-2026-08-02-b | 2026-08-02 | M1-T1 | E1a–E1e implicit capture; leakage = exp(−Σ_c·R) at 3 depths + a 16-seed bias check; k_inf within 3σ on 3 media; 7 tests |
 | M1-T3 | **done** | session-2026-08-02-b | 2026-08-02 | M1-T2 | power iteration + 8³ entropy + dual σ + Λ; **measured that C-901's h_tol=1e-3 is correlation-limited, not batch-limited** — M1-T5 must re-measure at C-900 before G0a; 9 tests |
-| M1-T4a | todo (RUNNABLE) | — | — | M0-T5 | OPEN-literature benchmark models; one ADR per benchmark; xs dataset |
+| M1-T4a-1 | **in_progress** | session-2026-08-02-b | 2026-08-02 | M0-T5 | SPLIT from M1-T4a (§8): OPEN-literature benchmark MODELS (geometry/composition/k_eff), materials, scenarios, one ADR per benchmark |
+| M1-T4a-2 | todo | — | — | M1-T4a-1 | SPLIT from M1-T4a (§8): the cited isotope-complete 4-group `fast4` dataset + provenance data card (D4 carve-out). **~450 cited values across the 16 species of `08 §1`; needs ENDF via a documented collapse or a published multigroup library — MUST NOT be invented** |
 | M1-T4b | blocked | owner | — | owner ICSBEP access | OPTIONAL, owner-gated; autonomous sessions MUST NOT claim |
 | M1-T5 | todo | — | — | M1-T3, M1-T4a | nukebench + gen_gates → gates.toml |
 | M2-T1 | todo | — | — | M1-T4a | materials + trinity_canonical.toml |

@@ -1,0 +1,1088 @@
+# Strict machine-readable sibling of appendix/constants.md (03 §1, authored M0-T3-a).
+#
+# THIS FILE IS AUTHORED BY HAND; data/constants.toml and the C++ headers are
+# GENERATED from it by tools/gen_constants. Never edit the generated outputs.
+#
+# Every entry carries `appendix_text` — the Value cell of the corresponding
+# appendix row, verbatim after markdown normalisation. tools/verify/
+# constants_roundtrip asserts the bijection both ways and compares that text
+# exactly, so an appendix edit that is not propagated here fails ctest instead
+# of silently drifting. Ranges and prose stay in the appendix (03 §1).
+#
+# Three array types (ADR-015):
+#   [[constant]]  scalar, with optional lo/hi band around a meaningful nominal
+#   [[band]]      lo/hi with NO nominal — gate bands have no physical centre
+#   [[registry]]  named multi-value entries (tuples, stream tables)
+
+schema_version = 1
+
+# ===========================================================================
+# 1. Physics constants (appendix §1)
+# ===========================================================================
+
+[[constant]]
+id = "C-010"
+name = "sigma_f_pu239_fast"
+value = 1.8
+lo = 1.7
+hi = 1.8
+unit = "barns"
+status = "PUBLIC"
+use = "compute"
+cite = "ENDF, Primer"
+appendix_text = "1.8 (1.7–1.8)"
+
+[[constant]]
+id = "C-011"
+name = "sigma_f_u235_fast"
+value = 1.2
+unit = "barns"
+status = "PUBLIC"
+use = "compute"
+cite = "ENDF"
+appendix_text = "1.2"
+
+[[constant]]
+id = "C-012"
+name = "sigma_f_u238_fast"
+value = 0.5
+unit = "barns"
+status = "PUBLIC"
+use = "compute"
+cite = "ENDF"
+appendix_text = "0.5"
+
+[[constant]]
+id = "C-013"
+name = "sigma_f_pu239_thermal"
+value = 750.0
+unit = "barns"
+status = "PUBLIC"
+use = "crosscheck"
+cite = "ENDF"
+appendix_text = "750"
+
+[[constant]]
+id = "C-020"
+name = "nu_bar_pu239_total"
+value = 2.9
+unit = "n/fission"
+status = "PUBLIC"
+use = "compute"
+cite = "NWFAQ-8"
+note = "TOTAL nu-bar (prompt + delayed) — ADR-013. k_prompt is derived downstream, never here."
+appendix_text = "2.9"
+
+[[constant]]
+id = "C-021"
+name = "nu_bar_u235_total"
+value = 2.4
+unit = "n/fission"
+status = "PUBLIC"
+use = "compute"
+cite = "NWFAQ-8"
+note = "TOTAL nu-bar — ADR-013."
+appendix_text = "2.4"
+
+[[constant]]
+id = "C-021b"
+name = "nu_bar_u238_total"
+value = 2.8
+lo = 2.5
+hi = 2.9
+unit = "n/fission"
+status = "PUBLIC"
+use = "compute"
+cite = "ENDF"
+note = "TOTAL nu-bar — ADR-013."
+appendix_text = "2.8 (2.5–2.9)"
+
+[[constant]]
+id = "C-022"
+name = "beta_pu239"
+value = 0.0020
+unit = "-"
+status = "PUBLIC"
+use = "compute"
+cite = "keepin, ENDF"
+appendix_text = "0.0020"
+
+[[constant]]
+id = "C-022b"
+name = "beta_u235"
+value = 0.0065
+unit = "-"
+status = "PUBLIC"
+use = "compute"
+cite = "keepin, ENDF"
+appendix_text = "0.0065"
+
+[[constant]]
+id = "C-022c"
+name = "beta_u238"
+value = 0.0148
+unit = "-"
+status = "PUBLIC"
+use = "compute"
+cite = "keepin, ENDF"
+appendix_text = "0.0148"
+
+[[constant]]
+id = "C-022d"
+name = "beta_pu240"
+value = 0.0026
+unit = "-"
+status = "PUBLIC"
+use = "compute"
+cite = "keepin, ENDF"
+appendix_text = "0.0026"
+
+[[constant]]
+id = "C-022e"
+name = "beta_pu241"
+value = 0.0049
+unit = "-"
+status = "PUBLIC"
+use = "compute"
+cite = "keepin, ENDF"
+appendix_text = "0.0049"
+
+[[constant]]
+id = "C-030"
+name = "generation_time_uncompressed"
+value = 10.0
+unit = "ns"
+status = "DECLASSIFIED"
+use = "compute"
+cite = "Primer, NWFAQ"
+appendix_text = "10"
+
+[[constant]]
+id = "C-031"
+name = "neutron_speed_1mev"
+value = 1.4e9
+unit = "cm/s"
+status = "PUBLIC"
+use = "compute"
+cite = "Primer"
+appendix_text = "1.4e9"
+
+[[constant]]
+id = "C-032"
+name = "fission_mfp_pu_normal_density"
+value = 12.7
+unit = "cm"
+status = "DECLASSIFIED"
+use = "compute"
+cite = "Primer"
+appendix_text = "12.7 (13 class)"
+
+[[constant]]
+id = "C-033"
+name = "scattering_mfp"
+value = 2.5
+unit = "cm"
+status = "DECLASSIFIED"
+use = "crosscheck"
+cite = "Primer"
+appendix_text = "2.5"
+
+[[constant]]
+id = "C-040"
+name = "e_f_prompt_deposited"
+value = 180.0
+unit = "MeV"
+status = "PUBLIC"
+use = "compute"
+cite = "Primer"
+appendix_text = "180"
+
+[[constant]]
+id = "C-041"
+name = "phi_kt_fissions_per_kiloton"
+derived = "C-918 / (C-040 * C-917)"
+value = 1.4508e23
+unit = "1/kt"
+status = "PUBLIC"
+use = "compute"
+cite = "derived"
+note = "The ONLY constant converting fissions to yield (E6). Generator recomputes it; the appendix value is the rounded print of that computation."
+appendix_text = "derived = C-918/(C-040·C-917) = 1.4508e23"
+
+[[constant]]
+id = "C-042"
+name = "kt_per_kg_pu239_sherbeck"
+value = 18.29
+unit = "kt/kg"
+status = "PUBLIC"
+use = "crosscheck"
+cite = "NP-1771"
+note = "Sher & Beck total-energy basis (~190 MeV) — ~5% above the C-040 prompt-deposited basis. MUST NOT enter tallies or gates (MAJ-11)."
+appendix_text = "18.29"
+
+[[constant]]
+id = "C-043"
+name = "kt_per_kg_u235_sherbeck"
+value = 17.74
+unit = "kt/kg"
+status = "PUBLIC"
+use = "crosscheck"
+cite = "NP-1771"
+note = "Same basis caveat as C-042."
+appendix_text = "17.74"
+
+[[constant]]
+id = "C-050"
+name = "critical_mass_bare_pu239_alpha"
+value = 10.0
+unit = "kg"
+status = "DECLASSIFIED"
+use = "crosscheck"
+cite = "Wellerstein-2015"
+note = "At rho = 19.8 g/cm3. Critical mass scales as rho^-2 (MAJ-29)."
+appendix_text = "10"
+
+[[constant]]
+id = "C-050b"
+name = "critical_mass_bare_pu_delta"
+value = 16.5
+lo = 16.0
+hi = 17.0
+unit = "kg"
+status = "PUBLIC"
+use = "crosscheck"
+cite = "Jezebel PMF-001"
+note = "At rho = 15.6 g/cm3. Nominal is the band midpoint; the appendix states a range, not a nominal."
+appendix_text = "16–17"
+
+[[constant]]
+id = "C-051"
+name = "urchin_initiator_output"
+value = 1.5e8
+lo = 1.0e8
+hi = 2.0e8
+unit = "n/s"
+status = "DECLASSIFIED"
+use = "compute"
+cite = "NWFAQ-8.1.1"
+note = "Nominal is the band midpoint; the appendix states a range (~1 n per 5–10 ns)."
+appendix_text = "1.0e8–2.0e8 (≈1 n per 5–10 ns)"
+
+[[constant]]
+id = "C-052"
+name = "pit_criticality_fraction_uncompressed_tamped"
+value = 0.78
+lo = 0.68
+hi = 0.88
+unit = "fraction of M_c"
+status = "DECLASSIFIED"
+use = "compute"
+cite = "NWFAQ-8.1.1"
+note = "Fraction of critical MASS, not of k."
+appendix_text = "0.78 (0.68–0.88)"
+
+[[constant]]
+id = "C-053"
+name = "critical_masses_at_2x_compression"
+value = 3.12
+lo = 2.6
+hi = 4.4
+unit = "-"
+status = "DECLASSIFIED"
+use = "compute"
+cite = "NWFAQ-2 prose (\"3–4\"), reconciled via ρ⁻² scaling from C-052"
+note = "DERIVED from C-052, not independent (QC-12)."
+appendix_text = "3.12 nominal (2.6–4.4)"
+
+[[constant]]
+id = "C-060"
+name = "compression_ratio"
+value = 2.2
+lo = 2.0
+hi = 2.5
+unit = "ratio"
+status = "DECLASSIFIED"
+use = "compute"
+cite = "Wellerstein-2015, NWFAQ"
+appendix_text = "2.2 (2.0–2.5)"
+
+[[constant]]
+id = "C-061"
+name = "comp_b_detonation_velocity"
+value = 7.9
+unit = "km/s"
+status = "PUBLIC"
+use = "compute"
+cite = "NWFAQ-8.1.1"
+appendix_text = "7.9"
+
+[[constant]]
+id = "C-062"
+name = "baratol_detonation_velocity"
+value = 4.9
+unit = "km/s"
+status = "PUBLIC"
+use = "compute"
+cite = "NWFAQ-8.1.1"
+appendix_text = "4.9"
+
+[[constant]]
+id = "C-070"
+name = "guderley_alpha_spherical_gamma_5_3"
+value = 0.688377
+unit = "-"
+status = "PUBLIC"
+use = "compute"
+cite = "Guderley-1942, Lazarus-1981"
+note = "Spherical, gamma = 5/3 — consistent with E4's EOS choice."
+appendix_text = "0.688377"
+
+[[constant]]
+id = "C-071"
+name = "x_unit_detonation_simultaneity"
+value = 10.0
+unit = "ns"
+status = "DECLASSIFIED"
+use = "compute"
+cite = "NWFAQ-8.1.1"
+note = "Appendix states it as ±10 ns; the constant is the half-width."
+appendix_text = "±10"
+
+[[constant]]
+id = "C-072"
+name = "he_assembly_symmetry_tolerance"
+value = 5.0
+unit = "%"
+status = "DECLASSIFIED"
+use = "compute"
+cite = "NWFAQ-8.1.1"
+appendix_text = "5"
+
+[[constant]]
+id = "C-090"
+name = "trinity_pu_burnup"
+value = 0.16
+lo = 0.15
+hi = 0.17
+unit = "fraction of core"
+status = "PUBLIC"
+use = "crosscheck"
+cite = "Wellerstein-2013"
+appendix_text = "0.16 (0.15–0.17)"
+
+[[constant]]
+id = "C-091"
+name = "trinity_yield_radiochemistry_1945"
+value = 18.6
+unit = "kt"
+status = "PUBLIC"
+use = "crosscheck"
+cite = "Selby-2021"
+appendix_text = "18.6"
+
+[[constant]]
+id = "C-092"
+name = "trinity_yield_doe_official"
+value = 21.0
+unit = "kt"
+status = "PUBLIC"
+use = "crosscheck"
+cite = "DOE"
+appendix_text = "21"
+
+[[constant]]
+id = "C-093"
+name = "trinity_yield_selby_2021"
+value = 24.8
+lo = 22.8
+hi = 26.8
+unit = "kt"
+status = "PUBLIC"
+use = "crosscheck"
+cite = "Selby-2021"
+appendix_text = "24.8 ± 2"
+
+[[constant]]
+id = "C-094"
+name = "u238_tamper_yield_share"
+value = 0.20
+lo = 0.10
+hi = 0.30
+unit = "fraction"
+status = "DECLASSIFIED"
+use = "crosscheck"
+cite = "NWFAQ-8.1.1"
+appendix_text = "0.20 (0.10–0.30)"
+
+# ===========================================================================
+# 2. Canonical geometry — outside diameters (appendix §2)
+#
+# `value` is the OD in cm. The appendix mass column holds RANGES ("108–111 kg",
+# "~1.8–1.9 t") and 03 §1 keeps ranges in the appendix, so masses are NOT
+# mirrored here. Layer-mass verification therefore belongs to M2-T1, where
+# data/materials/*.json supplies the densities to recompute them from.
+# ===========================================================================
+
+[[constant]]
+id = "C-100"
+name = "od_urchin_initiator"
+value = 2.0
+unit = "cm"
+status = "DECLASSIFIED"
+use = "compute"
+cite = "NWFAQ-8.1.1"
+appendix_text = "2.0"
+
+[[constant]]
+id = "C-101"
+name = "od_initiator_cavity"
+value = 2.1
+unit = "cm"
+status = "RECONSTRUCTED"
+use = "compute"
+cite = "CM"
+appendix_text = "2.1"
+
+[[constant]]
+id = "C-102"
+name = "od_pu_ga_core"
+value = 9.17
+unit = "cm"
+status = "DECLASSIFIED"
+use = "compute"
+cite = "LA-3067"
+note = "Authoritative pair is OD 9.17 cm + mass 6.15 kg; density is DERIVED (15.23 g/cm3 solid). The mass lives in the appendix note, and the 2.4% over-determination against the quoted delta-phase 15.6 is checked at M2-T1 where the densities exist."
+appendix_text = "9.17"
+
+[[constant]]
+id = "C-103"
+name = "od_natural_u_tamper"
+value = 22.86
+unit = "cm"
+status = "RECONSTRUCTED"
+use = "compute"
+cite = "CM, NWFAQ-8.1.1"
+appendix_text = "22.86"
+
+[[constant]]
+id = "C-104"
+name = "od_b10_acrylic_shell"
+value = 23.50
+unit = "cm"
+status = "DECLASSIFIED"
+use = "compute"
+cite = "NWFAQ-8.1.1"
+appendix_text = "23.50"
+
+[[constant]]
+id = "C-105"
+name = "od_aluminum_pusher"
+value = 46.99
+unit = "cm"
+status = "RECONSTRUCTED"
+use = "compute"
+cite = "CM"
+appendix_text = "46.99"
+
+[[constant]]
+id = "C-106"
+name = "od_inner_he_booster"
+value = 92.075
+unit = "cm"
+status = "RECONSTRUCTED"
+use = "compute"
+cite = "CM"
+appendix_text = "92.075"
+
+[[constant]]
+id = "C-107"
+name = "od_lens_he_layer"
+value = 137.8
+unit = "cm"
+status = "DECLASSIFIED"
+use = "compute"
+cite = "NWFAQ-8.1.1"
+appendix_text = "137.8"
+
+[[constant]]
+id = "C-108"
+name = "od_cork_liner"
+value = 140.3
+unit = "cm"
+status = "RECONSTRUCTED"
+use = "compute"
+cite = "CM"
+appendix_text = "140.3"
+
+[[constant]]
+id = "C-109"
+name = "od_duralumin_case"
+value = 145.4
+unit = "cm"
+status = "RECONSTRUCTED"
+use = "compute"
+cite = "CM"
+appendix_text = "145.4"
+
+# ===========================================================================
+# 3. Molar masses & exact constants (appendix §3)
+# ===========================================================================
+
+[[constant]]
+id = "C-910"
+name = "molar_mass_pu239"
+value = 239.0522
+unit = "g/mol"
+status = "PUBLIC"
+use = "compute"
+cite = "NNDC/AME2020"
+species = "Pu239"
+appendix_text = "239.0522"
+
+[[constant]]
+id = "C-911"
+name = "molar_mass_pu240"
+value = 240.0538
+unit = "g/mol"
+status = "PUBLIC"
+use = "compute"
+cite = "NNDC/AME2020"
+species = "Pu240"
+appendix_text = "240.0538"
+
+[[constant]]
+id = "C-912"
+name = "molar_mass_u235"
+value = 235.0439
+unit = "g/mol"
+status = "PUBLIC"
+use = "compute"
+cite = "NNDC/AME2020"
+species = "U235"
+appendix_text = "235.0439"
+
+[[constant]]
+id = "C-913"
+name = "molar_mass_u238"
+value = 238.0508
+unit = "g/mol"
+status = "PUBLIC"
+use = "compute"
+cite = "NNDC/AME2020"
+species = "U238"
+appendix_text = "238.0508"
+
+[[constant]]
+id = "C-914"
+name = "molar_mass_u234"
+value = 234.0410
+unit = "g/mol"
+status = "PUBLIC"
+use = "compute"
+cite = "NNDC/AME2020"
+species = "U234"
+appendix_text = "234.0410"
+
+[[constant]]
+id = "C-915"
+name = "molar_mass_ga_natural"
+value = 69.723
+unit = "g/mol"
+status = "PUBLIC"
+use = "crosscheck"
+cite = "IUPAC"
+species = "Ga"
+element_averaged = true
+note = "Readout only. 03 §3 forbids natural-abundance expansion, and the canonical pit resolves Ga-69/Ga-71 separately (C-915a/b)."
+appendix_text = "69.723"
+
+[[constant]]
+id = "C-915a"
+name = "molar_mass_ga69"
+value = 68.9256
+unit = "g/mol"
+status = "PUBLIC"
+use = "compute"
+cite = "NNDC/AME2020"
+species = "Ga69"
+appendix_text = "68.9256"
+
+[[constant]]
+id = "C-915b"
+name = "molar_mass_ga71"
+value = 70.9247
+unit = "g/mol"
+status = "PUBLIC"
+use = "compute"
+cite = "NNDC/AME2020"
+species = "Ga71"
+appendix_text = "70.9247"
+
+[[constant]]
+id = "C-916"
+name = "avogadro_constant"
+value = 6.02214076e23
+unit = "1/mol"
+status = "PUBLIC"
+use = "compute"
+cite = "SI (exact)"
+appendix_text = "6.02214076e23"
+
+[[constant]]
+id = "C-917"
+name = "mev_to_joule"
+value = 1.602176634e-13
+unit = "J/MeV"
+status = "PUBLIC"
+use = "compute"
+cite = "SI (exact)"
+appendix_text = "1.602176634e-13"
+
+[[constant]]
+id = "C-918"
+name = "kiloton_tnt_to_joule"
+value = 4.184e12
+unit = "J/kt"
+status = "PUBLIC"
+use = "compute"
+cite = "convention (exact)"
+appendix_text = "4.184e12"
+
+[[constant]]
+id = "C-919"
+name = "molar_mass_pu241"
+value = 241.0568
+unit = "g/mol"
+status = "PUBLIC"
+use = "compute"
+cite = "NNDC/AME2020"
+species = "Pu241"
+appendix_text = "241.0568"
+
+[[constant]]
+id = "C-920"
+name = "molar_mass_b10"
+value = 10.0129
+unit = "g/mol"
+status = "PUBLIC"
+use = "compute"
+cite = "NNDC/AME2020"
+species = "B10"
+appendix_text = "10.0129"
+
+[[constant]]
+id = "C-921"
+name = "molar_mass_b11"
+value = 11.0093
+unit = "g/mol"
+status = "PUBLIC"
+use = "compute"
+cite = "NNDC/AME2020"
+species = "B11"
+appendix_text = "11.0093"
+
+[[constant]]
+id = "C-922"
+name = "molar_mass_c12"
+value = 12.0000
+unit = "g/mol"
+status = "PUBLIC"
+use = "compute"
+cite = "SI (definitional)"
+species = "C12"
+appendix_text = "12.0000"
+
+[[constant]]
+id = "C-923"
+name = "molar_mass_h1"
+value = 1.00783
+unit = "g/mol"
+status = "PUBLIC"
+use = "compute"
+cite = "NNDC/AME2020"
+species = "H1"
+appendix_text = "1.00783"
+
+[[constant]]
+id = "C-924"
+name = "molar_mass_o16"
+value = 15.9949
+unit = "g/mol"
+status = "PUBLIC"
+use = "compute"
+cite = "NNDC/AME2020"
+species = "O16"
+appendix_text = "15.9949"
+
+[[constant]]
+id = "C-925"
+name = "molar_mass_n14"
+value = 14.0031
+unit = "g/mol"
+status = "PUBLIC"
+use = "compute"
+cite = "NNDC/AME2020"
+species = "N14"
+appendix_text = "14.0031"
+
+[[constant]]
+id = "C-926"
+name = "molar_mass_al27"
+value = 26.9815
+unit = "g/mol"
+status = "PUBLIC"
+use = "compute"
+cite = "NNDC/AME2020"
+species = "Al27"
+appendix_text = "26.9815"
+
+[[constant]]
+id = "C-927"
+name = "molar_mass_be9"
+value = 9.01218
+unit = "g/mol"
+status = "PUBLIC"
+use = "compute"
+cite = "NNDC/AME2020"
+species = "Be9"
+appendix_text = "9.01218"
+
+[[constant]]
+id = "C-928"
+name = "molar_mass_po210"
+value = 209.9829
+unit = "g/mol"
+status = "PUBLIC"
+use = "compute"
+cite = "NNDC/AME2020"
+species = "Po210"
+appendix_text = "209.9829"
+
+[[constant]]
+id = "C-929"
+name = "molar_mass_w_natural"
+value = 183.84
+unit = "g/mol"
+status = "PUBLIC"
+use = "compute"
+cite = "IUPAC"
+species = "W"
+element_averaged = true
+note = "Monoisotopic-treatment element per the appendix §3 rule."
+appendix_text = "183.84"
+
+# ===========================================================================
+# 4. Simulation knobs (appendix §4) — SIM, tunable, not physics.
+#
+# The appendix §4 table has no Status/Use/Cite columns; §4's own header
+# declares the whole section SIM, and `cite` records the governing rule.
+# ===========================================================================
+
+[[registry]]
+id = "C-900"
+name = "eigen_gate_config"
+status = "SIM"
+cite = "08 §2 gate procedure (QC-06)"
+note = "Gate-valid eigen configuration. C-900b is never valid for a gate claim."
+appendix_text = "1e6 / 50 / 200"
+[registry.entries]
+batch = 1e6
+inactive = 50
+active = 200
+
+[[registry]]
+id = "C-900b"
+name = "eigen_interactive_config"
+status = "SIM"
+cite = "08 §2 (QC-06)"
+note = "Studio / in-burst refresh. NEVER valid for gate claims."
+appendix_text = "1e5 / 10 / 30 — never valid for gate claims"
+[registry.entries]
+batch = 1e5
+inactive = 10
+active = 30
+
+[[registry]]
+id = "C-900c"
+name = "eigen_cpu_ref_smoke_config"
+status = "SIM"
+cite = "08 §2"
+appendix_text = "1e5 / 10 / 50"
+[registry.entries]
+batch = 1e5
+inactive = 10
+active = 50
+
+[[registry]]
+id = "C-901"
+name = "eigen_tolerances"
+status = "SIM"
+cite = "05 §2"
+appendix_text = "1e-3 / 1e-4"
+[registry.entries]
+entropy_window = 1e-3
+k = 1e-4
+
+[[registry]]
+id = "C-902"
+name = "weight_cutoffs"
+status = "SIM"
+cite = "05 §1"
+appendix_text = "1e-4 / 1e-2"
+[registry.entries]
+w_min = 1e-4
+w_surv = 1e-2
+
+[[constant]]
+id = "C-903"
+name = "alpha_mode_eigen_refresh_interval"
+value = 10
+unit = "generations"
+status = "SIM"
+use = "compute"
+cite = "02 §3 main loop (integer counters only, MAJ-21)"
+appendix_text = "10 generations"
+
+[[constant]]
+id = "C-904"
+name = "population_renormalization_ceiling"
+value = 1e30
+unit = "-"
+status = "SIM"
+use = "compute"
+cite = "01 §4 log-renorm"
+appendix_text = "1e30"
+
+[[constant]]
+id = "C-905"
+name = "render_scales"
+status = "PENDING"
+resolved_by = "M7-T2"
+unit = "-"
+use = "compute"
+cite = "09 §1 temperature calibration"
+note = "render_temp_scale / render_density_scale / render_exposure. Set at M7 against peak emission-weighted T in [7500, 9500] K at burst+1 us."
+appendix_text = "set at M7 per 09 §1 calibration (peak emission-weighted T ∈ [7500, 9500] K at burst+1 µs; cite Selby-2021/Brixner footage)"
+
+[[constant]]
+id = "C-906"
+name = "asymmetry_coefficient_c_a"
+status = "PENDING"
+resolved_by = "M6-T3"
+unit = "-"
+use = "compute"
+cite = "01 §5 (C-071/C-072 rule)"
+note = "DERIVED at M6-T3 as c_a = 0.05*t_rise/10 ns. MUST NOT be fitted to any gate outcome — G3 validates, it does not calibrate."
+appendix_text = "DERIVED at M6-T3: c_a = 0.05·t_rise/10 ns (C-071/C-072 rule, 01 §5) — never gate-fitted"
+
+[[registry]]
+id = "C-907"
+name = "rng_stream_registry"
+status = "SIM"
+cite = "04 §2 Philox stream layout"
+note = "Stream ids are part of the RNG's normative layout — changing one changes every downstream random sequence."
+appendix_text = "source=1, flight=2, collision=3, fission=4, scatter=5, hydro=6, render=7"
+[registry.entries]
+source = 1
+flight = 2
+collision = 3
+fission = 4
+scatter = 5
+hydro = 6
+render = 7
+
+[[registry]]
+id = "C-908"
+name = "eigen_entropy_mesh"
+status = "SIM"
+cite = "01 §E2b (fixed Cartesian mesh; degeneracy on a 1-cell mesh, QC)"
+note = "Fixed 8x8x8 Cartesian mesh over the outermost-layer bounding box."
+appendix_text = "8×8×8 over outermost-layer bbox"
+[registry.entries]
+nx = 8
+ny = 8
+nz = 8
+
+[[constant]]
+id = "C-909"
+name = "quench_epsilon"
+value = 1e-4
+unit = "-"
+status = "SIM"
+use = "compute"
+cite = "01 §6 E6 (F_n < eps*F_peak, BLK-03)"
+appendix_text = "1e-4 (F_n < ε·F_peak, E6)"
+
+[[constant]]
+id = "C-909b"
+name = "eigen_refresh_dr_frac"
+value = 0.005
+unit = "-"
+status = "SIM"
+use = "compute"
+cite = "02 §3 hydro_moved_significantly"
+appendix_text = "0.005"
+
+# ===========================================================================
+# 5. Gate bands (appendix §5) — every gate threshold has an ID + derivation.
+#
+# Bands carry lo/hi and NO nominal (ADR-015): the centre of a gate band is not
+# a physical quantity and must not be computable by accident. `cite` carries
+# the Basis column verbatim.
+# ===========================================================================
+
+[[constant]]
+id = "C-930"
+name = "g0_k_deviation_tolerance"
+value = 500.0
+unit = "pcm"
+status = "SIM"
+use = "compute"
+cite = "gate design choice, SIM; + benchmark_uncertainty (08 §1 rule)"
+appendix_text = "500 pcm"
+
+[[constant]]
+id = "C-931"
+name = "g0_sigma_ceiling"
+value = 25.0
+unit = "pcm"
+status = "SIM"
+use = "compute"
+cite = "gate design choice, SIM (batch sized to reach it, C-900)"
+appendix_text = "25 pcm"
+
+[[constant]]
+id = "C-932"
+name = "g0c_absolute_equivalence_bound"
+value = 100.0
+unit = "pcm"
+status = "SIM"
+use = "compute"
+cite = "SIM"
+appendix_text = "100 pcm"
+
+[[band]]
+id = "C-933"
+name = "g1a_mass_fraction_band"
+lo = 0.68
+hi = 0.88
+unit = "fraction of M_c"
+status = "SIM"
+cite = "C-052 ± 0.10 (prose-source width), SIM"
+appendix_text = "[0.68, 0.88]"
+
+[[band]]
+id = "C-934"
+name = "g1a_derived_k_band"
+lo = 0.84
+hi = 0.96
+unit = "-"
+status = "SIM"
+cite = "one-group image of C-933; derivation recorded in gates.toml notes; SIM"
+appendix_text = "[0.84, 0.96]"
+
+[[band]]
+id = "C-935"
+name = "g1b_critical_masses_at_2rho0"
+lo = 2.6
+hi = 4.4
+unit = "-"
+status = "SIM"
+cite = "C-053 ±40% (prose source), SIM"
+appendix_text = "[2.6, 4.4]"
+
+[[band]]
+id = "C-936"
+name = "g1b_k_at_2x_band"
+lo = 1.35
+hi = 1.85
+unit = "-"
+status = "SIM"
+cite = "one-group image of C-935; SIM"
+appendix_text = "[1.35, 1.85]"
+
+[[band]]
+id = "C-937"
+name = "g1b_k_ratio_band"
+lo = 1.5
+hi = 2.0
+unit = "-"
+status = "SIM"
+cite = "k(2.0)/k(1.0); SIM"
+appendix_text = "[1.5, 2.0]"
+
+[[band]]
+id = "C-940"
+name = "g2_yield_band"
+lo = 16.6
+hi = 26.8
+unit = "kt"
+status = "PUBLIC"
+cite = "envelope of C-091/092/093 incl. Selby ±2"
+note = "Envelope of published estimates, not a model output — hence PUBLIC rather than SIM."
+appendix_text = "[16.6, 26.8] kt"
+
+[[band]]
+id = "C-941"
+name = "g2_pu_burnup_band"
+lo = 0.12
+hi = 0.20
+unit = "fraction"
+status = "SIM"
+cite = "C-090 (0.15–0.17) widened ±3 pp for few-group + Tier-2 error; SIM"
+appendix_text = "[0.12, 0.20]"
+
+[[band]]
+id = "C-942"
+name = "g2_tamper_yield_band"
+lo = 0.10
+hi = 0.30
+unit = "fraction"
+status = "SIM"
+cite = "C-094 ±10 pp; SIM"
+appendix_text = "[0.10, 0.30]"
+
+[[registry]]
+id = "C-943"
+name = "g2_timing_bands"
+status = "SIM"
+cite = "±(2–3)× around ~57 e-foldings at α≈1e8 (research doc §3); SIM"
+note = "Three separate bands; each entry is a [lo, hi] pair."
+appendix_text = "FWHM [5,100] ns; t_fire→peak [100 ns, 1.5 µs]; peak α [2e7, 3e8] s⁻¹"
+[registry.entries]
+fwhm_ns = [5.0, 100.0]
+t_fire_to_peak_s = [1.0e-7, 1.5e-6]
+peak_alpha_per_s = [2.0e7, 3.0e8]
+
+[[registry]]
+id = "C-944"
+name = "g3_degradation_criteria"
+status = "SIM"
+cite = "(b) visible-degradation requirement; (c) published-tolerance claim (C-071/C-072), NOT calibrated; SIM"
+note = "G3 validates the asymmetry model; it never calibrates c_a."
+appendix_text = "median(500ns) ≤ 0.9×median(0); median(10ns) ≥ 0.97×median(0)"
+[registry.entries]
+degraded_500ns_max_ratio = 0.9
+tolerated_10ns_min_ratio = 0.97
+
+[[constant]]
+id = "C-945"
+name = "g4_perf_budgets"
+status = "PENDING"
+resolved_by = "M4-T4"
+unit = "-"
+use = "compute"
+cite = "SIM (dev hardware-derived, ADR-009)"
+note = "The G4 budget list lives in 08 §2; it is measured on the dev GPU at M4-T4, not asserted here."
+appendix_text = "per 08 §2 G4 list"
+
+[[registry]]
+id = "C-946"
+name = "q_validity_thresholds"
+status = "SIM"
+cite = "R-13; SIM"
+note = "Quasi-static validity diagnostic q (01 §4). Above `conditional`, a gate result is CONDITIONAL, not a pass."
+appendix_text = "warn 0.02 / conditional 0.05"
+[registry.entries]
+warn = 0.02
+conditional = 0.05

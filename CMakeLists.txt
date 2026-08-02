@@ -175,6 +175,33 @@ target_link_libraries(nukesim_deps INTERFACE
 enable_testing()
 include(Catch)
 
+# ---------------------------------------------------------------------------
+# Generated constants (M0-T3-a). spec/appendix/constants.data.toml is the single
+# source of truth (01 §8); data/constants.toml and the headers below are its
+# output and are committed so a fresh clone compiles without running Python.
+# The `constants.generated_current` test is what stops them drifting.
+# ---------------------------------------------------------------------------
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+
+set(NUKESIM_CONSTANTS_STRICT ${CMAKE_SOURCE_DIR}/spec/appendix/constants.data.toml)
+set(NUKESIM_GEN_CONSTANTS ${CMAKE_SOURCE_DIR}/tools/gen_constants/gen_constants.py)
+set(NUKESIM_CONSTANTS_GENERATED
+    ${CMAKE_SOURCE_DIR}/data/constants.toml
+    ${CMAKE_SOURCE_DIR}/src/core/constants/constants_generated.h
+    ${CMAKE_SOURCE_DIR}/src/core/constants/constants_generated.cuh)
+
+add_custom_command(
+    OUTPUT ${NUKESIM_CONSTANTS_GENERATED}
+    COMMAND ${Python3_EXECUTABLE} ${NUKESIM_GEN_CONSTANTS}
+    DEPENDS ${NUKESIM_CONSTANTS_STRICT} ${NUKESIM_GEN_CONSTANTS}
+    COMMENT "Regenerating constants from spec/appendix/constants.data.toml"
+    VERBATIM)
+add_custom_target(nukesim_constants DEPENDS ${NUKESIM_CONSTANTS_GENERATED})
+
+add_library(nukesim_core_constants INTERFACE)
+add_dependencies(nukesim_core_constants nukesim_constants)
+target_include_directories(nukesim_core_constants INTERFACE ${CMAKE_SOURCE_DIR}/src)
+
 set(NUKESIM_TOOLCHAIN_TEST_SRC tests/unit/test_toolchain.cpp)
 if(NUKESIM_WITH_CUDA)
     list(APPEND NUKESIM_TOOLCHAIN_TEST_SRC tests/unit/test_toolchain_cuda.cu)
@@ -194,6 +221,22 @@ nukesim_strict(test_toolchain)
 # M0-T3, `-R rng` in M0-T4, `-R loaders` in M0-T5) would match nothing without a
 # stable module prefix. Every future test executable follows this pattern.
 catch_discover_tests(test_toolchain TEST_PREFIX "toolchain.")
+
+add_executable(test_constants tests/unit/test_constants.cpp)
+target_link_libraries(test_constants PRIVATE nukesim_core_constants Catch2::Catch2WithMain)
+nukesim_strict(test_constants)
+catch_discover_tests(test_constants TEST_PREFIX "constants.")
+
+# The two Python checks run under the same `ctest -R constants` probe the spec
+# commits to for M0-T3 — a stale generated header and a spec/code divergence are
+# both constants failures, whatever language notices them.
+add_test(NAME constants.roundtrip_bijection
+         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/verify/constants_roundtrip.py)
+add_test(NAME constants.generated_current
+         COMMAND ${Python3_EXECUTABLE} ${NUKESIM_GEN_CONSTANTS} --check)
+add_test(NAME constants.generator_rejects_missing_provenance
+         COMMAND ${Python3_EXECUTABLE}
+                 ${CMAKE_SOURCE_DIR}/tools/verify/constants_negative.py)
 
 # ---------------------------------------------------------------------------
 message(STATUS "nuclear-sim ${PROJECT_VERSION}")

@@ -6,14 +6,15 @@
 ## Current
 
 - **Milestone:** M0 — Foundation
-- **VERIFY:** `test ! -d .git && echo "pre-M0-T1 state confirmed"` (run from repo root `C:\NUCLEAR`; exits 1 once the repo exists — then replace with the M0-T2 build probe)
-- **NEXT ACTION:** Execute M0-T1 — `git init` in place at `C:\NUCLEAR`, `git remote add origin <public repo>`, create the `spec/02-architecture.md` §2 skeleton with `.gitkeep`, MIT `LICENSE` + `NOTICE.md`, `.gitignore` **verbatim from `02 §2`** (the `artifacts/gate_reports/**` un-ignores are load-bearing — QC-07), `git mv` the research doc to `research/`; DoD in `spec/07-milestones.md` M0-T1. M0-T1 is exempt from the push-a-claim-commit protocol (`README §5.3`) because it is the task that creates the repository.
-- **Owner pre-step (recommended before M0-T1):** create the empty public GitHub repo (ADR-011). Without a remote the §7 claim-race tiebreak is unusable, so run tasks single-session until it exists.
+- **VERIFY:** `git rev-parse --git-dir >/dev/null 2>&1 && git ls-files --error-unmatch LICENSE NOTICE.md spec/README.md >/dev/null && ! git check-ignore -q artifacts/gate_reports/x.json && echo "M0-T1 verified"` — falsifiable: fails if the repo is gone, if the licence/notice/spec are untracked, or if the gate-evidence un-ignore regressed (QC-07).
+- **NEXT ACTION:** Execute M0-T2 — author `CMakeLists.txt`, `CMakePresets.json`, `vcpkg.json` + `vcpkg-configuration.json` (with a pinned `builtin-baseline` SHA) per `spec/12-deployment.md` §1, which is the single source of truth for preset naming, `CMAKE_POLICY_VERSION_MINIMUM=3.5`, `CMAKE_CUDA_ARCHITECTURES=89-real;80-virtual;90-virtual` and first-party-only warning flags (`02 §4`); **port the CMake/preset idioms from `C:\Astrophage`, which already builds C++20 + CUDA 13.1 + sm_89 + MSVC on this machine, rather than re-deriving the CMake-4/vcpkg policy friction**; DoD in `spec/07-milestones.md` M0-T2.
 
 ## Ready-queue (runnable now)
 
-1. **M0-T1** (recommended — NEXT ACTION)
-2. *(nothing else — all other tasks depend on M0-T1/M0-T2)*
+1. **M0-T2** (recommended — NEXT ACTION) — toolchain; unblocks M0-T3/T4/T5 and therefore everything
+2. *(nothing else — M0-T3/T4/T5 all depend on M0-T2)*
+
+**Repository:** <https://github.com/bochen2029-pixel/nuclear-sim> — public, MIT (ADR-011). Remote exists, so the full claim protocol (`README §5.3`: branch + PROGRESS edit + pushed `claim:` commit) applies from M0-T2 onward and parallel sessions are now safe.
 
 ## Gates
 

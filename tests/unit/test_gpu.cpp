@@ -30,6 +30,8 @@
 #include "core/xs/xs.h"
 #include "gpu/device_data.h"
 #include "gpu/gpu_backend.h"
+#include "gpu/transport.h"
+#include "ref/ref_transport.h"
 
 #include "rng_kat.inl"
 #include "spec_examples.h"
@@ -119,6 +121,131 @@ struct ToyWorld {
     }
     ToyWorld(const ToyWorld&) = delete;
     ToyWorld& operator=(const ToyWorld&) = delete;
+};
+
+/// A single-sphere PURE ABSORBER: one U238-capture isotope (σ_f = σ_s = 0,
+/// μ̄ = 0), so Σ_tr = Σ_c and the leaked fraction is exp(−Σ_c·R) — the same DoD
+/// oracle test_ref.cpp uses. Density and σ_c give an optical depth ≈ 2.
+struct PureCaptureWorld {
+    std::filesystem::path root;
+    std::unique_ptr<ns::xs::FewGroupXS> xs;
+    std::unique_ptr<ns::material::MaterialLib> materials;
+    ns::geom::LayerStack stack;
+    double radius_cm = 10.0;
+
+    PureCaptureWorld() {
+        namespace fs = std::filesystem;
+        using nlohmann::json;
+        static int counter = 0;
+        root = fs::temp_directory_path() / ("nukesim_gpu_cap_" + std::to_string(counter++));
+        fs::remove_all(root);
+        fs::create_directories(root / "xs");
+        fs::create_directories(root / "materials");
+
+        const auto four = [](double v) { return json::array({v, v, v, v}); };
+        const json iso = {{"nu", four(0.0)},
+                          {"chi", json::array({1.0, 0.0, 0.0, 0.0})},
+                          {"sigma_f", four(0.0)},
+                          {"sigma_c", four(4.0)},
+                          {"sigma_s", four(0.0)},
+                          {"sigma_n2n", four(0.0)},
+                          {"mu_bar", four(0.0)},
+                          {"beta", 0.0065},
+                          {"transfer", json::array({json::array({1.0, 0.0, 0.0, 0.0}),
+                                                    json::array({0.0, 1.0, 0.0, 0.0}),
+                                                    json::array({0.0, 0.0, 1.0, 0.0}),
+                                                    json::array({0.0, 0.0, 0.0, 1.0})})},
+                          {"cite", "synthetic pure absorber — not physical data"},
+                          {"status", "SIM"}};
+        const json xs_doc = {{"schema_version", 2},
+                             {"name", "cap"},
+                             {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3})},
+                             {"isotopes", {{"U238", iso}}}};
+        spec_examples::write_file(root / "xs" / "cap.json", xs_doc.dump(2));
+
+        // density so n·1e-24·σ_c ≈ 0.2 /cm ⇒ Σ_c·R ≈ 2 at R = 10 cm.
+        const json mat = {{"schema_version", 1},
+                          {"name", "absorber"},
+                          {"density_g_cm3", 19.76},
+                          {"status", "SIM"},
+                          {"cite", "synthetic"},
+                          {"isotopes", {{"U238", 1.0}}}};
+        spec_examples::write_file(root / "materials" / "absorber.json", mat.dump(2));
+
+        xs = std::make_unique<ns::xs::FewGroupXS>(ns::xs::FewGroupXS::load(root / "xs" / "cap.json"));
+        materials = std::make_unique<ns::material::MaterialLib>(
+            ns::material::MaterialLib::load_dir(root / "materials", *xs));
+        stack = ns::geom::LayerStack(
+            {ns::geom::Layer{"medium", radius_cm, 0, "SIM"}});
+    }
+    ~PureCaptureWorld() {
+        std::error_code ec;
+        std::filesystem::remove_all(root, ec);
+    }
+    PureCaptureWorld(const PureCaptureWorld&) = delete;
+    PureCaptureWorld& operator=(const PureCaptureWorld&) = delete;
+};
+
+/// A single fissioning + scattering isotope (one-group, group-preserving) in a
+/// LARGE sphere so leakage is negligible and production per source ≈ k_inf =
+/// νΣ_f/(Σ_c+Σ_f). Exercises the multi-superstep event loop (scatter, roulette).
+struct FissionWorld {
+    std::filesystem::path root;
+    std::unique_ptr<ns::xs::FewGroupXS> xs;
+    std::unique_ptr<ns::material::MaterialLib> materials;
+    ns::geom::LayerStack stack;
+    double radius_cm = 200.0;
+
+    FissionWorld() {
+        namespace fs = std::filesystem;
+        using nlohmann::json;
+        static int counter = 0;
+        root = fs::temp_directory_path() / ("nukesim_gpu_fis_" + std::to_string(counter++));
+        fs::remove_all(root);
+        fs::create_directories(root / "xs");
+        fs::create_directories(root / "materials");
+
+        const auto four = [](double v) { return json::array({v, v, v, v}); };
+        const json iso = {{"nu", four(2.9)},
+                          {"chi", json::array({1.0, 0.0, 0.0, 0.0})},
+                          {"sigma_f", four(1.0)},
+                          {"sigma_c", four(0.5)},
+                          {"sigma_s", four(3.0)},
+                          {"sigma_n2n", four(0.0)},
+                          {"mu_bar", four(0.0)},  // Σ_tr = Σ_t, so k_inf is exact one-group
+                          {"beta", 0.0020},
+                          // group-preserving: every scatter stays in group 0.
+                          {"transfer", json::array({json::array({1.0, 0.0, 0.0, 0.0}),
+                                                    json::array({0.0, 1.0, 0.0, 0.0}),
+                                                    json::array({0.0, 0.0, 1.0, 0.0}),
+                                                    json::array({0.0, 0.0, 0.0, 1.0})})},
+                          {"cite", "synthetic fissioning medium — not physical data"},
+                          {"status", "SIM"}};
+        const json xs_doc = {{"schema_version", 2},
+                             {"name", "fis"},
+                             {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3})},
+                             {"isotopes", {{"Pu239", iso}}}};
+        spec_examples::write_file(root / "xs" / "fis.json", xs_doc.dump(2));
+
+        const json mat = {{"schema_version", 1},
+                          {"name", "fuel"},
+                          {"density_g_cm3", 15.0},
+                          {"status", "SIM"},
+                          {"cite", "synthetic"},
+                          {"isotopes", {{"Pu239", 1.0}}}};
+        spec_examples::write_file(root / "materials" / "fuel.json", mat.dump(2));
+
+        xs = std::make_unique<ns::xs::FewGroupXS>(ns::xs::FewGroupXS::load(root / "xs" / "fis.json"));
+        materials = std::make_unique<ns::material::MaterialLib>(
+            ns::material::MaterialLib::load_dir(root / "materials", *xs));
+        stack = ns::geom::LayerStack({ns::geom::Layer{"medium", radius_cm, 0, "SIM"}});
+    }
+    ~FissionWorld() {
+        std::error_code ec;
+        std::filesystem::remove_all(root, ec);
+    }
+    FissionWorld(const FissionWorld&) = delete;
+    FissionWorld& operator=(const FissionWorld&) = delete;
 };
 
 }  // namespace
@@ -315,4 +442,119 @@ TEST_CASE("device macro cross sections match the CPU mix() (float vs double pari
                          Catch::Matchers::WithinRel(mat.macro.nu_sigma_f[gi], 1e-4));
         }
     }
+}
+
+TEST_CASE("gpu fixed-source pure-capturer leakage matches ref (T-diff, G0c)", "[gpu]") {
+    // M4-T2-b: the event-based GPU transport vs the CPU oracle. Both estimate the
+    // pure-absorber leaked fraction exp(−Σ_c·R); G0c asks they agree within
+    // 3·√(σ_ref² + σ_gpu²) — statistical, because the backends draw different
+    // (double vs float) uniform sequences. This is the first differential check.
+    const PureCaptureWorld w;
+    const std::int64_t histories = 500000;
+    const std::uint64_t seed = 20260802;
+
+    // ref/ (double).
+    ns::ref::RefTransport ref(w.stack, *w.materials, *w.xs, seed);
+    ns::ref::TallyAcc tally;
+    ns::ref::SourceSpec spec;
+    spec.kind = ns::ref::SourceSpec::Kind::PointIsotropic;
+    spec.histories = histories;
+    ref.run_fixed_source(spec, tally);
+    const double leak_ref = tally.leaked_fraction();
+    const double sig_ref = tally.leaked_fraction_sigma();
+
+    // gpu (float).
+    ns::gpu::FixedSourceResult g;
+    REQUIRE(ns::gpu::gpu_fixed_source(w.stack, *w.materials, seed, histories,
+                                      {1.0f, 0.0f, 0.0f, 0.0f}, 256, 128, g));
+
+    const double optical_depth = w.materials->all().front().macro.sigma_c[0] * w.radius_cm;
+    const double analytic = std::exp(-optical_depth);
+    INFO("gpu=" << g.leaked_fraction << " ref=" << leak_ref << " analytic=" << analytic
+                << " Σc·R=" << optical_depth << " supersteps=" << g.supersteps);
+
+    // The GPU result sits on the analytic value...
+    REQUIRE_THAT(g.leaked_fraction, Catch::Matchers::WithinAbs(analytic, 0.005));
+    // ...and agrees with ref within G0c's statistical bound.
+    const double bound = 3.0 * std::sqrt(sig_ref * sig_ref + g.leaked_sigma * g.leaked_sigma);
+    REQUIRE(std::abs(g.leaked_fraction - leak_ref) <= bound);
+
+    // No fission ⇒ zero production; a pure capturer leaks or dies in ≤ 2 events
+    // (a leaker crosses the surface then leaks; an absorber collides and dies).
+    REQUIRE(g.k_estimate == 0.0);
+    REQUIRE(g.fission_bank_size == 0);  // no fission ⇒ nothing to bank
+    REQUIRE(g.supersteps >= 1);
+    REQUIRE(g.supersteps <= 2);
+}
+
+TEST_CASE("gpu fixed-source with scattering + fission matches ref (T-diff, G0c)", "[gpu]") {
+    // M4-T2-b: the full event loop — scatter, roulette, weight-weighted fission
+    // production — on a fissioning medium in a large sphere. production/source ≈
+    // k_inf = νΣ_f/(Σ_c+Σ_f). The GPU (float) and ref (double) must agree
+    // statistically (G0c) on both production/source and leakage.
+    const FissionWorld w;
+    const std::int64_t histories = 200000;
+    const std::uint64_t seed = 20260802;
+
+    ns::ref::RefTransport ref(w.stack, *w.materials, *w.xs, seed);
+    ns::ref::TallyAcc tally;
+    ns::ref::SourceSpec spec;
+    spec.kind = ns::ref::SourceSpec::Kind::PointIsotropic;
+    spec.histories = histories;
+    ref.run_fixed_source(spec, tally);
+    const double k_ref = tally.k_estimate();
+    const double k_sig_ref = tally.k_sigma();
+    const double leak_ref = tally.leaked_fraction();
+    const double leak_sig_ref = tally.leaked_fraction_sigma();
+
+    ns::gpu::FixedSourceResult g;
+    REQUIRE(ns::gpu::gpu_fixed_source(w.stack, *w.materials, seed, histories,
+                                      {1.0f, 0.0f, 0.0f, 0.0f}, 256, 128, g));
+
+    const auto& macro = w.materials->all().front().macro;
+    const double k_inf = macro.nu_sigma_f[0] / (macro.sigma_c[0] + macro.sigma_f[0]);
+    INFO("gpu k=" << g.k_estimate << " ref k=" << k_ref << " k_inf=" << k_inf
+                  << " gpu leak=" << g.leaked_fraction << " ref leak=" << leak_ref
+                  << " supersteps=" << g.supersteps);
+
+    // production/source ≈ k_inf (a few % headroom for the tiny finite-sphere leak).
+    REQUIRE_THAT(g.k_estimate, Catch::Matchers::WithinRel(k_inf, 0.03));
+    // G0c: GPU vs ref, production and leakage, both statistical.
+    const double k_bound = 3.0 * std::sqrt(k_sig_ref * k_sig_ref + g.k_sigma * g.k_sigma);
+    REQUIRE(std::abs(g.k_estimate - k_ref) <= k_bound);
+    const double leak_bound =
+        3.0 * std::sqrt(leak_sig_ref * leak_sig_ref + g.leaked_sigma * g.leaked_sigma);
+    REQUIRE(std::abs(g.leaked_fraction - leak_ref) <= leak_bound);
+    // Genuinely multi-superstep (many scatters before roulette death).
+    REQUIRE(g.supersteps > 5);
+
+    // Deterministic fission bank: E[⌊production + ξ⌋] = production, so the bank
+    // size ≈ total production = k·N.
+    REQUIRE(g.fission_bank_size > 0);
+    const double expected_bank = g.k_estimate * static_cast<double>(histories);
+    REQUIRE_THAT(static_cast<double>(g.fission_bank_size),
+                 Catch::Matchers::WithinRel(expected_bank, 0.02));
+}
+
+TEST_CASE("gpu fixed-source is bit-identical across launch configs", "[gpu]") {
+    // Same-backend determinism (01 §9 / BLK-11): tallies AND the fission bank
+    // depend only on the per-particle index-keyed streams and the prefix-sum
+    // slotting, never the launch geometry. Uses the fissioning medium so the bank
+    // is non-trivial and the multi-superstep loop is exercised.
+    const FissionWorld w;
+    const std::int64_t histories = 50000;
+    const std::uint64_t seed = 7;
+
+    ns::gpu::FixedSourceResult a;
+    ns::gpu::FixedSourceResult b;
+    REQUIRE(ns::gpu::gpu_fixed_source(w.stack, *w.materials, seed, histories,
+                                      {1.0f, 0.0f, 0.0f, 0.0f}, 64, 128, a));
+    REQUIRE(ns::gpu::gpu_fixed_source(w.stack, *w.materials, seed, histories,
+                                      {1.0f, 0.0f, 0.0f, 0.0f}, 512, 256, b));
+    REQUIRE(a.leaked_fraction == b.leaked_fraction);  // bit-identical tallies
+    REQUIRE(a.leaked_sigma == b.leaked_sigma);
+    REQUIRE(a.k_estimate == b.k_estimate);
+    REQUIRE(a.fission_bank_size == b.fission_bank_size);          // deterministic slots
+    REQUIRE(a.fission_bank_checksum == b.fission_bank_checksum);  // + fork streams
+    REQUIRE(a.fission_bank_size > 0);
 }

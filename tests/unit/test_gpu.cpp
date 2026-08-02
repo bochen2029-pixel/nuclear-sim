@@ -29,6 +29,7 @@
 #include "core/rng/rng.h"
 #include "core/xs/xs.h"
 #include "gpu/device_data.h"
+#include "gpu/eigen.h"
 #include "gpu/gpu_backend.h"
 #include "gpu/transport.h"
 #include "ref/ref_transport.h"
@@ -534,6 +535,32 @@ TEST_CASE("gpu fixed-source with scattering + fission matches ref (T-diff, G0c)"
     const double expected_bank = g.k_estimate * static_cast<double>(histories);
     REQUIRE_THAT(static_cast<double>(g.fission_bank_size),
                  Catch::Matchers::WithinRel(expected_bank, 0.02));
+}
+
+TEST_CASE("gpu eigen power iteration is deterministic and gives a sane k", "[gpu]") {
+    // M4-T3: the fission-source iteration on the GPU. A finite Pu sphere (leakage
+    // matters, so k_eff < k_inf). The result must be bit-identical across launch
+    // configs (streams by fork, progeny at prefix-sum slots), and k in a sane
+    // range. The differential vs ref/'s eigen is the next check.
+    const FissionWorld w;  // reuse the fissioning material (index 0)
+    const ns::geom::LayerStack sphere({ns::geom::Layer{"core", 12.0, 0, "SIM"}});
+    const std::uint64_t seed = 20260802;
+
+    ns::gpu::EigenResultGpu a;
+    ns::gpu::EigenResultGpu b;
+    REQUIRE(ns::gpu::gpu_eigen(sphere, *w.materials, seed, 3000, 20, 40, 64, 128, a));
+    REQUIRE(ns::gpu::gpu_eigen(sphere, *w.materials, seed, 3000, 20, 40, 256, 256, b));
+    INFO("k=" << a.k << " +/- " << a.k_sigma << " H=" << a.entropy_final);
+
+    // Deterministic across launch geometries.
+    REQUIRE(a.k == b.k);
+    REQUIRE(a.source_checksum == b.source_checksum);
+    REQUIRE(a.entropy_final == b.entropy_final);
+
+    // Sane eigenvalue and a converged, non-degenerate source.
+    REQUIRE(a.k > 0.5);
+    REQUIRE(a.k < 3.0);
+    REQUIRE(a.entropy_final > 0.0);
 }
 
 TEST_CASE("gpu fixed-source is bit-identical across launch configs", "[gpu]") {

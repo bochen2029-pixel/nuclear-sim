@@ -1,0 +1,23 @@
+# Normalise to LF in the repository. spec/04-module-core.md §6 specifies LF for
+# canonical_hash() normalisation, and the hash-stability test asserts CRLF↔LF
+# invariance — keeping the repo LF-only removes an entire class of drift.
+* text=auto eol=lf
+
+*.md      text eol=lf
+*.toml    text eol=lf
+*.json    text eol=lf
+*.cmake   text eol=lf
+*.h       text eol=lf
+*.cuh     text eol=lf
+*.cpp     text eol=lf
+*.cu      text eol=lf
+*.py      text eol=lf
+*.sh      text eol=lf
+*.ps1     text eol=crlf
+
+*.png     binary
+*.jpg     binary
+*.exr     binary
+*.f16     binary
+*.bin     binary
+*.db      binary

@@ -1,0 +1,49 @@
+# SESSIONS — Append-Only Session Log
+
+> Every session appends ONE entry at END (README.md §5.9). Append-only — never edit history.
+> Keep entries compact; they are the first thing the next session reads after PROGRESS.md.
+
+## Entry format
+
+```
+### YYYY-MM-DD — <session-id> — <task IDs>
+- **Did:** concrete bullets (files created/changed, decisions applied).
+- **Evidence:** exact commands run + key output lines (gate exits, test counts, timings).
+- **State:** green / red (build+tests), branch, commit hashes.
+- **Blockers:** what stopped progress, if anything.
+- **Notes for next session:** gotchas, context that isn't obvious from the spec.
+```
+
+## Bootstrap prompt
+
+The canonical bootstrap prompt lives at `README.md` §9 (single source — do not duplicate the text here; MIN-12). Paste THAT into a fresh session.
+
+---
+
+### 2026-08-02 — session-2026-08-02-a — SPEC AUTHORING (no task ID)
+- **Did:** Authored the complete spec system under `C:\NUCLEAR\spec\`: README (router + session protocol), 00 overview/scope, 01 physics (E1–E8), 02 architecture (D1–D9), 03 data contracts (all schemas), 04 core modules, 05 transport/kinetics/hydro, 06 frontends, 07 milestones M0–M7 with task IDs + gates G0–G4, 08 validation (Godiva/Jezebel + gate procedures), 09 rendering, 10 UI, 11 testing, 12 deployment, 13 risks, PROGRESS/SESSIONS/DECISIONS/CHANGELOG, appendix/constants. Source: `compass_artifact_wf-c65239f6-5229-5cf8-862c-4480219688c2_text_markdown.md` + prior brainstorm decisions (C++/CUDA/OptiX; full 4-stage scope; all three frontends + cloud sweeps incl. MCTS).
+- **Evidence:** n/a (documentation only; no build exists).
+- **State:** green (docs only). No git repo yet — M0-T1 creates it.
+- **Blockers:** none.
+- **Notes for next session:** Implementation has NOT started. Begin at PROGRESS.md NEXT ACTION (M0-T1). `08-validation.md` contains `[VERIFY]` placeholders that M1-T4 must replace with exact ICSBEP sheet values — do not treat them as final. The research doc should be copied (not moved) into `research/` by M0-T1.
+
+### 2026-08-02 — session-2026-08-02-a (cont.) — PRIOR UPDATE / SPEC AMENDMENT (no task ID)
+- **Did:** User reported this machine has a full C/C++/CUDA toolchain + RTX 4070 Ti SUPER and sibling CUDA projects. Verified directly: CUDA 13.1 (V13.1.80), RTX 4070 Ti SUPER (sm_89, 16,376 MiB, driver 610.47, RT cores), MSVC 14.44, CMake 4.3.3, Python 3.13.2, OptiX SDK 9.1.0 (`C:\ProgramData\NVIDIA Corporation\OptiX SDK 9.1.0`), vcpkg at `C:\vcpkg`. Sibling projects inspected: `C:\Buddhabrot_CUDA` (CLAUDE.md + DESIGN_SPEC pattern), `C:\backrooms` (PROGRESS.md + vcpkg manifest presets — the "contracts-and-gates" process the user referenced; our spec system is congruent), `C:\Booster_Lander_Simulator` (DECISIONS.md/RUN_STATE/HANDOFF files — same multi-session pattern as our PROGRESS/SESSIONS/DECISIONS). Amended spec per its own amendment protocol: toolchain pins (`12-deployment.md`), GPU-first policy + D1/D2 notes (`02-architecture.md`), M4 retimed to run in parallel with M2/M3 (`07-milestones.md`), G4 perf targets re-based to 4070 Ti SUPER (`08-validation.md`), sm targets (`05-module-transport.md`), environment notes (`PROGRESS.md`), ADR-009 (`DECISIONS.md`), CHANGELOG entry.
+- **Evidence:** `nvcc --version` → 13.1.80; `nvidia-smi` → RTX 4070 Ti SUPER, 16376 MiB, 8.9, 610.47; OptiX SDK 9.1.0 dir listing; `/c/vcpkg/vcpkg.exe` exists; `cmake --version` → 4.3.3; `python --version` → 3.13.2.
+- **State:** green (docs only; still no repo — M0-T1 creates it).
+- **Blockers:** none.
+- **Notes for next session:** Default to `--backend gpu` everywhere; CPU `ref/` is oracle-only. OptiX 9.1 is present locally (M6 unblocked on that axis). When writing CMake presets in M0-T2, set `VCPKG_ROOT=C:\vcpkg` and follow backrooms' vcpkg-manifest preset idiom. Don't re-verify the toolchain — it's recorded in PROGRESS.md; only re-check if a build error suggests drift.
+
+### 2026-08-02 — session-2026-08-02-a (cont.) — REVIEW TRIAGE (spec v0.2, no task ID)
+- **Did:** Triaged ALL THREE external reviews (see ADR-012 for the full adjudication): `spec/reviews/REVIEW_2026-08-02.md` (BLK/MAJ), `spec/reviews/bak/REVIEW_2026-08-02.md` (A/B/C/D), `spec/reviews/bak/REVIEW_2026-08-02_other-agent_0129.md` (lettered). Read via `C:\chunker` (worked cleanly; `.chunks/` dirs are regenerable tool artifacts, gitignored). Applied the consolidated amendment: **full rewrites** of 01-physics, 02-architecture, 03-data-contracts, 04-module-core, 05-module-transport, 06-frontends, 07-milestones, 08-validation, appendix/constants, 10-ui, 11-testing, 13-risks, spec/README, PROGRESS; **targeted edits** to 00-overview, 09-rendering, 12-deployment, DECISIONS, CHANGELOG, SESSIONS, root README. Physics fixes that change the model: E1c full implicit capture; E3a source term + ν̄_eff + k_prompt wording; Λ from eigen (E3b, ∝1/ρ); energy-conserving E4; E5 defined; Tier-1 formula fixed (was r→0); Tier-2 derived t_c + γ=5/3 label; E6 quench now ε·F_peak (was peak-power termination, ~2× yield error); quench split reported. Gate redesign: all thresholds carry constant IDs (C-930–C-946) + derivations; normative seed sets; G1a mass-fraction gate; G1b 4-criterion; G2 envelope band [16.6,26.8]kt + consistency + timing + σ + max_q; G3 decoupled from c_a calibration; G4 per-device + gen/s + eigen-call cap; G5 parity first-class; CONDITIONAL fallback for G0a/b. Process: repo root = C:\NUCLEAR (no spec copy); ready-queue + depends_on; claim tiebreak; WIP journals; impact-analysis rule; falsifiable VERIFY; checkpoint v2 (identity+CRC+native precision+eigen state); canonical_hash normative; deterministic GPU design (prefix-sum slots, parent-derived streams, fixed-point reductions). Scope: interactive-vs-automated distinction + axis_class mechanical enforcement; rendering physical-honesty rule. Owner decisions applied: public GitHub + MIT (ADR-011); ICSBEP owner-gated (M1-T4b), open-literature default (M1-T4a).
+- **Evidence:** reviews verified by spot-recomputation before acceptance (TOML parse error, tally 10× arithmetic, Guderley γ=5/3 value, pit r/M/ρ over-determination 6.30 vs 6.15 kg, Fuchs–Nordheim post-peak energy split, fmod-on-float scheduling, entropy degeneracy on 1-cell mesh). Adjudications documented in ADR-012 items 1–9. Reviewer preserve-lists honored (see ADR-012 consequences).
+- **State:** green (docs only; still no repo — M0-T1 creates it IN PLACE now).
+- **Blockers:** M0-T6-b needs owner to create the public GitHub repo; M1-T4b optional owner ICSBEP decision.
+- **Notes for next session:** Spec is now v0.2 — do not read the pre-triage state from memory; the files changed substantially. M0-T1 is the NEXT ACTION per PROGRESS.md. Note M0-T1 no longer copies spec/ anywhere (single-tree rule). `.gitignore` must include `*.chunks/`. If any review finding appears unaddressed, check ADR-012's adjudication list first, then the target file; if genuinely missed, that's a defect — amend per protocol.
+
+### 2026-08-03 — session-2026-08-03-a — QC PASS on the v0.2 triage (no task ID; amendment)
+- **Did:** Independent QC of the ADR-012 triage against the three review reports and against arithmetic. Found and fixed 16 items. Blocking-class: **QC-01** ν̄ labelled PROMPT in `01 §1`/C-020 while `01 §4` applied a (1−β) correction on top — double-counting worth ~650 pcm on Godiva, larger than G0a's whole tolerance (→ ADR-013: ν̄ is TOTAL, `beta` REQUIRED per isotope, k_prompt derived once downstream); **QC-02** G2 criterion 4 used the `use=crosscheck` kt/kg constant inside a gate, which `11 §4`'s own static check greps for (restated via Φ_kt/C-910/C-916); **QC-03** molar masses existed for 6 of the 16 species `08 §1` requires, and C-915 was *natural* Ga while `03 §3` forbids natural-abundance expansion and the canonical pit uses Ga-69/Ga-71 separately — so number density was uncomputable for the canonical material (added C-915a/b, C-919–C-929 + a completeness rule with a hard-error check). Major: **QC-04** the replacement tally example failed 2 of its own 8 invariants (I3 5.5e-4, I4 1.25e-3, against 1e-6); **QC-05** invariant 4 was structurally unsatisfiable at 1e-6 with any Pu-240 fissions (3.6e-5 error from using M_Pu239 for all Pu); **QC-06** G2's eigen configuration was unspecified — a ~60× cost swing; **QC-07** all of `artifacts/` was gitignored, so every gate-evidence path in PROGRESS.md pointed at an unreadable file. Plus QC-08…QC-16 (wip dir, Σ_a→Σ_c + Σ_f=0, invariant 9, band-coupling notes, closed-risk section, Godiva budget annotation, claim-protocol bootstrap exemption, verification oracle).
+- **Evidence:** all nine `03 §5` invariants re-derived in Python at printed precision on the new example — I2 0.0, I3 7.5e-8, I4 2.6e-7, I5 0.0, I6 0.0, I9 exact. Materials example independently confirmed self-consistent (atom fractions 1.000000, Ga 1.0008 wt%, Pu-240 1.00 at%, ρ 15.23 × V(4.585) = 6.149 kg). Φ_kt = 1.4508041e23. Transfer-matrix rows all 1.000000, no upscatter.
+- **State:** green (docs only). Spec **v0.3**. No repo yet — M0-T1 creates it.
+- **Blockers:** none new. Owner pre-step recommended: create the empty public repo before M0-T1.
+- **Notes for next session:** **Review is closed at v0.3** (README §10) — further spec change comes from implementation contact, not review. Two things to steal rather than write: `C:\Astrophage\scripts\canon.py` + `docs/VERIFICATION.md` (the generated first-principles oracle; it caught a 47× integrator error there, and it is the mechanism that would have caught BLK-01/03/04 here) and Astrophage's CMake/preset setup, which already builds C++20 + CUDA 13.1 + sm_89 + MSVC on this exact machine. Both are wired into M0-T2/M0-T3 DoDs. Astrophage's determinism trio (id-keyed streams, 64-bit fixed-point accumulation, stable sort) is the same design `05 §6` now mandates — it is proven in production at `m5-green`, so port it rather than re-deriving.

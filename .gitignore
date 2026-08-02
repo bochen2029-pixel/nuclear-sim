@@ -1,0 +1,44 @@
+# === Normative block — verbatim from spec/02-architecture.md §2 (QC-07) ===
+# Run bundles are large and disposable. Gate reports and the perf trend are NOT:
+# spec/README.md §4 makes gates the root of trust across sessions, and PROGRESS.md's
+# gate table records report paths. If they are untracked, every gate claim points at a
+# file the next session cannot open. CI artifact archives are not a substitute — they expire.
+
+build/
+artifacts/**
+!artifacts/gate_reports/
+!artifacts/gate_reports/**
+!artifacts/perf_history.jsonl
+artifacts/perf_history_*.jsonl
+*.chunks/
+.env
+
+# === Non-normative hygiene (local toolchain / editor / OS noise) ===
+# Permitted by spec/02-architecture.md §2; additions here are typo/clarification class.
+
+out/
+cmake-build-*/
+CMakeUserPresets.json
+vcpkg_installed/
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.sln.docstates
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Large binary outputs (object storage per spec/12-deployment.md §4)
+*.f16
+*.exr
+frames/
+sweep.db
+sweep.db-journal

@@ -5,15 +5,15 @@
 
 ## Current
 
-- **Milestone:** M1 — CPU reference transport + bare-sphere benchmarks (M0 complete; SYNC-M1 run; M1-T1 done)
-- **VERIFY:** `cmake --preset win-x64 && cmake --build --preset win-x64-rel && ctest --preset win-x64-rel` — the `12 §2` canonical loop; falsifiable and real (configure + compile + link + **75 passing tests**). Takes ~1 min warm. Per-task probes are **anchored** (`11 §1`): `ctest --preset win-x64-rel -R "^<module>\."` for module ∈ {toolchain, constants, oracle, rng, loaders, geometry, ref} — all seven resolve and are disjoint.
-- **NEXT ACTION:** Execute M1-T4a-2 — author the cited, isotope-complete 4-group `fast4` dataset at `data/xs/fast4.json` covering all 16 species `08 §1` enumerates, plus its provenance data card in `data/benchmarks/` (weighting spectrum, collapse method, transport correction — the one-time D4 carve-out). **This is ~450 physical values and they MUST NOT be invented.** Acceptable sources: a published multigroup library, or ENDF/B processed through a documented collapse; every value carries `cite` + `status`, and `03 §2` requires `beta` per isotope and `mu_bar` per group. **If cited data cannot be obtained, mark M1-T4a-2 `blocked`, record why in SESSIONS.md, and switch to M4-T1 — do NOT fill the file with plausible numbers.** Fabricated cross sections would make G0a/G0b compare the code against invented values, which is the one failure this project's whole provenance discipline exists to prevent. Autonomous sessions MUST NOT seek ICSBEP Handbook access (BLK-14, owner-gated M1-T4b).
+- **Milestone:** M1 — CPU reference transport + bare-sphere benchmarks (M0 complete; M1-T1..T3 + T4a-1 done). **M4 started in parallel (ADR-009); SYNC-M4 run — see the SYNC checklist below.**
+- **VERIFY:** `cmake --preset win-x64 && cmake --build --preset win-x64-rel && ctest --preset win-x64-rel` — the `12 §2` canonical loop; falsifiable and real (configure + compile + link + **75 passing tests** on a CPU-only build; **more when the CUDA backend is present**, see below). Takes ~1 min warm. Per-task probes are **anchored** (`11 §1`): `ctest --preset win-x64-rel -R "^<module>\."` for module ∈ {toolchain, constants, oracle, rng, loaders, geometry, ref, eigen, benchmarks} — all resolve and are disjoint. `^gpu\.` is added by M4-T1 and only registers when `NUKESIM_WITH_CUDA` is ON (auto-detected from nvcc; OFF on the CPU-only CI runners, which stay at 75).
+- **NEXT ACTION:** Execute **M4-T1** — author the CUDA backend foundation under `src/gpu/`: SoA persistent particle buffers (pos / dir(θ,φ) / group / weight / stream-state), the **device Philox** (reuse `core/rng` — the SAME bijection as `ref/`, never a copy), and the three deterministic primitives of `05 §6` — progeny **slots** via exclusive prefix-sum with no atomic cursor; **streams** via `rng::fork` from parent identity; **reductions** in fixed-point int64 with no floating-point atomicAdd. DoD (`07`): device KATs match CPU including `fork(42,1000,3) = 12597386599640143736`, and **same-backend bit-identity across thread counts**. CUDA-guarded so the CPU-only CI stays green. See `spec/05-module-transport.md §6`, `spec/04-module-core.md §2`, `spec/01-physics.md §9`; DoD in `07-milestones.md`. **Why not the prior NEXT ACTION (M1-T4a-2):** it needs ~450 cited xs values from a published multigroup library or ENDF-via-documented-collapse; no such data or tooling is present (no NJOY/ENDF locally; BLK-14 forbids ICSBEP), so M1-T4a-2 is now `blocked` pending owner-provided data and M4-T1 is the ADR-009 fallback that "should already have started".
 
 ## Ready-queue (runnable now)
 
-1. **M1-T4a-2** (recommended — NEXT ACTION) — the cited `fast4` dataset; blocks M1-T5/G0a and all of M2. **Read the NEXT ACTION line above before starting: this task can legitimately end in `blocked`.**
-2. **M4-T1** — GPU buffers + device Philox; fully unblocked, **ADR-009 says it SHOULD already have started**, and it is the right pick if M1-T4a-2 stalls
-3. *(M1-T5 and M2-T1 both need M1-T4a-2)*
+1. **M4-T1** (recommended — NEXT ACTION; **claimed in_progress by session-2026-08-02-c**) — GPU SoA buffers + device Philox + deterministic slots/streams/reductions; fully unblocked, **ADR-009 says it SHOULD already have started**.
+2. **M4-T2** — event kernels + deterministic fission bank; runnable once M4-T1 lands (parallel with M2/M3, ADR-009).
+3. *(M1-T4a-2 is now `blocked` pending owner-provided cited xs data — see Blockers; M1-T5 and M2-T1 both depend on it.)*
 
 **Repository:** <https://github.com/bochen2029-pixel/nuclear-sim> — public, MIT (ADR-011). Remote exists, so the full claim protocol (`README §5.3`: branch + PROGRESS edit + pushed `claim:` commit) applies from M0-T2 onward and parallel sessions are now safe.
 
@@ -47,7 +47,7 @@
 | M1-T2 | **done** | session-2026-08-02-b | 2026-08-02 | M1-T1 | E1a–E1e implicit capture; leakage = exp(−Σ_c·R) at 3 depths + a 16-seed bias check; k_inf within 3σ on 3 media; 7 tests |
 | M1-T3 | **done** | session-2026-08-02-b | 2026-08-02 | M1-T2 | power iteration + 8³ entropy + dual σ + Λ; **measured that C-901's h_tol=1e-3 is correlation-limited, not batch-limited** — M1-T5 must re-measure at C-900 before G0a; 9 tests |
 | M1-T4a-1 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T5 | Godiva + Jezebel from JEFF Report 16 / CSEWG F5+F1 (open); atom densities primary, all derived values cross-check the spec's old placeholders; ADR-016/017; `08 §1` placeholders replaced; 5 tests |
-| M1-T4a-2 | todo | — | — | M1-T4a-1 | SPLIT from M1-T4a (§8): the cited isotope-complete 4-group `fast4` dataset + provenance data card (D4 carve-out). **~450 cited values across the 16 species of `08 §1`; needs ENDF via a documented collapse or a published multigroup library — MUST NOT be invented** |
+| M1-T4a-2 | **blocked** | owner | 2026-08-02 | M1-T4a-1 | **BLOCKED (session-2026-08-02-c): needs owner-provided cited data.** Isotope-complete 4-group `fast4` dataset — ~450 physical values needing a published multigroup library or ENDF via a documented collapse (D4 carve-out); no NJOY/ENDF tooling or data present locally, BLK-14 forbids ICSBEP. Unblock = owner supplies a citable multigroup library **or** authorises/installs an ENDF+collapse pipeline. MUST NOT be invented. |
 | M1-T4b | blocked | owner | — | owner ICSBEP access | OPTIONAL, owner-gated; autonomous sessions MUST NOT claim |
 | M1-T5 | todo | — | — | M1-T3, M1-T4a | nukebench + gen_gates → gates.toml |
 | M2-T1 | todo | — | — | M1-T4a | materials + trinity_canonical.toml |
@@ -57,7 +57,7 @@
 | M3-T2 | todo | — | — | M2-T2 | Tier-2 hydro (derived t_c, conserving E4) |
 | M3-T3 | todo | — | — | M3-T1, M3-T2 | coupling + tallies + tally_invariants |
 | M3-T4 | todo | — | — | M3-T3 | initiator timing |
-| M4-T1 | todo | — | — | M1-T1 | gpu buffers + device Philox + deterministic slots/streams/reductions (start early, ADR-009) |
+| M4-T1 | in_progress | session-2026-08-02-c | 2026-08-02 | M1-T1 | gpu buffers + device Philox + deterministic slots/streams/reductions (start early, ADR-009) |
 | M4-T2 | todo | — | — | M4-T1 | event kernels (parallel with M2/M3, ADR-009) |
 | M4-T3 | todo | — | — | M1-T3, M4-T2 | gpu eigen + G0c harness |
 | M4-T4 | todo | — | — | M4-T3 | perf pass + G4 |
@@ -78,6 +78,8 @@
 
 **SYNC-M1 — run 2026-08-02 by session-2026-08-02-b, before claiming M1-T1.** Compared every implemented module against `04`; `05` has no implementation yet. Three findings: (1) `04 §3` named `MatXS mix(const Material&, const FewGroupXS&)` and it did not exist — the logic was inline in `MaterialLib::load_file`; **fixed**, extracted and declared in `core/material` (the dependency runs opposite to `04 §3`'s placement). (2) `04 §5`'s `Material::fracs` was `vector<pair<const IsotopeXS*, double>>`, which cannot carry a species that has a molar mass but no cross sections in the set — appendix §3 requires the mass per species regardless; **spec amended** to the implemented `Constituent` form. (3) `canonical_hash()` (`04 §6`) remains unimplemented — its test is grouped with geometry in `04 §7`, so **M1-T1 carries it**. Scenario paths vs `03 §4` and constants vs the appendix were already covered by `ctest -R loaders` and `constants.roundtrip_bijection` respectively; both green.
 
+**SYNC-M4 — run 2026-08-02 by session-2026-08-02-c, before claiming M4-T1.** M4 enters `src/gpu/` (empty but for `optix/.gitkeep`). Audited vs `04`/`05`/`03`: (1) **`04 §2` device RNG** — `core/rng/{philox,rng}.h` are `constexpr` and the philox header already anticipates the device port ("the same source compiles for device code unchanged … the GPU port (M4-T1) substitutes `__umulhi`"). Making them device-compilable is M4-T1's job. Resolution: a behaviour-preserving `NUKESIM_HD` macro (`__host__ __device__` under `__CUDACC__`, empty on a host compiler) via new `src/core/hd.h`; frozen KAT values and the host build are unchanged (test_rng re-verifies). **Not a spec amendment** — it is the implementation of the port `04 §2`/`05 §6` already specify. (2) **`05 §6` GPU design** — M4-T1 declares **no** `GpuTransport` interface: declaring an unimplemented method is exactly what SYNC-M1 caught for `mix()`. M4-T1 ships only the foundation primitives (SoA buffers, device Philox, slots/streams/reductions); the `RefTransport`-shaped `GpuTransport` arrives at M4-T3. (3) **Scenario paths / constants** — N/A for a buffers task; the C-907 stream registry is already generated, and the fixed-point reduction scale is a documented numerical detail (like the Philox multipliers, deliberately not a physical constant — philox.h). No divergence found; no amendment needed.
+
 
 Before claiming the first task of a new milestone: run the SYNC audit (`07-milestones.md` §SYNC) — APIs vs `04`/`05`, paths vs `03 §4`, constants vs appendix; log results in SESSIONS.md.
 
@@ -90,4 +92,5 @@ Before claiming the first task of a new milestone: run the SYNC audit (`07-miles
 ## Blockers
 
 - ~~**M0-T6-b:** owner creates the public GitHub repo (ADR-011).~~ **RESOLVED 2026-08-03** — repo live at <https://github.com/bochen2029-pixel/nuclear-sim> (public, MIT). M0-T6 collapses to a single task: local CI + Actions workflow, then Actions green on main.
+- **M1-T4a-2 (blocks M1-T5/G0a + all of M2) — NEW 2026-08-02:** needs owner-provided cited cross-section data — a published 4-group / multigroup fast library, or an ENDF + documented-collapse pipeline (NJOY-class), neither present locally. BLK-14 forbids an autonomous session seeking ICSBEP access. **Owner action to unblock:** supply a citable multigroup library, or authorise/install an ENDF processing pipeline. Assessed by session-2026-08-02-c: no local NJOY/ENDF/ACE tooling; the benchmark scenarios already reference `xs_set = "fast4"`, which does not yet exist, so G0a/G0b cannot run until this lands.
 - **M1-T4b (optional):** owner ICSBEP access decision. Not required — M1-T4a (open literature) is the default path.

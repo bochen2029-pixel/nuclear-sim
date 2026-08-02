@@ -29,8 +29,10 @@
 #include "core/rng/rng.h"
 #include "core/xs/xs.h"
 #include "gpu/device_data.h"
+#include "gpu/eigen.h"
 #include "gpu/gpu_backend.h"
 #include "gpu/transport.h"
+#include "physics/eigen/eigen.h"
 #include "ref/ref_transport.h"
 
 #include "rng_kat.inl"
@@ -534,6 +536,64 @@ TEST_CASE("gpu fixed-source with scattering + fission matches ref (T-diff, G0c)"
     const double expected_bank = g.k_estimate * static_cast<double>(histories);
     REQUIRE_THAT(static_cast<double>(g.fission_bank_size),
                  Catch::Matchers::WithinRel(expected_bank, 0.02));
+}
+
+TEST_CASE("gpu eigen power iteration is deterministic and gives a sane k", "[gpu]") {
+    // M4-T3: the fission-source iteration on the GPU. A finite Pu sphere (leakage
+    // matters, so k_eff < k_inf). The result must be bit-identical across launch
+    // configs (streams by fork, progeny at prefix-sum slots), and k in a sane
+    // range. The differential vs ref/'s eigen is the next check.
+    const FissionWorld w;  // reuse the fissioning material (index 0)
+    const ns::geom::LayerStack sphere({ns::geom::Layer{"core", 12.0, 0, "SIM"}});
+    const std::uint64_t seed = 20260802;
+
+    ns::gpu::EigenResultGpu a;
+    ns::gpu::EigenResultGpu b;
+    REQUIRE(ns::gpu::gpu_eigen(sphere, *w.materials, seed, 3000, 20, 40, 64, 128, a));
+    REQUIRE(ns::gpu::gpu_eigen(sphere, *w.materials, seed, 3000, 20, 40, 256, 256, b));
+    INFO("k=" << a.k << " +/- " << a.k_sigma << " H=" << a.entropy_final);
+
+    // Deterministic across launch geometries.
+    REQUIRE(a.k == b.k);
+    REQUIRE(a.source_checksum == b.source_checksum);
+    REQUIRE(a.entropy_final == b.entropy_final);
+
+    // Sane eigenvalue and a converged, non-degenerate source.
+    REQUIRE(a.k > 0.5);
+    REQUIRE(a.k < 3.0);
+    REQUIRE(a.entropy_final > 0.0);
+}
+
+TEST_CASE("gpu eigen k matches ref eigen (differential, G0c-style)", "[gpu]") {
+    // M4-T3: GPU power iteration k vs ref/'s eigen solver on the same finite Pu
+    // sphere. Both estimate k_eff; the GPU (float, reservoir fission sites) and
+    // ref (double, full source) agree within a toy-batch tolerance. The FORMAL
+    // G0c gate (≤100 pcm at C-900 batch via `nukebench diff`) awaits M1-T5.
+    const FissionWorld w;
+    const ns::geom::LayerStack sphere({ns::geom::Layer{"core", 12.0, 0, "SIM"}});
+    const std::uint64_t seed = 20260802;
+    const std::int64_t batch = 4000;
+    const int inactive = 30;
+    const int active = 60;
+
+    ns::ref::RefTransport reft(sphere, *w.materials, *w.xs, seed);
+    ns::physics::EigenSpec spec;
+    spec.batch = batch;
+    spec.inactive = inactive;
+    spec.active = active;
+    spec.seed = seed;
+    spec.h_tol = 1.0;  // loose: run the full active set, don't gate on entropy here
+    const ns::physics::EigenResult er = ns::physics::run_eigen(reft, spec);
+
+    ns::gpu::EigenResultGpu g;
+    REQUIRE(ns::gpu::gpu_eigen(sphere, *w.materials, seed, batch, inactive, active, 256, 128, g));
+
+    INFO("gpu k=" << g.k << " +/- " << g.k_sigma << "   ref k=" << er.k << " +/- "
+                  << er.sigma_pcm * 1e-5);
+    REQUIRE(er.k > 0.5);
+    // Statistical equivalence, with a toy-batch tolerance (successive-cycle
+    // correlation inflates the true σ beyond the naive estimate).
+    REQUIRE_THAT(g.k, Catch::Matchers::WithinRel(er.k, 0.03));
 }
 
 TEST_CASE("gpu fixed-source is bit-identical across launch configs", "[gpu]") {

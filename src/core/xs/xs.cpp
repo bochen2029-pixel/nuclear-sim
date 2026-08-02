@@ -67,16 +67,16 @@ void load_transfer(const json& iso, const std::filesystem::path& path, const std
     }
 
     const json& matrix = iso.at("transfer");
-    require(matrix.is_array() && matrix.size() == kGroups, path, field,
+    require(matrix.is_array() && matrix.size() == kGroupsN, path, field,
             "must be a " + std::to_string(kGroups) + "x" + std::to_string(kGroups) + " matrix");
 
-    for (std::size_t from = 0; from < kGroups; ++from) {
+    for (std::size_t from = 0; from < kGroupsN; ++from) {
         const std::string row_field = field + "[" + std::to_string(from) + "]";
-        require(matrix[from].is_array() && matrix[from].size() == kGroups, path, row_field,
+        require(matrix[from].is_array() && matrix[from].size() == kGroupsN, path, row_field,
                 "each row must have " + std::to_string(kGroups) + " entries");
 
         double sum = 0.0;
-        for (std::size_t to = 0; to < kGroups; ++to) {
+        for (std::size_t to = 0; to < kGroupsN; ++to) {
             require(matrix[from][to].is_number(), path,
                     row_field + "[" + std::to_string(to) + "]", "must be a number");
             const double p = matrix[from][to].get<double>();
@@ -138,16 +138,16 @@ IsotopeXS load_isotope(const json& iso, const std::filesystem::path& path, const
     require(out.beta >= 0.0 && out.beta < 0.05, path, prefix + ".beta",
             "delayed-neutron fraction must lie in [0, 0.05); got " + std::to_string(out.beta));
 
-    const auto nu = require_array(iso, path, "nu", prefix + ".nu", kGroups);
-    const auto chi = require_array(iso, path, "chi", prefix + ".chi", kGroups);
-    const auto sigma_f = require_array(iso, path, "sigma_f", prefix + ".sigma_f", kGroups);
-    const auto sigma_c = require_array(iso, path, "sigma_c", prefix + ".sigma_c", kGroups);
-    const auto sigma_s = require_array(iso, path, "sigma_s", prefix + ".sigma_s", kGroups);
-    const auto mu_bar = require_array(iso, path, "mu_bar", prefix + ".mu_bar", kGroups);
+    const auto nu = require_array(iso, path, "nu", prefix + ".nu", kGroupsN);
+    const auto chi = require_array(iso, path, "chi", prefix + ".chi", kGroupsN);
+    const auto sigma_f = require_array(iso, path, "sigma_f", prefix + ".sigma_f", kGroupsN);
+    const auto sigma_c = require_array(iso, path, "sigma_c", prefix + ".sigma_c", kGroupsN);
+    const auto sigma_s = require_array(iso, path, "sigma_s", prefix + ".sigma_s", kGroupsN);
+    const auto mu_bar = require_array(iso, path, "mu_bar", prefix + ".mu_bar", kGroupsN);
 
-    std::vector<double> sigma_n2n(kGroups, 0.0);  // optional, default 0 (03 §2)
+    std::vector<double> sigma_n2n(kGroupsN, 0.0);  // optional, default 0 (03 §2)
     if (iso.contains("sigma_n2n") && !iso.at("sigma_n2n").is_null()) {
-        sigma_n2n = require_array(iso, path, "sigma_n2n", prefix + ".sigma_n2n", kGroups);
+        sigma_n2n = require_array(iso, path, "sigma_n2n", prefix + ".sigma_n2n", kGroupsN);
     }
 
     reject_nonnegative(nu, path, prefix + ".nu");
@@ -209,7 +209,7 @@ FewGroupXS FewGroupXS::load(const std::filesystem::path& path) {
     require(doc.contains("group_bounds_MeV"), path, "group_bounds_MeV", "is REQUIRED");
     const json& bounds = doc.at("group_bounds_MeV");
     require(bounds.is_array(), path, "group_bounds_MeV", "must be an array");
-    require(bounds.size() == kGroups + 1, path, "group_bounds_MeV",
+    require(bounds.size() == kGroupsN + 1, path, "group_bounds_MeV",
             "must have n_groups+1 = " + std::to_string(kGroups + 1)
                 + " entries. Schema v2 fixes 4 groups (04 §3's Transfer is 4x4); more groups "
                   "is the schema-v3 path via ADR (D4, R-1). Got "

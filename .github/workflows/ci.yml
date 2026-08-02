@@ -1,0 +1,103 @@
+# CI (M0-T6). Mirrors 11 §3's matrix as far as hosted runners allow.
+#
+# Both jobs are CPU-only, which is deliberate: GitHub-hosted runners carry no
+# CUDA toolkit, so NUKESIM_WITH_CUDA auto-detects OFF (12 §2). That is exactly
+# the configuration 12 §2 requires to keep working — "a CPU-only machine MUST
+# build nscore, nukebench, nukefarm, and run unit + CPU-backend golden tests".
+# 11 §3's GPU row is explicitly "self-hosted/cloud GPU (on demand, M4+)" and is
+# added when there is GPU code to run (M4-T3/M4-T4).
+#
+# Green here is a precondition for claiming work: "CI red on main => no new task
+# claims" (11 §3, green-state rule project-wide).
+
+name: CI
+
+on:
+  push:
+    branches: [main, 'task/**', 'fix/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: windows-latest (MSVC)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure, build and test
+        shell: pwsh
+        env:
+          # The win-x64 preset pins VCPKG_ROOT to C:/vcpkg, which is where the
+          # hosted image puts it too — assert rather than assume, because a
+          # moved vcpkg would otherwise surface as an opaque toolchain error.
+          VCPKG_ROOT: C:/vcpkg
+        run: |
+          if (-not (Test-Path 'C:/vcpkg/scripts/buildsystems/vcpkg.cmake')) {
+            throw 'vcpkg not found at C:/vcpkg (12 §1 pins this path)'
+          }
+          ./tools/ci/local_ci.ps1 -Both
+
+  linux:
+    name: ubuntu-latest (gcc, CPU-only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Configure, build and test
+        env:
+          # Hosted images expose vcpkg through VCPKG_INSTALLATION_ROOT; the
+          # Linux presets read VCPKG_ROOT (12 §1), so bridge the two here rather
+          # than hard-coding a path that differs per image.
+          VCPKG_ROOT: ${{ env.VCPKG_INSTALLATION_ROOT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VCPKG_ROOT:-}" ]; then
+            echo "VCPKG_INSTALLATION_ROOT was empty on this image" >&2
+            exit 1
+          fi
+          chmod +x tools/ci/local_ci.sh
+          ./tools/ci/local_ci.sh --preset linux-x64 --config Release
+
+  # QC-07: the committed copy of artifacts/gate_reports/ is PRIMARY — PROGRESS.md's
+  # gate table points at those paths and a session must be able to open them. This
+  # archive is an addition, never a substitute: build artifacts expire, and an
+  # expired artifact turns "trust gates, not prose" back into prose.
+  gate-evidence:
+    name: archive gate reports
+    runs-on: ubuntu-latest
+    needs: [windows, linux]
+    if: always() && needs.windows.result == 'success' && needs.linux.result == 'success'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Confirm the committed copy exists
+        run: |
+          set -euo pipefail
+          if [ ! -d artifacts/gate_reports ]; then
+            echo "artifacts/gate_reports/ is missing — it is TRACKED by design (02 §2, QC-07)" >&2
+            exit 1
+          fi
+          if git check-ignore -q artifacts/gate_reports/x.json; then
+            echo "artifacts/gate_reports/ is gitignored; the un-ignore in .gitignore regressed" >&2
+            exit 1
+          fi
+          echo "committed gate-evidence path is present and tracked"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gate-reports
+          path: artifacts/gate_reports/
+          if-no-files-found: ignore
+          retention-days: 90

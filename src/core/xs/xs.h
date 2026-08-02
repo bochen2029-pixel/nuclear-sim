@@ -8,6 +8,7 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <filesystem>
 #include <map>
 #include <string>
@@ -20,6 +21,10 @@ namespace ns::xs {
 /// part of the normative API rather than a runtime value; more groups is the
 /// schema-v3 path via ADR (D4, R-1).
 inline constexpr int kGroups = 4;
+/// Same value as an unsigned type. 04 §3's groups() returns int, but every
+/// container size compared against it is a size_t, and gcc's -Wsign-compare
+/// (fatal under 02 §4's -Werror) does not accept the mix.
+inline constexpr std::size_t kGroupsN = static_cast<std::size_t>(kGroups);
 
 struct GroupData {
     double nu = 0.0;         // TOTAL nu-bar (prompt + delayed) — ADR-013

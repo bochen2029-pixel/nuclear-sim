@@ -49,13 +49,17 @@ void reject_unknown_keys(const toml::table& table, const std::set<std::string>& 
     }
 }
 
-const toml::table& require_table(const toml::table& parent, const std::string& key,
+/// Returns a POINTER, not a reference: gcc's -Wdangling-reference (fatal under
+/// 02 §4's -Werror) cannot prove the lifetime of a reference returned from a
+/// helper like this, and it is right to be suspicious in general. Callers
+/// dereference at the binding site, where the lifetime is obvious.
+const toml::table* require_table(const toml::table& parent, const std::string& key,
                                  const std::filesystem::path& path) {
     const auto* node = parent.get(key);
     require(node != nullptr, path, key, "table is REQUIRED (03 §4)");
     const auto* table = node->as_table();
     require(table != nullptr, path, key, "must be a table");
-    return *table;
+    return table;
 }
 
 double require_number(const toml::table& t, const std::string& key,
@@ -276,7 +280,7 @@ Scenario Scenario::load(const std::filesystem::path& path, const std::filesystem
     }
 
     // ---- [data] ----------------------------------------------------------
-    const toml::table& data = require_table(doc, "data", path);
+    const toml::table& data = *require_table(doc, "data", path);
     reject_unknown_keys(data, {"xs_set", "materials_dir"}, path, "data");
     out.xs_set = require_string(data, "xs_set", path, "data");
     out.materials_dir = data_root / require_string(data, "materials_dir", path, "data");
@@ -285,7 +289,7 @@ Scenario Scenario::load(const std::filesystem::path& path, const std::filesystem
     parse_layers(doc, path, out);
 
     // ---- [time] ----------------------------------------------------------
-    const toml::table& time = require_table(doc, "time", path);
+    const toml::table& time = *require_table(doc, "time", path);
     reject_unknown_keys(time, {"t_zero"}, path, "time");
     out.t_zero = require_string(time, "t_zero", path, "time");
     require(out.t_zero == "he_initiation", path, "time.t_zero",
@@ -294,7 +298,7 @@ Scenario Scenario::load(const std::filesystem::path& path, const std::filesystem
                 + "\"");
 
     // ---- [initiator] -----------------------------------------------------
-    const toml::table& initiator = require_table(doc, "initiator", path);
+    const toml::table& initiator = *require_table(doc, "initiator", path);
     reject_unknown_keys(initiator, {"strength_n_per_s", "t_fire_s", "pulse_width_s"}, path,
                         "initiator");
     out.initiator_strength_n_per_s = require_number(initiator, "strength_n_per_s", path,
@@ -307,7 +311,7 @@ Scenario Scenario::load(const std::filesystem::path& path, const std::filesystem
             "must be positive");
 
     // ---- [compression] ---------------------------------------------------
-    const toml::table& compression = require_table(doc, "compression", path);
+    const toml::table& compression = *require_table(doc, "compression", path);
     reject_unknown_keys(compression, {"tier", "ratio", "t_c_s"}, path, "compression");
     out.compression_tier = static_cast<int>(require_integer(compression, "tier", path,
                                                             "compression"));
@@ -340,7 +344,7 @@ Scenario Scenario::load(const std::filesystem::path& path, const std::filesystem
     }
 
     // ---- [kinetics] ------------------------------------------------------
-    const toml::table& kinetics = require_table(doc, "kinetics", path);
+    const toml::table& kinetics = *require_table(doc, "kinetics", path);
     reject_unknown_keys(kinetics, {"generation_time_s_initial", "eigen_refresh_gens",
                                    "eigen_refresh_dr_frac", "t_max_s", "quench_epsilon"},
                         path, "kinetics");
@@ -364,7 +368,7 @@ Scenario Scenario::load(const std::filesystem::path& path, const std::filesystem
             "at k < 1 (BLK-03)");
 
     // ---- [eigen] ---------------------------------------------------------
-    const toml::table& eigen = require_table(doc, "eigen", path);
+    const toml::table& eigen = *require_table(doc, "eigen", path);
     reject_unknown_keys(eigen, {"batch", "inactive", "active"}, path, "eigen");
     out.eigen_batch = require_integer(eigen, "batch", path, "eigen");
     out.eigen_inactive = static_cast<int>(require_integer(eigen, "inactive", path, "eigen"));
@@ -376,12 +380,12 @@ Scenario Scenario::load(const std::filesystem::path& path, const std::filesystem
     require(out.eigen_active >= 1, path, "eigen.active", "must be at least 1");
 
     // ---- [transport] / [hydro] -------------------------------------------
-    const toml::table& transport = require_table(doc, "transport", path);
+    const toml::table& transport = *require_table(doc, "transport", path);
     reject_unknown_keys(transport, {"sim_neutrons"}, path, "transport");
     out.sim_neutrons = require_integer(transport, "sim_neutrons", path, "transport");
     require(out.sim_neutrons > 0, path, "transport.sim_neutrons", "must be positive");
 
-    const toml::table& hydro = require_table(doc, "hydro", path);
+    const toml::table& hydro = *require_table(doc, "hydro", path);
     reject_unknown_keys(hydro, {"every_gens"}, path, "hydro");
     out.hydro_every_gens = static_cast<int>(require_integer(hydro, "every_gens", path, "hydro"));
     require(out.hydro_every_gens >= 1, path, "hydro.every_gens", "must be an integer >= 1");
@@ -487,7 +491,7 @@ Scenario Scenario::load(const std::filesystem::path& path, const std::filesystem
     }
 
     // ---- [output] ---------------------------------------------------------
-    const toml::table& output = require_table(doc, "output", path);
+    const toml::table& output = *require_table(doc, "output", path);
     reject_unknown_keys(output, {"tallies", "checkpoint_every_gens", "dump_fields", "dump_stride",
                                  "dump_max_frames", "dump_budget_gb"},
                         path, "output");

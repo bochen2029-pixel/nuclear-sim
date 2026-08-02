@@ -39,7 +39,7 @@ nukefarm resume --sweep <name>
 ## 3. `nukestudio` — interactive app (M7)
 
 - Tech: GLFW + ImGui (docking) + ImPlot; renderer per `09-rendering.md`. Local-only.
-- Panels (schema-driven from `[ui."…"]` annotations, 03 §4 + `10-ui.md`): Parameters, Geometry cutaway, Criticality (k gauge with quench-phase marker, Rossi-α per E3c, critical-mass-equivalent "public-band estimate"), Burst (log₁₀ population, cumulative yield, per-generation fissions), Fields (channel selector), Timeline (D6 timebase + scrub when paused).
+- Panels (schema-driven from `[ui."…"]` annotations, 03 §4 + `10-ui.md`): Parameters, Geometry cutaway (M7-T5 adds the free clip plane + detonator toggle/delay grid, ADR-018), Criticality (k gauge with quench-phase marker, Rossi-α per E3c, critical-mass-equivalent "public-band estimate"), Burst (log₁₀ population, cumulative yield, per-generation fissions), Fields (channel selector), Timeline (D6 timebase + scrub when paused; M7-T5 adds computed-state event markers, ADR-018). M7-T5 also adds BURST-phase neutron trails per `09 §4`.
 - Controls: Run / Pause / Step-generation / Reset-with-seed. Counterfactual parameter values mark the run `non_canonical` with a **persistent badge** (`00 §2`); edited-until-rerun state shows a separate "dirty" marker.
 - Threading per `02 §3` (snapshot model; async eigen refresh with visible "refreshing" state; sim stall with live render = G4 fail).
 - Parity (gate G5): "export scenario" writes the exact TOML reproducing the current state in `nukebench` same-backend, bit-identical.

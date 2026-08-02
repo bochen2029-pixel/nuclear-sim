@@ -77,6 +77,7 @@
 | M7-T2 | todo | — | — | M7-T1 | raymarcher + color + tonemap + temp calibration |
 | M7-T3 | todo | — | — | M7-T2, M4-T4 | nukestudio + G5 parity |
 | M7-T4 | todo | — | — | M7-T2 | nukecinema + make_film |
+| M7-T5 | todo | — | — | M7-T3, M6-T3 | Sandbox mode (ADR-018): per-detonator `[[lenses.detonators]]` schema + loader validation; free clip plane (shells + volume); deterministic seeded neutron trails (BURST phase); timeline event markers from computed state. Non-canonical discipline unchanged; no physics/gate change |
 
 ## Milestone-boundary SYNC checklist
 

@@ -140,6 +140,11 @@ every_gens = 10                 # integer ≥ 1; WARN if < eigen_refresh_gens (e
 [lenses]                        # Stage 3 only (M6); absent earlier
 count = 32
 jitter_ns = 10.0
+# [[lenses.detonators]]        # OPTIONAL per-detonator selection (ADR-018, M7-T5); absent = all
+# enable = true                #   fire on time (the canonical form). When present, exactly `count`
+# delay_s = 0.0                #   entries, one per detonator; delay_s in [0.0, 1.0e-6] seconds
+                               #   (schema units — the same envelope as the 0–1000 ns jitter axis).
+                               #   Any non-default detonator config marks the run non_canonical.
 
 [source]                        # REQUIRED iff mode = "fixed_source" (05 §1 SourceSpec mirrors this)
 kind = "point"                  # point | shell | volume | replay
@@ -176,9 +181,15 @@ range = [1.0e-9, 1.0e-7]
 display_unit = "ns"             # presentation only; never changes stored value or hash
 display_scale = 1.0e9
 status = "DECLASSIFIED"
+[ui."lenses.detonators"]        # ADR-018 (M7-T5): custom per-lens toggle/delay grid, not a scalar
+label = "Detonators"            #   slider — the range bounds each entry's delay_s (schema units,
+range = [0.0, 1.0e-6]           #   same envelope as the jitter axis); enable has no range.
+display_unit = "ns"
+display_scale = 1.0e9
+status = "SIM"
 ```
 
-Validation rules: `layers` is TOP-LEVEL and the loader rejects it under `[data]` with a diagnostic (M0-T5 — the array previously sat below the `[data]` header, which TOML reparents); layers strictly increasing radii; every `material` resolves under `[data].materials_dir`; `xs_set` resolves and names match; every value within its `[ui.*].range` for gate runs; `seed` required; `mode = "td"` rejected in v1; unknown keys hard-error; `layers.<id>.field` selects **by `id`** (override grammar: `layers.<id>.field`, `materials.<name>.<field>`, `xs.<iso>.<field>`, `section.key`; positional `layers[<int>]` accepted but not recommended).
+Validation rules: `layers` is TOP-LEVEL and the loader rejects it under `[data]` with a diagnostic (M0-T5 — the array previously sat below the `[data]` header, which TOML reparents); layers strictly increasing radii; every `material` resolves under `[data].materials_dir`; `xs_set` resolves and names match; every value within its `[ui.*].range` for gate runs; `seed` required; `mode = "td"` rejected in v1; unknown keys hard-error; `layers.<id>.field` selects **by `id`** (override grammar: `layers.<id>.field`, `materials.<name>.<field>`, `xs.<iso>.<field>`, `section.key`; positional `layers[<int>]` accepted but not recommended); `lenses.detonators`, when present, MUST have exactly `lenses.count` entries and each `delay_s ∈ [0, 1e-6]` (absent = all fire on time — ADR-018).
 
 ## 5. `tally.json` — run output (schema v1)
 

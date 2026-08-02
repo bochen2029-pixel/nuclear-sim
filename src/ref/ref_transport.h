@@ -1,0 +1,139 @@
+// CPU reference transport — the permanent correctness oracle (D1/ADR-001).
+//
+// History-based, double precision throughout, clarity over speed. This exists
+// only to be correct; src/gpu/ exists only to be fast, and G0c binds them.
+//
+// Implicit capture is normative (E1c, BLK-05 / ADR-012 item 1): the neutron is
+// never killed at fission, and `sigma_c` never terminates a history directly.
+// The analog-with-implicit-absorption variant was explicitly rejected — it
+// double-counts Sigma_f/Sigma_t and shifts k by a few hundred pcm, which is
+// small enough to still look plausible.
+
+#pragma once
+
+#include "core/geometry/geometry.h"
+#include "core/material/material.h"
+#include "core/rng/rng.h"
+#include "core/xs/xs.h"
+
+#include <array>
+#include <cstdint>
+#include <vector>
+
+namespace ns::ref {
+
+struct Particle {
+    geom::Vec3 pos;
+    geom::Vec3 dir;
+    int group = 0;
+    double weight = 1.0;
+    rng::Stream stream;
+};
+
+/// Mirrors 03 §4's [source] block (05 §1).
+struct SourceSpec {
+    enum class Kind { PointIsotropic, UniformSphere, UniformShell, FissionSourceReplay };
+
+    Kind kind = Kind::PointIsotropic;
+    geom::Vec3 center{0.0, 0.0, 0.0};
+    double r_inner = 0.0;
+    double r_outer = 0.0;
+    std::array<double, xs::kGroups> group_weights{1.0, 0.0, 0.0, 0.0};  // normalized at use
+    std::int64_t histories = 100000;
+};
+
+/// Accumulated tallies plus the per-history moments needed for sigma.
+///
+/// Statistics come from per-HISTORY scores, not per-collision ones: collisions
+/// within a history are correlated, so treating them as independent samples
+/// would understate sigma — and both M1-T2 DoD checks are stated in sigma.
+class TallyAcc {
+public:
+    void begin_history(double source_weight);
+    void end_history();
+
+    void add_leaked(double weight);
+    void add_fission_production(double weight, int isotope_index);
+    void add_fission_events(double weight, int isotope_index);
+    void add_track_length(double weight_times_distance, int layer);
+
+    void resize_isotopes(std::size_t count);
+    void resize_layers(std::size_t count);
+
+    std::int64_t histories() const noexcept { return histories_; }
+    double source_weight() const noexcept { return source_weight_; }
+
+    /// Leaked weight per unit source weight, and the standard error of that mean.
+    double leaked_fraction() const;
+    double leaked_fraction_sigma() const;
+
+    /// Fission neutrons produced per source neutron. In a medium with no
+    /// leakage this IS k_inf (01 §2).
+    double k_estimate() const;
+    double k_sigma() const;
+
+    const std::vector<double>& fissions_by_isotope() const noexcept { return fissions_by_isotope_; }
+    const std::vector<double>& production_by_isotope() const noexcept {
+        return production_by_isotope_;
+    }
+    const std::vector<double>& track_length_by_layer() const noexcept { return flux_by_layer_; }
+
+private:
+    static double standard_error(double sum, double sum_sq, std::int64_t n);
+
+    std::int64_t histories_ = 0;
+    double source_weight_ = 0.0;
+
+    double history_leaked_ = 0.0;
+    double history_production_ = 0.0;
+
+    double sum_leak_ = 0.0, sum_leak_sq_ = 0.0;
+    double sum_prod_ = 0.0, sum_prod_sq_ = 0.0;
+
+    std::vector<double> fissions_by_isotope_;
+    std::vector<double> production_by_isotope_;
+    std::vector<double> flux_by_layer_;
+};
+
+class RefTransport {
+public:
+    RefTransport(const geom::LayerStack& stack, const material::MaterialLib& materials,
+                 const xs::FewGroupXS& xs_set, std::uint64_t seed);
+
+    /// Transports `spec.histories` source neutrons and accumulates into `tally`.
+    ///
+    /// Fission progeny are TALLIED but not propagated: propagating them is a
+    /// fission-source iteration, i.e. the eigen solver (M1-T3). What this
+    /// measures is production per source neutron, which in a leakage-free
+    /// medium is exactly k_inf.
+    void run_fixed_source(const SourceSpec& spec, TallyAcc& tally);
+
+    /// Analytic k_inf of a homogeneous medium: nu*Sigma_f / (Sigma_c + Sigma_f).
+    /// The oracle the MC result is checked against, computed independently of
+    /// the transport loop.
+    static double analytic_k_inf(const material::Material& mat, const xs::FewGroupXS& xs_set,
+                                 int group);
+
+    const std::vector<std::string>& isotope_names() const noexcept { return isotope_names_; }
+
+private:
+    struct IsotopeSlot {
+        const xs::IsotopeXS* iso = nullptr;
+        double number_density = 0.0;  // atoms/barn-cm, so n*sigma is 1/cm
+        int global_index = -1;
+    };
+    struct LayerData {
+        std::vector<IsotopeSlot> isotopes;
+        std::array<double, xs::kGroups> sigma_t{};
+        std::array<double, xs::kGroups> sigma_tr{};
+    };
+
+    const geom::LayerStack& stack_;
+    geom::AnalyticSphereTracker tracker_;
+    const xs::FewGroupXS& xs_;
+    std::uint64_t seed_;
+    std::vector<LayerData> layers_;
+    std::vector<std::string> isotope_names_;
+};
+
+}  // namespace ns::ref

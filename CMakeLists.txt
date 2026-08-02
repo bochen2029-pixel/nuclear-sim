@@ -246,7 +246,8 @@ add_library(nukesim_core STATIC
     src/core/xs/xs.cpp
     src/core/material/material.cpp
     src/core/scenario/scenario.cpp
-    src/core/scenario/canonical_hash.cpp)
+    src/core/scenario/canonical_hash.cpp
+    src/ref/ref_transport.cpp)
 target_link_libraries(nukesim_core PUBLIC nukesim_core_constants nukesim_deps)
 target_include_directories(nukesim_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 nukesim_strict(nukesim_core)
@@ -268,6 +269,13 @@ target_compile_definitions(test_geometry PRIVATE NUKESIM_SOURCE_DIR="${CMAKE_SOU
 nukesim_strict(test_geometry)
 catch_discover_tests(test_geometry TEST_PREFIX "geometry.")
 
+add_executable(test_ref tests/unit/test_ref.cpp)
+target_link_libraries(test_ref PRIVATE nukesim_core Catch2::Catch2WithMain)
+target_include_directories(test_ref PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
+target_compile_definitions(test_ref PRIVATE NUKESIM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+nukesim_strict(test_ref)
+catch_discover_tests(test_ref TEST_PREFIX "ref.")
+
 add_executable(test_rng tests/unit/test_rng.cpp)
 target_link_libraries(test_rng PRIVATE nukesim_core_constants Catch2::Catch2WithMain)
 target_include_directories(test_rng PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
@@ -277,7 +285,7 @@ catch_discover_tests(test_rng TEST_PREFIX "rng.")
 # The frozen vector is only evidence if an independent implementation still
 # agrees with it — this re-runs the Python Philox, which must reproduce the
 # three published Random123 vectors before it will certify anything (04 §2).
-add_test(NAME rng.kat_independent_reference
+add_test(NAME rng.kat_independent_oracle
          COMMAND ${Python3_EXECUTABLE}
                  ${CMAKE_SOURCE_DIR}/tools/verify/rng_kat_gen.py --check)
 

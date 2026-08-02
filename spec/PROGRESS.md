@@ -6,14 +6,13 @@
 ## Current
 
 - **Milestone:** M0 — Foundation
-- **VERIFY:** `cmake --preset win-x64 && cmake --build --preset win-x64-rel && ctest --preset win-x64-rel` — the `12 §2` canonical loop; falsifiable and real (configure + compile + link + **27 passing tests**). Takes ~1 min warm. Per-task probes: `ctest --preset win-x64-rel -R toolchain|constants|rng`.
+- **VERIFY:** `cmake --preset win-x64 && cmake --build --preset win-x64-rel && ctest --preset win-x64-rel` — the `12 §2` canonical loop; falsifiable and real (configure + compile + link + **28 passing tests**). Takes ~1 min warm. Per-task probes: `ctest --preset win-x64-rel -R toolchain|constants|rng|oracle`.
 - **NEXT ACTION:** Execute M0-T5 — implement the xs / materials / scenario loaders in `src/core/` per `spec/04-module-core.md` §3–§6 and `spec/03-data-contracts.md` §2–§4, with the full negative-test set (xs v2: reject `sigma_a`, reject `sigma_t` in-file, reject null transfer for non-SIM sets, reject upscatter, reject missing `mu_bar`, reject non-descending bounds, compute `sigma_t` and `sigma_tr`; scenario: `[data]` resolution, `[ui.*]` ranges, override grammar, `mode="td"` rejection, `[source]` rules) and precise file/field/constraint diagnostics; canonical example files must parse verbatim; register as `catch_discover_tests(test_loaders TEST_PREFIX "loaders.")` per `11 §1`; DoD in `07-milestones.md` M0-T5.
 
 ## Ready-queue (runnable now)
 
 1. **M0-T5** (recommended — NEXT ACTION) — loaders; the last thing blocking M0-T6 and all of M1
-2. **M0-T3-b** — generated `docs/VERIFICATION.md` oracle per `11 §5`; independent of M0-T5, safe to run in parallel in another session
-3. *(M0-T6 needs M0-T5)*
+2. *(M0-T6 needs M0-T5; M0-T1…T4 and M0-T3-a/-b are done)*
 
 **Repository:** <https://github.com/bochen2029-pixel/nuclear-sim> — public, MIT (ADR-011). Remote exists, so the full claim protocol (`README §5.3`: branch + PROGRESS edit + pushed `claim:` commit) applies from M0-T2 onward and parallel sessions are now safe.
 
@@ -39,7 +38,7 @@
 | M0-T1 | **done** | session-2026-08-03-a | 2026-08-03 | — | repo init in place (BLK-12); MIT LICENSE + NOTICE; `.gitignore` gate-evidence un-ignores verified both ways (QC-07); pushed to github.com/bochen2029-pixel/nuclear-sim |
 | M0-T2 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T1 | canonical loop green from a clean build dir + cold vcpkg cache; 6/6 ctest incl. a real CUDA kernel round-trip. Generator `Visual Studio 17 2022` (win-x64), triplet `x64-windows-static`, baseline `d59284957…` — all recorded in `12 §1` |
 | M0-T3-a | **done** | session-2026-08-02-b | 2026-08-02 | M0-T2 | 96 strict entries ↔ 96 appendix rows, bijective; `[[band]]` added (ADR-015); Φ_kt recomputed = 1.4508041e23; 26 validator guards; 15/15 ctest |
-| M0-T3-b | **in_progress** | session-2026-08-02-b | 2026-08-02 | M0-T3-a | SPLIT from M0-T3 (§8): generated `docs/VERIFICATION.md` first-principles oracle per `11 §5` (all six sections) + byte-identical regeneration check |
+| M0-T3-b | **done** | session-2026-08-02-b | 2026-08-02 | M0-T3-a | all 6 `11 §5` sections; 9/9 tally invariants pass on the canonical example (I3 7.5e-8 independently reproduces the QC session's figure); Tier-1 endpoints exact, mass conservation 1.5e-16; §2 layer masses correctly PENDING(M2-T1); found the C-042/C-043 blanket-"~5%" wording defect |
 | M0-T4 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T2 | 3 published Random123 vectors reproduce (also at compile time); project-local vector emitted by an INDEPENDENT Python Philox, not self-recorded; fork + (ctr,sub) resume KATs; 10 tests |
 | M0-T5 | todo | — | — | M0-T2, M0-T3-a | loaders incl. xs v2 semantics + negative tests (needs the constants pipeline, not the oracle) |
 | M0-T6 | todo | — | — | M0-T5 | local CI + Actions workflow → Actions green on main (owner repo step resolved 2026-08-03) |

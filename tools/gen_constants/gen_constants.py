@@ -207,7 +207,7 @@ def emit_runtime_toml(doc: dict) -> str:
         out.append(f'name = "{entry["name"]}"')
         if "value" in entry:
             out.append(f"value = {_num(entry['value'])}")
-        for opt in ("lo", "hi"):
+        for opt in ("lo", "hi", "mass_kg", "mass_lo_kg", "mass_hi_kg"):
             if opt in entry:
                 out.append(f"{opt} = {_num(entry[opt])}")
         for opt in ("unit", "status", "use", "cite", "resolved_by", "derived", "species"):
@@ -266,6 +266,10 @@ def _emit_constant(entry: dict, out: list[str]) -> None:
             f"static_assert({name}_lo <= {name} && {name} <= {name}_hi,"
             f' "{cid}: value outside its declared band");'
         )
+    for opt, suffix in (("mass_kg", "mass_kg"), ("mass_lo_kg", "mass_lo_kg"),
+                        ("mass_hi_kg", "mass_hi_kg")):
+        if opt in entry:
+            out.append(f"inline constexpr double {name}_{suffix} = {_num(entry[opt])};")
     out.append("")
 
 

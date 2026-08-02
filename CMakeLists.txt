@@ -319,6 +319,39 @@ add_test(NAME constants.crosscheck_misuse
                  ${CMAKE_SOURCE_DIR}/tools/verify/crosscheck_misuse.py)
 
 # ---------------------------------------------------------------------------
+# CUDA backend foundation (M4-T1): SoA buffers + device Philox + the three
+# deterministic primitives of 05 §6 (slots / streams / reductions).
+#
+# CUDA-guarded on purpose. The hosted CI runners carry no CUDA toolkit, so
+# NUKESIM_WITH_CUDA auto-detects OFF (12 §2) and this whole block is skipped —
+# CI stays at its committed CPU test count and green. The dev machine has nvcc,
+# so it builds `nukesim_gpu` and runs the `gpu.` probe. The device Philox is the
+# SAME headers as ref/ (core/rng), made device-callable by the NUKESIM_HD macro
+# (SYNC-M4); no second implementation exists to drift from the frozen KATs.
+# ---------------------------------------------------------------------------
+if(NUKESIM_WITH_CUDA)
+    add_library(nukesim_gpu STATIC src/gpu/gpu_backend.cu)
+    target_include_directories(nukesim_gpu PUBLIC ${CMAKE_SOURCE_DIR}/src)
+    target_link_libraries(nukesim_gpu PUBLIC CUDA::cudart_static)
+    # The device Philox reuses core/rng, whose Counter/Key are std::array. MSVC's
+    # std::array::operator[] is constexpr __host__ (not __host__ __device__), so
+    # calling it from device code needs --expt-relaxed-constexpr — the documented
+    # nvcc mechanism for reusing constexpr host functions on the device. It
+    # changes no results; it only lets the ONE RNG source serve both backends
+    # (04 §2: the device RNG must be the same bijection as ref/, not a copy). The
+    # portability KATs (gpu.*) are what prove the reuse is bit-correct.
+    target_compile_options(nukesim_gpu PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
+    nukesim_strict(nukesim_gpu)
+
+    add_executable(test_gpu tests/unit/test_gpu.cpp)
+    target_link_libraries(test_gpu PRIVATE nukesim_gpu Catch2::Catch2WithMain)
+    target_include_directories(test_gpu PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
+    nukesim_strict(test_gpu)
+    catch_discover_tests(test_gpu TEST_PREFIX "gpu.")
+endif()
+
+# ---------------------------------------------------------------------------
 message(STATUS "nuclear-sim ${PROJECT_VERSION}")
 message(STATUS "  C++            ${CMAKE_CXX_STANDARD}")
 message(STATUS "  CUDA           ${NUKESIM_WITH_CUDA}  ${CMAKE_CUDA_COMPILER_VERSION}  arch ${CMAKE_CUDA_ARCHITECTURES}")

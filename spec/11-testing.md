@@ -19,6 +19,7 @@ Every task's DoD includes its tests. `ctest` is the single entry point; suites a
   | geometry (M1-T1) | `test_geometry` | `geometry.` | `ctest -R "^geometry\."` |
   | ref (M1-T2) | `test_ref` | `ref.` | `ctest -R "^ref\."` |
   | eigen (M1-T3) | `test_eigen` | `eigen.` | `ctest -R "^eigen\."` |
+  | benchmarks (M1-T4a-1) | `test_benchmarks` | `benchmarks.` | `ctest -R "^benchmarks\."` |
 - **Golden (per-backend, MAJ-42):** goldens recorded as `tests/golden/<artifact>.<backend>.sha256`; a golden test compares against the golden for the backend under test and SKIPs (not FAILs) when none exists. `tally.json` goldens ALSO compare structurally: all fields present, all 9 invariants of `03 §5` hold, floating values within declared tolerance (1e-12 same-backend, 3σ cross-backend). Cinema frame goldens: perceptual-hash with declared threshold, never exact hashes. Intentional changes ⇒ regenerate + CHANGELOG entry + visible diff.
 - **Differential (T-diff):** ref vs gpu per `08 §G0c`; OptiX-vs-analytic parity (M6-T1). Mandatory before M4/M6 gate claims.
 - **Perf (T-perf):** timed gate scenarios per `08 §G4`; results appended to `artifacts/perf_history.jsonl` — **committed** (`02 §2`), because its whole value is the cross-session trend. Rotated at 100 MB into `perf_history_<YYYYMM>.jsonl`, which IS gitignored (history beyond the current file goes to object storage).

@@ -1,0 +1,61 @@
+# Jezebel — bare delta-phase Pu-Ga sphere criticality benchmark (G0b).
+#
+# Model: JEFF Report 16 Annex 3 (OECD/NEA, open), adopting CSEWG Benchmark Book
+# BNL 19302 ENDF 202 Rev. 11-81, fast benchmark F1. Full derivation and
+# citations in data/benchmarks/jezebel.md. status = PUBLIC-DERIVED.
+#
+# Benchmark k_eff = 1.0000 +/- 0.0020.
+
+schema_version = 1
+name = "jezebel"
+seed = 20260802
+mode = "eigen_only"
+
+layers = [
+  { id = "core", r_outer_cm = 6.385, material = "pu_ga_jezebel", status = "PUBLIC-DERIVED" },
+]
+
+[data]
+xs_set        = "fast4"
+materials_dir = "data/materials"
+
+[time]
+t_zero = "he_initiation"
+
+# Required by the schema; a bare-sphere eigenvalue calculation has no initiator,
+# no compression and no burn. These are inert placeholders, not physics.
+[initiator]
+strength_n_per_s = 0.0
+t_fire_s         = 0.0
+pulse_width_s    = 1.0e-8
+
+[compression]
+tier  = 2
+ratio = 1.0
+
+[kinetics]
+generation_time_s_initial = 1.0e-8
+eigen_refresh_gens        = 10
+eigen_refresh_dr_frac     = 0.005
+t_max_s                   = 1.0e-6
+quench_epsilon            = 1.0e-4
+
+# C-900 gate configuration. C-900b (interactive) is NEVER valid for a gate claim.
+[eigen]
+batch    = 1000000
+inactive = 50
+active   = 200
+
+[transport]
+sim_neutrons = 1000000
+
+[hydro]
+every_gens = 10
+
+[output]
+tallies = ["k"]
+checkpoint_every_gens = 100
+dump_fields = false
+dump_stride = 10
+dump_max_frames = 0
+dump_budget_gb = 20

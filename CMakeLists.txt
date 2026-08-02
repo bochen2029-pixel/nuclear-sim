@@ -271,6 +271,13 @@ target_compile_definitions(test_geometry PRIVATE NUKESIM_SOURCE_DIR="${CMAKE_SOU
 nukesim_strict(test_geometry)
 catch_discover_tests(test_geometry TEST_PREFIX "geometry.")
 
+add_executable(test_benchmarks tests/unit/test_benchmarks.cpp)
+target_link_libraries(test_benchmarks PRIVATE nukesim_core Catch2::Catch2WithMain)
+target_include_directories(test_benchmarks PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
+target_compile_definitions(test_benchmarks PRIVATE NUKESIM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+nukesim_strict(test_benchmarks)
+catch_discover_tests(test_benchmarks TEST_PREFIX "benchmarks.")
+
 add_executable(test_eigen tests/unit/test_eigen.cpp)
 target_link_libraries(test_eigen PRIVATE nukesim_core Catch2::Catch2WithMain)
 target_include_directories(test_eigen PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)

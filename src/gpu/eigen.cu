@@ -258,6 +258,16 @@ bool gpu_eigen(const ns::geom::LayerStack& stack, const ns::material::MaterialLi
     const double radius = stack.outermost_radius();
     const int cap = static_cast<int>(batch) * 8;  // bank headroom for k>1 systems
 
+    // Peak-VRAM probe (M4-T4): the eigen allocates its whole footprint up front
+    // (two ping-pong banks + per-source scratch, all cap-sized), so the free-memory
+    // drop right after allocation is the peak. Observational; never gates flow.
+    std::size_t free_before = 0;
+    std::size_t total_mem = 0;
+    std::size_t min_free = 0;
+    if (cudaMemGetInfo(&free_before, &total_mem) == cudaSuccess) {
+        min_free = free_before;
+    }
+
     Bank ba{};
     Bank bb{};
     int* m = nullptr;
@@ -277,6 +287,14 @@ bool gpu_eigen(const ns::geom::LayerStack& stack, const ns::material::MaterialLi
            && cudaMalloc(&fg, static_cast<std::size_t>(cap) * sizeof(int)) == cudaSuccess
            && cudaMalloc(&prod, static_cast<std::size_t>(cap) * sizeof(float)) == cudaSuccess
            && cudaMalloc(&d_overflow, sizeof(int)) == cudaSuccess;
+
+    if (ok) {
+        std::size_t f = 0;
+        std::size_t t = 0;
+        if (cudaMemGetInfo(&f, &t) == cudaSuccess && f < min_free) {
+            min_free = f;  // peak: both banks + all per-source scratch resident
+        }
+    }
 
     if (ok) {
         k_init<<<blocks, threads>>>(ba, static_cast<int>(batch));
@@ -411,6 +429,8 @@ bool gpu_eigen(const ns::geom::LayerStack& stack, const ns::material::MaterialLi
     out.entropy_final = last_entropy;
     out.generations = total_gens;
     out.source_checksum = checksum;
+    out.peak_vram_bytes =
+        (free_before > min_free) ? static_cast<std::int64_t>(free_before - min_free) : 0;
     return true;
 }
 

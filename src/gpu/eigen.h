@@ -26,6 +26,9 @@ struct EigenResultGpu {
     /// Position-weighted checksum of the final fission bank — bit-identical across
     /// launch configs (determinism).
     unsigned long long source_checksum = 0;
+    /// Peak device memory attributed to this run (M4-T4), via cudaMemGetInfo.
+    /// Observational only — launches nothing, cannot affect k or determinism.
+    std::int64_t peak_vram_bytes = 0;
 };
 
 /// Bare/layered-sphere k-eigenvalue by GPU power iteration. `batch` source

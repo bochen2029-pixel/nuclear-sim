@@ -358,6 +358,15 @@ if(NUKESIM_WITH_CUDA)
     target_compile_definitions(test_gpu PRIVATE NUKESIM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
     nukesim_strict(test_gpu)
     catch_discover_tests(test_gpu TEST_PREFIX "gpu.")
+
+    # M4-T4 perf harness: times the GPU eigen/transport across a batch sweep and
+    # appends to artifacts/perf_history.jsonl (11 §1). Deliberately NOT a ctest —
+    # it is a measurement tool, not a gate, so the anchored `gpu.` count is
+    # unchanged. Dev-only (inside NUKESIM_WITH_CUDA); CPU CI never builds it.
+    add_executable(gpu_perf tools/perf/gpu_perf.cpp)
+    target_link_libraries(gpu_perf PRIVATE nukesim_gpu)
+    target_include_directories(gpu_perf PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    nukesim_strict(gpu_perf)
 endif()
 
 # ---------------------------------------------------------------------------

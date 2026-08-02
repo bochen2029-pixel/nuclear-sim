@@ -381,6 +381,22 @@ bool gpu_fixed_source(const ns::geom::LayerStack& stack,
         return fail();
     }
 
+    // Peak-VRAM probe (M4-T4): free memory now, then the minimum free seen at the
+    // allocation milestones below. Observational; never gates control flow.
+    std::size_t free_before = 0;
+    std::size_t total_mem = 0;
+    std::size_t min_free = 0;
+    if (cudaMemGetInfo(&free_before, &total_mem) == cudaSuccess) {
+        min_free = free_before;
+    }
+    const auto probe_free = [&min_free]() {
+        std::size_t f = 0;
+        std::size_t t = 0;
+        if (cudaMemGetInfo(&f, &t) == cudaSuccess && f < min_free) {
+            min_free = f;
+        }
+    };
+
     const int n = static_cast<int>(histories);
     const std::size_t nf = static_cast<std::size_t>(n) * sizeof(float);
     const std::size_t ni = static_cast<std::size_t>(n) * sizeof(int);
@@ -408,6 +424,7 @@ bool gpu_fixed_source(const ns::geom::LayerStack& stack,
            && cudaMalloc(&tilebase, static_cast<std::size_t>(kTile) * sizeof(int)) == cudaSuccess;
 
     if (ok) {
+        probe_free();  // SoA + scan scratch now resident
         k_init<<<blocks, threads>>>(soa, problem.geometry(), seed, n, group_weights[0],
                                     group_weights[1], group_weights[2], group_weights[3]);
         k_iota<<<blocks, threads>>>(active, n);
@@ -481,6 +498,7 @@ bool gpu_fixed_source(const ns::geom::LayerStack& stack,
                             cudaMemcpyDeviceToHost) == cudaSuccess;
         }
     }
+    probe_free();  // peak: SoA + scan scratch + bank scratch + fission bank all resident
     cudaFree(m);
     cudaFree(offset);
     cudaFree(bank);
@@ -522,6 +540,8 @@ bool gpu_fixed_source(const ns::geom::LayerStack& stack,
     out.supersteps = supersteps;
     out.fission_bank_size = bank_total;
     out.fission_bank_checksum = bank_checksum;
+    out.peak_vram_bytes =
+        (free_before > min_free) ? static_cast<std::int64_t>(free_before - min_free) : 0;
     return true;
 }
 

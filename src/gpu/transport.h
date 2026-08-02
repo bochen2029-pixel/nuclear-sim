@@ -38,6 +38,10 @@ struct FixedSourceResult {
     /// deterministic-slot + fork mechanism on real transport output.
     std::int64_t fission_bank_size = 0;
     unsigned long long fission_bank_checksum = 0;
+    /// Peak device memory attributed to this run (M4-T4): free-memory drop from
+    /// entry to the largest allocation milestone, via cudaMemGetInfo. Observational
+    /// only — it launches nothing and cannot affect the physics or determinism.
+    std::int64_t peak_vram_bytes = 0;
 };
 
 /// Point-isotropic source at the origin with birth spectrum `group_weights`.

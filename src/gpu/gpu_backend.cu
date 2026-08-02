@@ -172,6 +172,24 @@ int device_count() {
     return count;
 }
 
+bool device_info(DeviceInfo& out) {
+    cudaDeviceProp prop{};
+    if (cudaGetDeviceProperties(&prop, 0) != cudaSuccess) {
+        return fail();
+    }
+    std::size_t free_bytes = 0;
+    std::size_t total_bytes = 0;
+    if (cudaMemGetInfo(&free_bytes, &total_bytes) != cudaSuccess) {
+        return fail();
+    }
+    out.name = prop.name;
+    out.cc_major = prop.major;
+    out.cc_minor = prop.minor;
+    out.total_bytes = static_cast<std::int64_t>(total_bytes);
+    out.free_bytes = static_cast<std::int64_t>(free_bytes);
+    return true;
+}
+
 bool device_philox_published(std::array<std::array<std::uint32_t, 4>, 3>& out) {
     unsigned int* d = nullptr;
     if (cudaMalloc(&d, 12 * sizeof(unsigned int)) != cudaSuccess) return fail();

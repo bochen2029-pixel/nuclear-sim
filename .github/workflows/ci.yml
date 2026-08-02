@@ -28,8 +28,14 @@ concurrency:
 
 jobs:
   windows:
-    name: windows-latest (MSVC)
-    runs-on: windows-latest
+    # Pinned, not `windows-latest`: 12 §1 pins MSVC 14.44 / VS 2022, and the
+    # win-x64 preset names the "Visual Studio 17 2022" generator. The rolling
+    # label has moved to a newer Visual Studio, so `windows-latest` would test a
+    # toolchain the spec does not pin — and did fail here with "could not find
+    # any instance of Visual Studio" after vcpkg had happily built with the
+    # newer compiler. Bumping this is a 12 §1 amendment, which is the point.
+    name: windows-2022 (MSVC 14.44, the pinned toolchain)
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
 
@@ -56,17 +62,18 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ninja-build
 
       - name: Configure, build and test
-        env:
-          # Hosted images expose vcpkg through VCPKG_INSTALLATION_ROOT; the
-          # Linux presets read VCPKG_ROOT (12 §1), so bridge the two here rather
-          # than hard-coding a path that differs per image.
-          VCPKG_ROOT: ${{ env.VCPKG_INSTALLATION_ROOT }}
         run: |
           set -euo pipefail
-          if [ -z "${VCPKG_ROOT:-}" ]; then
-            echo "VCPKG_INSTALLATION_ROOT was empty on this image" >&2
+          # Hosted images expose vcpkg through VCPKG_INSTALLATION_ROOT; the Linux
+          # presets read VCPKG_ROOT (12 §1). Bridged in the shell, not via the
+          # `env:` context — that context sees only workflow-defined variables,
+          # so ${{ env.VCPKG_INSTALLATION_ROOT }} expands to the empty string.
+          export VCPKG_ROOT="${VCPKG_INSTALLATION_ROOT:-}"
+          if [ -z "$VCPKG_ROOT" ]; then
+            echo "VCPKG_INSTALLATION_ROOT is unset on this image" >&2
             exit 1
           fi
+          echo "using vcpkg at $VCPKG_ROOT"
           chmod +x tools/ci/local_ci.sh
           ./tools/ci/local_ci.sh --preset linux-x64 --config Release
 

@@ -11,7 +11,7 @@
 
 ## Ready-queue (runnable now)
 
-1. **M4-T2-b** (recommended — NEXT ACTION) — event transport + deterministic fission bank + T-diff (G0c) on a fixed-source toy; unblocked (M4-T2-a done), reuses the device geometry + cross sections + scan + reduction already built.
+1. **M4-T2-b** (recommended — NEXT ACTION; **claimed in_progress by session-2026-08-02-c**) — event transport + deterministic fission bank + T-diff (G0c) on a fixed-source toy; unblocked (M4-T2-a done), reuses the device geometry + cross sections + scan + reduction already built.
 2. **M4-T3** — GpuTransport eigen path + G0c harness; needs M4-T2-b (and M1-T3, done).
 3. *(M1-T4a-2 is `blocked` pending owner-provided cited xs data — see Blockers. **M2-T1's `depends_on = M1-T4a` is ambiguous after the -1/-2 split:** authoring the canonical materials + `trinity_canonical.toml` and the mass/geometry checks may proceed on M1-T4a-1 (done) since those need densities + molar masses, not Σ — but every downstream G1/G2 gate needs the blocked fast4 xs. A session picking M2-T1 should resolve that dependency explicitly first.)*
 
@@ -59,7 +59,7 @@
 | M3-T4 | todo | — | — | M3-T3 | initiator timing |
 | M4-T1 | **done** | session-2026-08-02-c | 2026-08-02 | M1-T1 | SoA buffers + device Philox (**reuses `core/rng`** via `NUKESIM_HD` + `--expt-relaxed-constexpr`, one source, no copy) + deterministic slots (exclusive prefix-sum, no atomic cursor) / streams (`fork`) / reductions (fixed-point int64, no FP atomicAdd). Device KATs match CPU incl. `fork(42,1000,3)`; reduction bit-identical across 4 launch configs, scan across 3 tile sizes. 6 `gpu.` tests; CUDA-guarded so CI stays 75 |
 | M4-T2-a | **done** | session-2026-08-02-c | 2026-08-02 | M4-T1 | device geometry (float `AnalyticSphereTracker` mirror, `geometry.cuh`) + device material/xs (`materials.cuh`: per-layer macro Σ_t/Σ_tr + per-isotope slots). Float↔double parity vs CPU tracker (axial/tangential/miss/inside-out rays) and `mix()` (Σ_t/Σ_tr/νΣ_f); 2 new `gpu.` tests → 83 total dev. Per-isotope nu/chi/transfer + `global_index` deferred to M4-T2-b (built with the collision kernel that uses them) |
-| M4-T2-b | todo | — | — | M4-T2-a | SPLIT from M4-T2: event transport (tentative-event → prefix-sum partition → branchless kernels) + deterministic fission bank at the M4-T1 scan slots. DoD = T-diff subset on a fixed-source toy (ref↔gpu statistical, G0c) |
+| M4-T2-b | in_progress | session-2026-08-02-c | 2026-08-02 | M4-T2-a | SPLIT from M4-T2: event transport (tentative-event → prefix-sum partition → branchless kernels) + deterministic fission bank at the M4-T1 scan slots. DoD = T-diff subset on a fixed-source toy (ref↔gpu statistical, G0c) |
 | M4-T3 | todo | — | — | M1-T3, M4-T2-b | gpu eigen + G0c harness |
 | M4-T4 | todo | — | — | M4-T3 | perf pass + G4 |
 | M5-T1 | todo | — | — | M3-T3, M4-T3 | checkpoint/resume v2 + T-resume |

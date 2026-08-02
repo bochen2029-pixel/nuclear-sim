@@ -16,12 +16,29 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace ns::gpu {
 
 /// Visible CUDA device count, or -1 if the runtime could not be queried.
 int device_count();
+
+// --- Device identity + memory (perf-log provenance, M4-T4) -------------------
+
+/// Name, compute capability and global-memory sizes of device 0. Purely
+/// observational (queries the runtime, launches nothing), used to stamp
+/// artifacts/perf_history.jsonl with the hardware the numbers were measured on.
+struct DeviceInfo {
+    std::string name;
+    int cc_major = 0;
+    int cc_minor = 0;
+    std::int64_t total_bytes = 0;  // global memory capacity
+    std::int64_t free_bytes = 0;   // free at the moment of the query
+};
+
+/// Populate `out` for CUDA device 0. False on any CUDA error.
+bool device_info(DeviceInfo& out);
 
 // --- Device Philox known-answer tests (DoD: device matches CPU) -------------
 

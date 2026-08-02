@@ -325,7 +325,9 @@ Things owed by a future task that are easy to lose track of:
 | M2-T1 | Extend `oracle.py` §2 (layer masses) rather than writing a separate check; it emits an explicit PENDING block today |
 | M2-T1 | The C-102 pit 2.4% density over-determination check lands here, where the densities exist |
 | M4-T1 | Reproduce `fork(42,1000,3)` on the device (`04 §2c`) |
-| M4-T4 | C-945 (G4 perf budgets) is `PENDING`, resolved by measurement on the dev GPU |
+| M4-T4-a | **done** — FP64 fraction measured 0.00% (C-945's one workload-independent criterion); dev-GPU throughput/VRAM baselines in `artifacts/perf_history.jsonl` |
+| M4-T4-b | swap the eigen's history-per-thread transport for the event-based `k_step` (measured divergence-free) + device-side per-gen reductions. **NOT** the branchless split (dropped — k_step is 100% thread-efficient) |
+| M2–M3 / M7 / M1-T4a-2 | the REST of C-945 (canonical-burst gen/s, render fps, Godiva gate eigen) — needs workloads that don't exist yet; C-945 stays `PENDING`, `resolved_by="M4-T4"` is optimistic |
 | M5-T5 | Verify the `nvidia/cuda:13.1-devel-ubuntu22.04` tag/digest **before** writing the Dockerfile (`12 §3`) |
 | M6-T3 | C-906 (`c_a`) is `PENDING` and is **derived**, never gate-fitted |
 | M7-T2 | C-905 (render scales) is `PENDING`, set by the `09 §1` temperature calibration |

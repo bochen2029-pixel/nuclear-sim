@@ -58,7 +58,7 @@ U-235. The appendix convention note records both figures.
 
 ## 2. Layer masses from geometry × density
 
-**PENDING — requires `data/materials/*.json` (M2-T1).**
+**PENDING — requires the canonical assembly materials, `data/materials/pu_ga_delta.json` and siblings (M2-T1).**
 
 This section recomputes each layer's mass from its `02 §2` geometry and its
 material density and compares it against the appendix §2 Mass column. The

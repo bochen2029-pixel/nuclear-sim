@@ -6,14 +6,14 @@
 ## Current
 
 - **Milestone:** M1 — CPU reference transport + bare-sphere benchmarks (M0 complete; SYNC-M1 run; M1-T1 done)
-- **VERIFY:** `cmake --preset win-x64 && cmake --build --preset win-x64-rel && ctest --preset win-x64-rel` — the `12 §2` canonical loop; falsifiable and real (configure + compile + link + **70 passing tests**). Takes ~1 min warm. Per-task probes are **anchored** (`11 §1`): `ctest --preset win-x64-rel -R "^<module>\."` for module ∈ {toolchain, constants, oracle, rng, loaders, geometry, ref} — all seven resolve and are disjoint.
-- **NEXT ACTION:** Execute M1-T4a — author the OPEN-literature benchmark models per `spec/07-milestones.md` M1-T4a and `spec/08-validation.md` §1: Godiva and Jezebel descriptions with citations and retrieval dates into `data/benchmarks/*.md`; finalize `godiva.toml`, `jezebel.toml`, the `pu_ga_jezebel` material (≈4.5 wt% Pu-240 — the loader ERRORS if a scenario named `jezebel` uses `pu_ga_delta`) and an **isotope-complete** cited `fast4` xs set covering all 16 species `08 §1` enumerates; document the collapse method, weighting spectrum and transport correction as a data card (the one-time D4 carve-out); replace every `[M1-T4a]` placeholder in `08 §1`; one ADR per benchmark (MAJ-46). **Autonomous sessions MUST NOT request ICSBEP handbook access — that is owner-gated M1-T4b (BLK-14); use open literature only.**
+- **VERIFY:** `cmake --preset win-x64 && cmake --build --preset win-x64-rel && ctest --preset win-x64-rel` — the `12 §2` canonical loop; falsifiable and real (configure + compile + link + **75 passing tests**). Takes ~1 min warm. Per-task probes are **anchored** (`11 §1`): `ctest --preset win-x64-rel -R "^<module>\."` for module ∈ {toolchain, constants, oracle, rng, loaders, geometry, ref} — all seven resolve and are disjoint.
+- **NEXT ACTION:** Execute M1-T4a-2 — author the cited, isotope-complete 4-group `fast4` dataset at `data/xs/fast4.json` covering all 16 species `08 §1` enumerates, plus its provenance data card in `data/benchmarks/` (weighting spectrum, collapse method, transport correction — the one-time D4 carve-out). **This is ~450 physical values and they MUST NOT be invented.** Acceptable sources: a published multigroup library, or ENDF/B processed through a documented collapse; every value carries `cite` + `status`, and `03 §2` requires `beta` per isotope and `mu_bar` per group. **If cited data cannot be obtained, mark M1-T4a-2 `blocked`, record why in SESSIONS.md, and switch to M4-T1 — do NOT fill the file with plausible numbers.** Fabricated cross sections would make G0a/G0b compare the code against invented values, which is the one failure this project's whole provenance discipline exists to prevent. Autonomous sessions MUST NOT seek ICSBEP Handbook access (BLK-14, owner-gated M1-T4b).
 
 ## Ready-queue (runnable now)
 
-1. **M1-T4a** (recommended — NEXT ACTION) — OPEN-literature benchmark models + the cited `fast4` dataset; the last thing blocking M1-T5/G0a and all of M2
-2. **M4-T1** — GPU buffers + device Philox; **ADR-009 says it SHOULD start now**, in parallel with M1/M2/M3
-3. *(M1-T5 needs M1-T4a; M2-T1 needs M1-T4a)*
+1. **M1-T4a-2** (recommended — NEXT ACTION) — the cited `fast4` dataset; blocks M1-T5/G0a and all of M2. **Read the NEXT ACTION line above before starting: this task can legitimately end in `blocked`.**
+2. **M4-T1** — GPU buffers + device Philox; fully unblocked, **ADR-009 says it SHOULD already have started**, and it is the right pick if M1-T4a-2 stalls
+3. *(M1-T5 and M2-T1 both need M1-T4a-2)*
 
 **Repository:** <https://github.com/bochen2029-pixel/nuclear-sim> — public, MIT (ADR-011). Remote exists, so the full claim protocol (`README §5.3`: branch + PROGRESS edit + pushed `claim:` commit) applies from M0-T2 onward and parallel sessions are now safe.
 
@@ -46,7 +46,8 @@
 | M1-T1 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T5 | LayerStack + AnalyticSphereTracker + in-tree SHA-256 + `canonical_hash()` (carried per SYNC-M1); 16 tests incl. the nudge-direction pair and the `04 §6` stability matrix |
 | M1-T2 | **done** | session-2026-08-02-b | 2026-08-02 | M1-T1 | E1a–E1e implicit capture; leakage = exp(−Σ_c·R) at 3 depths + a 16-seed bias check; k_inf within 3σ on 3 media; 7 tests |
 | M1-T3 | **done** | session-2026-08-02-b | 2026-08-02 | M1-T2 | power iteration + 8³ entropy + dual σ + Λ; **measured that C-901's h_tol=1e-3 is correlation-limited, not batch-limited** — M1-T5 must re-measure at C-900 before G0a; 9 tests |
-| M1-T4a | todo (RUNNABLE) | — | — | M0-T5 | OPEN-literature benchmark models; one ADR per benchmark; xs dataset |
+| M1-T4a-1 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T5 | Godiva + Jezebel from JEFF Report 16 / CSEWG F5+F1 (open); atom densities primary, all derived values cross-check the spec's old placeholders; ADR-016/017; `08 §1` placeholders replaced; 5 tests |
+| M1-T4a-2 | todo | — | — | M1-T4a-1 | SPLIT from M1-T4a (§8): the cited isotope-complete 4-group `fast4` dataset + provenance data card (D4 carve-out). **~450 cited values across the 16 species of `08 §1`; needs ENDF via a documented collapse or a published multigroup library — MUST NOT be invented** |
 | M1-T4b | blocked | owner | — | owner ICSBEP access | OPTIONAL, owner-gated; autonomous sessions MUST NOT claim |
 | M1-T5 | todo | — | — | M1-T3, M1-T4a | nukebench + gen_gates → gates.toml |
 | M2-T1 | todo | — | — | M1-T4a | materials + trinity_canonical.toml |

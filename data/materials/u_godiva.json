@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "name": "u_godiva",
+  "density_g_cm3": 18.7421,
+  "status": "PUBLIC-DERIVED",
+  "cite": "JEFF Report 16 Annex 3 (OECD/NEA, open) adopting CSEWG Benchmark Book BNL 19302 ENDF 202 Rev. 11-81, fast benchmark F5; retrieved 2026-08-02. Derivation in data/benchmarks/godiva.md",
+  "isotopes": {
+    "U235": 0.937695353,
+    "U238": 0.052052511,
+    "U234": 0.010252136
+  },
+  "composition_check": {
+    "U235_wt_pct": 93.7112
+  }
+}

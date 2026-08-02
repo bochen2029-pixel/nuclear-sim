@@ -126,9 +126,13 @@ def check_materials(entries: dict[str, dict], problems: list[str]) -> int:
         except json.JSONDecodeError as exc:
             problems.append(f"{path.name}: not valid JSON ({exc})")
             continue
-        composition = data.get("composition")
+        # 03 §3 names this table `isotopes` (atom fractions). This check read
+        # `composition` and was vacuous until M1-T4a-1 added the first material
+        # files, at which point it failed on correct data — a verifier with no
+        # data to verify proves nothing about itself.
+        composition = data.get("isotopes")
         if not isinstance(composition, dict):
-            problems.append(f"{path.name}: no 'composition' table (03 §3)")
+            problems.append(f"{path.name}: no 'isotopes' table (03 §3)")
             continue
         for species in composition:
             if species not in known:

@@ -7,15 +7,20 @@ Gate thresholds are normative and live in `data/benchmarks/gates.toml` (03 §10 
 > `[M1-T4a]` = placeholder finalized by M1-T4a from OPEN literature (BLK-14: the ICSBEP Handbook is access-restricted — NEA Data Bank, named users, intended-use statement; autonomous sessions MUST NOT apply). M1-T4a derives models from openly published descriptions (LANL reports, published benchmark summary/cross-evaluation papers, OpenMC/MCNP validation-suite documentation), records every number + open citation + URL + retrieval date in `data/benchmarks/{godiva,jezebel}.md`, tags the model `status = "PUBLIC-DERIVED"`, and logs one ADR per benchmark (MAJ-46). **M1-T4b (optional, owner-gated):** replace with ICSBEP sheet values if the owner obtains access; record sheet + revision.
 
 **Godiva — HEU-MET-FAST-001** (bare HEU sphere)
-- ~93.7 wt% U-235, ~5.2% U-238, ~1.0% U-234 `[M1-T4a]`; ρ ≈ 18.7–18.8 g/cm³ `[M1-T4a]`; radius ≈ 8.74 cm; mass ≈ 52–54 kg `[M1-T4a]`
-- Benchmark k_eff = 1.0000 ± 0.0010 `[M1-T4a]`
+- **FINALIZED by M1-T4a-1** from JEFF Report 16 Annex 3 (OECD/NEA, open) adopting CSEWG Benchmark Book BNL 19302 ENDF 202 Rev. 11-81, fast benchmark **F5**; retrieved 2026-08-02. Full derivation + citations in `data/benchmarks/godiva.md`; ADR-016.
+- Primary datum is **atom densities** (nuclei/b-cm): U-235 0.045000, U-238 0.002498, U-234 0.000492. **Radius 8.741 cm.**
+- Derived: ρ = **18.7421 g/cm³**, mass = **52.431 kg**, wt% = 93.7112 / 5.2686 / 1.0202 (U-235/U-238/U-234) — each independently reproducing the approximate figures previously quoted here.
+- Benchmark **k_eff = 1.0000 ± 0.0010** (experimental). Model `status = "PUBLIC-DERIVED"`; the ±0.0010 is an experimental uncertainty, NOT a verified benchmark-model uncertainty, so per the rule below it counts as 0 pcm and the gate report must say so.
 
 **Jezebel — PU-MET-FAST-001** (bare δ-phase Pu-Ga sphere)
-- **4.5 wt% Pu-240**, ~1.02 wt% Ga, balance Pu-239 `[M1-T4a]` (open cross-evaluation literature); ρ ≈ 15.6 g/cm³; radius ≈ 6.385 cm; mass ≈ 17.0 kg `[M1-T4a]`
-- Benchmark k_eff = 1.0000 ± 0.0020 `[M1-T4a]`
+- **FINALIZED by M1-T4a-1** from the same source, fast benchmark **F1**; retrieved 2026-08-02. Derivation in `data/benchmarks/jezebel.md`; ADR-017.
+- Primary datum is **atom densities** (nuclei/b-cm): Pu-239 0.037050, Pu-240 0.001751, Pu-241 0.000117, Ga(nat) 0.001375. **Radius 6.385 cm.**
+- Derived: ρ = **15.6112 g/cm³**, mass = **17.022 kg**, Ga = **1.0197 wt%**. **Pu-240 is 4.4710 wt% of the material, 4.5171 wt% of the Pu, and 4.4990 at% of the Pu** — all three round to the published "4.5%", so the at%/wt% ambiguity in the literature has no consequence here (recorded so it is not re-litigated).
+- Natural Ga is split **Ga-69 60.108% / Ga-71 39.892%** (IUPAC) by explicit author choice, because `03 §3` forbids the LOADER expanding natural abundance; the split reproduces the natural-Ga mass to 7 digits.
+- Benchmark **k_eff = 1.0000 ± 0.0020** (experimental; same PUBLIC-DERIVED caveat as Godiva).
 - Scenario MUST use material `pu_ga_jezebel`, NEVER `pu_ga_delta` (loader-enforced, 03 §3). Trinity material ≠ Jezebel material (Pu-240 1.0% vs 4.5%).
 
-Required isotope set for the xs set (M1-T4a enumerates fully): U-234, U-235, U-238, Pu-239, Pu-240, Pu-241(trace), Ga-69/71, B-10, C, H, O, N, Al, W, Be, Po.
+Required isotope set for the xs set (**M1-T4a-2** enumerates fully — the dataset is split out because it is ~450 cited values and MUST NOT be invented): U-234, U-235, U-238, Pu-239, Pu-240, Pu-241(trace), Ga-69/71, B-10, C, H, O, N, Al, W, Be, Po.
 
 Benchmark uncertainty rule (operational, MIN-06): gate tolerance = `500 pcm + benchmark_uncertainty_pcm` (from gates.toml); if the benchmark uncertainty is unverified (PUBLIC-DERIVED model), it is taken as 0 and the gate report MUST state so.
 

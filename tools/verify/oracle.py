@@ -147,10 +147,14 @@ def section_layer_masses(c: dict) -> tuple[list[str], list[str]]:
         "## 2. Layer masses from geometry × density",
         "",
     ]
-    have_materials = MATERIALS.is_dir() and any(MATERIALS.glob("*.json"))
+    # The layer-mass recomputation needs the CANONICAL assembly's materials
+    # (M2-T1), not merely some materials: M1-T4a-1's benchmark spheres are a
+    # different geometry entirely, so their presence must not silently retire
+    # this PENDING block.
+    have_materials = (MATERIALS / "pu_ga_delta.json").exists()
     if not have_materials:
         lines += [
-            "**PENDING — requires `data/materials/*.json` (M2-T1).**",
+            "**PENDING — requires the canonical assembly materials, `data/materials/pu_ga_delta.json` and siblings (M2-T1).**",
             "",
             "This section recomputes each layer's mass from its `02 §2` geometry and its",
             "material density and compares it against the appendix §2 Mass column. The",

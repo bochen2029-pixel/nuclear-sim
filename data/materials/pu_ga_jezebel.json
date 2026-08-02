@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "name": "pu_ga_jezebel",
+  "density_g_cm3": 15.6112,
+  "status": "PUBLIC-DERIVED",
+  "cite": "JEFF Report 16 Annex 3 (OECD/NEA, open) adopting CSEWG Benchmark Book BNL 19302 ENDF 202 Rev. 11-81, fast benchmark F1; retrieved 2026-08-02. Natural Ga split Ga-69/Ga-71 60.108/39.892 (IUPAC) by explicit author choice per 03 section 3. Derivation in data/benchmarks/jezebel.md",
+  "isotopes": {
+    "Pu239": 0.919514556,
+    "Pu240": 0.043456680,
+    "Pu241": 0.002903730,
+    "Ga69": 0.020511876,
+    "Ga71": 0.013613159
+  },
+  "composition_check": {
+    "Ga_wt_pct": 1.0197,
+    "Pu240_wt_pct_of_Pu": 4.5171
+  }
+}

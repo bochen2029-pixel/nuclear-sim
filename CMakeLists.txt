@@ -330,7 +330,10 @@ add_test(NAME constants.crosscheck_misuse
 # (SYNC-M4); no second implementation exists to drift from the frozen KATs.
 # ---------------------------------------------------------------------------
 if(NUKESIM_WITH_CUDA)
-    add_library(nukesim_gpu STATIC src/gpu/gpu_backend.cu src/gpu/device_data.cu)
+    add_library(nukesim_gpu STATIC
+        src/gpu/gpu_backend.cu
+        src/gpu/device_data.cu
+        src/gpu/transport.cu)
     target_include_directories(nukesim_gpu PUBLIC ${CMAKE_SOURCE_DIR}/src)
     # nukesim_core (host) supplies the CPU LayerStack / materials / xs that the
     # M4-T2-a device builders mirror and the parity tests compare against.

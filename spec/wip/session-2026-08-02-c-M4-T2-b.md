@@ -33,3 +33,18 @@ Fold durable items into SESSIONS.md at END, then delete this file.
 - Cross-backend is STATISTICAL only (G0c) — never assert ref==gpu bit-identity.
 
 ## Findings (append as they happen)
+- ref keys each history's stream as `Stream(seed, source_id, ctr=history)` — history index goes
+  in the COUNTER slot. Multi-block histories can overlap (history h draws blocks h,h+1,… while
+  h+1 starts at h+1) → mild inter-history correlation. NOT my task to fix ref (M1-T2 done/green),
+  and cross-backend is statistical, so the GPU uses the BETTER keying: particle p's stream =
+  `fork(source_base, 0, p)` (splitmix-distributed unique stream id, non-overlapping). Store
+  (ctr,sub) in SoA and resume each superstep; stream id recomputable from the particle's
+  orig_index. This is exactly what `fork` is for (BLK-11 streams-from-identity).
+- GPU uses `uniform_f` (float, 01 §9); ref uses `uniform_d`. Streams therefore differ →
+  histories differ → compared STATISTICALLY only (G0c, within 3σ). Never assert ref==gpu bits.
+- sigma computed like ref: per-HISTORY scores (per-particle score_leak/score_prod arrays), then
+  mean + standard_error on the host — identical estimator to TallyAcc, and deterministic since
+  each particle's score depends only on its index-keyed stream (bit-identity across configs).
+- Scope call: deliver a correct, deterministic multi-superstep transport (dead-skip per
+  superstep) + T-diff FIRST; prefix-sum COMPACTION of alive particles (reusing M4-T1 scan) is
+  the "prefix-sum partition" the DoD names — add once the physics T-diff is green.

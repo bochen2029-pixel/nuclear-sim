@@ -30,6 +30,8 @@
 #include "core/xs/xs.h"
 #include "gpu/device_data.h"
 #include "gpu/gpu_backend.h"
+#include "gpu/transport.h"
+#include "ref/ref_transport.h"
 
 #include "rng_kat.inl"
 #include "spec_examples.h"
@@ -119,6 +121,69 @@ struct ToyWorld {
     }
     ToyWorld(const ToyWorld&) = delete;
     ToyWorld& operator=(const ToyWorld&) = delete;
+};
+
+/// A single-sphere PURE ABSORBER: one U238-capture isotope (σ_f = σ_s = 0,
+/// μ̄ = 0), so Σ_tr = Σ_c and the leaked fraction is exp(−Σ_c·R) — the same DoD
+/// oracle test_ref.cpp uses. Density and σ_c give an optical depth ≈ 2.
+struct PureCaptureWorld {
+    std::filesystem::path root;
+    std::unique_ptr<ns::xs::FewGroupXS> xs;
+    std::unique_ptr<ns::material::MaterialLib> materials;
+    ns::geom::LayerStack stack;
+    double radius_cm = 10.0;
+
+    PureCaptureWorld() {
+        namespace fs = std::filesystem;
+        using nlohmann::json;
+        static int counter = 0;
+        root = fs::temp_directory_path() / ("nukesim_gpu_cap_" + std::to_string(counter++));
+        fs::remove_all(root);
+        fs::create_directories(root / "xs");
+        fs::create_directories(root / "materials");
+
+        const auto four = [](double v) { return json::array({v, v, v, v}); };
+        const json iso = {{"nu", four(0.0)},
+                          {"chi", json::array({1.0, 0.0, 0.0, 0.0})},
+                          {"sigma_f", four(0.0)},
+                          {"sigma_c", four(4.0)},
+                          {"sigma_s", four(0.0)},
+                          {"sigma_n2n", four(0.0)},
+                          {"mu_bar", four(0.0)},
+                          {"beta", 0.0065},
+                          {"transfer", json::array({json::array({1.0, 0.0, 0.0, 0.0}),
+                                                    json::array({0.0, 1.0, 0.0, 0.0}),
+                                                    json::array({0.0, 0.0, 1.0, 0.0}),
+                                                    json::array({0.0, 0.0, 0.0, 1.0})})},
+                          {"cite", "synthetic pure absorber — not physical data"},
+                          {"status", "SIM"}};
+        const json xs_doc = {{"schema_version", 2},
+                             {"name", "cap"},
+                             {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3})},
+                             {"isotopes", {{"U238", iso}}}};
+        spec_examples::write_file(root / "xs" / "cap.json", xs_doc.dump(2));
+
+        // density so n·1e-24·σ_c ≈ 0.2 /cm ⇒ Σ_c·R ≈ 2 at R = 10 cm.
+        const json mat = {{"schema_version", 1},
+                          {"name", "absorber"},
+                          {"density_g_cm3", 19.76},
+                          {"status", "SIM"},
+                          {"cite", "synthetic"},
+                          {"isotopes", {{"U238", 1.0}}}};
+        spec_examples::write_file(root / "materials" / "absorber.json", mat.dump(2));
+
+        xs = std::make_unique<ns::xs::FewGroupXS>(ns::xs::FewGroupXS::load(root / "xs" / "cap.json"));
+        materials = std::make_unique<ns::material::MaterialLib>(
+            ns::material::MaterialLib::load_dir(root / "materials", *xs));
+        stack = ns::geom::LayerStack(
+            {ns::geom::Layer{"medium", radius_cm, 0, "SIM"}});
+    }
+    ~PureCaptureWorld() {
+        std::error_code ec;
+        std::filesystem::remove_all(root, ec);
+    }
+    PureCaptureWorld(const PureCaptureWorld&) = delete;
+    PureCaptureWorld& operator=(const PureCaptureWorld&) = delete;
 };
 
 }  // namespace
@@ -315,4 +380,63 @@ TEST_CASE("device macro cross sections match the CPU mix() (float vs double pari
                          Catch::Matchers::WithinRel(mat.macro.nu_sigma_f[gi], 1e-4));
         }
     }
+}
+
+TEST_CASE("gpu fixed-source pure-capturer leakage matches ref (T-diff, G0c)", "[gpu]") {
+    // M4-T2-b: the event-based GPU transport vs the CPU oracle. Both estimate the
+    // pure-absorber leaked fraction exp(−Σ_c·R); G0c asks they agree within
+    // 3·√(σ_ref² + σ_gpu²) — statistical, because the backends draw different
+    // (double vs float) uniform sequences. This is the first differential check.
+    const PureCaptureWorld w;
+    const std::int64_t histories = 500000;
+    const std::uint64_t seed = 20260802;
+
+    // ref/ (double).
+    ns::ref::RefTransport ref(w.stack, *w.materials, *w.xs, seed);
+    ns::ref::TallyAcc tally;
+    ns::ref::SourceSpec spec;
+    spec.kind = ns::ref::SourceSpec::Kind::PointIsotropic;
+    spec.histories = histories;
+    ref.run_fixed_source(spec, tally);
+    const double leak_ref = tally.leaked_fraction();
+    const double sig_ref = tally.leaked_fraction_sigma();
+
+    // gpu (float).
+    ns::gpu::FixedSourceResult g;
+    REQUIRE(ns::gpu::gpu_fixed_source(w.stack, *w.materials, seed, histories,
+                                      {1.0f, 0.0f, 0.0f, 0.0f}, 256, 128, g));
+
+    const double optical_depth = w.materials->all().front().macro.sigma_c[0] * w.radius_cm;
+    const double analytic = std::exp(-optical_depth);
+    INFO("gpu=" << g.leaked_fraction << " ref=" << leak_ref << " analytic=" << analytic
+                << " Σc·R=" << optical_depth << " supersteps=" << g.supersteps);
+
+    // The GPU result sits on the analytic value...
+    REQUIRE_THAT(g.leaked_fraction, Catch::Matchers::WithinAbs(analytic, 0.005));
+    // ...and agrees with ref within G0c's statistical bound.
+    const double bound = 3.0 * std::sqrt(sig_ref * sig_ref + g.leaked_sigma * g.leaked_sigma);
+    REQUIRE(std::abs(g.leaked_fraction - leak_ref) <= bound);
+
+    // No fission ⇒ zero production; a pure capturer leaks or dies in ≤ 2 events
+    // (a leaker crosses the surface then leaks; an absorber collides and dies).
+    REQUIRE(g.k_estimate == 0.0);
+    REQUIRE(g.supersteps >= 1);
+    REQUIRE(g.supersteps <= 2);
+}
+
+TEST_CASE("gpu fixed-source is bit-identical across launch configs", "[gpu]") {
+    // Same-backend determinism (01 §9 / BLK-11): the result depends only on the
+    // per-particle index-keyed streams, never the launch geometry.
+    const PureCaptureWorld w;
+    const std::int64_t histories = 100000;
+    const std::uint64_t seed = 7;
+
+    ns::gpu::FixedSourceResult a;
+    ns::gpu::FixedSourceResult b;
+    REQUIRE(ns::gpu::gpu_fixed_source(w.stack, *w.materials, seed, histories,
+                                      {1.0f, 0.0f, 0.0f, 0.0f}, 64, 128, a));
+    REQUIRE(ns::gpu::gpu_fixed_source(w.stack, *w.materials, seed, histories,
+                                      {1.0f, 0.0f, 0.0f, 0.0f}, 512, 256, b));
+    REQUIRE(a.leaked_fraction == b.leaked_fraction);  // bit-identical
+    REQUIRE(a.leaked_sigma == b.leaked_sigma);
 }

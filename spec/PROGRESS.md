@@ -46,7 +46,7 @@
 | M0-T6 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T5 | `tools/ci/local_ci.{ps1,sh}` + `.github/workflows/ci.yml`; Actions green on `main` (windows-2022 + ubuntu-latest + gate-evidence archive); `.env.example` committed |
 | M1-T1 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T5 | LayerStack + AnalyticSphereTracker + in-tree SHA-256 + `canonical_hash()` (carried per SYNC-M1); 16 tests incl. the nudge-direction pair and the `04 §6` stability matrix |
 | M1-T2 | **done** | session-2026-08-02-b | 2026-08-02 | M1-T1 | E1a–E1e implicit capture; leakage = exp(−Σ_c·R) at 3 depths + a 16-seed bias check; k_inf within 3σ on 3 media; 7 tests |
-| M1-T3 | todo | — | — | M1-T2 | eigen (8³ mesh entropy, dual σ, Λ estimator) |
+| M1-T3 | **in_progress** | session-2026-08-02-b | 2026-08-02 | M1-T2 | eigen (8³ mesh entropy, dual σ, Λ estimator) |
 | M1-T4a | todo (RUNNABLE) | — | — | M0-T5 | OPEN-literature benchmark models; one ADR per benchmark; xs dataset |
 | M1-T4b | blocked | owner | — | owner ICSBEP access | OPTIONAL, owner-gated; autonomous sessions MUST NOT claim |
 | M1-T5 | todo | — | — | M1-T3, M1-T4a | nukebench + gen_gates → gates.toml |

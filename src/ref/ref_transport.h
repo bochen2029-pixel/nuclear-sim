@@ -30,6 +30,35 @@ struct Particle {
     rng::Stream stream;
 };
 
+/// One banked fission neutron. The eigen solver's bank is a vector of these.
+struct FissionSite {
+    geom::Vec3 pos;
+    int group = 0;
+    int isotope = -1;
+    int layer = -1;
+};
+
+/// The fission source of one generation: sites plus the resolved breakdowns
+/// 05 §1/§2 require (per-isotope S_i drives beta_eff and nu_bar_eff; the fixed
+/// 8^3 mesh drives the Shannon-entropy convergence test).
+struct FissionSource {
+    std::vector<FissionSite> sites;
+    std::vector<double> by_isotope;
+    std::vector<double> by_layer;
+    std::vector<double> mesh;  // 8*8*8 = 512, C-908
+};
+
+/// What one power-iteration generation produced.
+struct GenerationResult {
+    FissionSource source;
+    double production = 0.0;      // sum of w*nu*sigma_f/sigma_t over collisions
+    double source_weight = 0.0;
+    double leaked_weight = 0.0;
+    /// sum of w * path_length / v, i.e. the numerator of the prompt lifetime
+    /// (01 §3's track-length time estimator).
+    double time_weight = 0.0;
+};
+
 /// Mirrors 03 §4's [source] block (05 §1).
 struct SourceSpec {
     enum class Kind { PointIsotropic, UniformSphere, UniformShell, FissionSourceReplay };
@@ -107,6 +136,30 @@ public:
     /// measures is production per source neutron, which in a leakage-free
     /// medium is exactly k_inf.
     void run_fixed_source(const SourceSpec& spec, TallyAcc& tally);
+
+    /// Transports one generation from `bank` and produces the next one.
+    ///
+    /// Progeny are banked as floor(w*nu_i*(sigma_f,i/sigma_t,i)/k_gen + xi)
+    /// sites at the collision point (E1c). Dividing by the running k is what
+    /// keeps the bank population stable across generations.
+    void run_generation(const std::vector<FissionSite>& bank, double k_gen,
+                        std::uint64_t generation, GenerationResult& out);
+
+    /// An initial bank for the power iteration.
+    /// `concentrated` puts every site at the origin — 05 §2's deliberately bad
+    /// source, which must take measurably longer to converge than a uniform one.
+    std::vector<FissionSite> initial_bank(std::int64_t count, bool concentrated,
+                                          std::uint64_t seed) const;
+
+    /// Neutron speed for a group, cm/s.
+    ///
+    /// Derived by scaling C-031 (1.4e9 cm/s at ~1 MeV) as v ∝ sqrt(E), with E
+    /// the geometric-mean energy of the group. Anchoring on the existing
+    /// constant avoids introducing a neutron mass the appendix does not carry,
+    /// and makes the 1 MeV group reproduce C-031 by construction.
+    double group_speed_cm_s(int group) const;
+
+    const geom::LayerStack& stack() const noexcept { return stack_; }
 
     /// Analytic k_inf of a homogeneous medium: nu*Sigma_f / (Sigma_c + Sigma_f).
     /// The oracle the MC result is checked against, computed independently of

@@ -241,9 +241,12 @@ add_test(NAME constants.generator_rejects_missing_provenance
 # nscore loaders (M0-T5). GUI-free and deterministic by construction (D7).
 # ---------------------------------------------------------------------------
 add_library(nukesim_core STATIC
+    src/core/geometry/geometry.cpp
+    src/core/hash/sha256.cpp
     src/core/xs/xs.cpp
     src/core/material/material.cpp
-    src/core/scenario/scenario.cpp)
+    src/core/scenario/scenario.cpp
+    src/core/scenario/canonical_hash.cpp)
 target_link_libraries(nukesim_core PUBLIC nukesim_core_constants nukesim_deps)
 target_include_directories(nukesim_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 nukesim_strict(nukesim_core)
@@ -257,6 +260,13 @@ target_compile_definitions(test_loaders PRIVATE
     NUKESIM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 nukesim_strict(test_loaders)
 catch_discover_tests(test_loaders TEST_PREFIX "loaders.")
+
+add_executable(test_geometry tests/unit/test_geometry.cpp)
+target_link_libraries(test_geometry PRIVATE nukesim_core Catch2::Catch2WithMain)
+target_include_directories(test_geometry PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
+target_compile_definitions(test_geometry PRIVATE NUKESIM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+nukesim_strict(test_geometry)
+catch_discover_tests(test_geometry TEST_PREFIX "geometry.")
 
 add_executable(test_rng tests/unit/test_rng.cpp)
 target_link_libraries(test_rng PRIVATE nukesim_core_constants Catch2::Catch2WithMain)

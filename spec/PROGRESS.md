@@ -6,15 +6,14 @@
 ## Current
 
 - **Milestone:** M1 — CPU reference transport + bare-sphere benchmarks (M0 complete; SYNC-M1 run; M1-T1 done)
-- **VERIFY:** `cmake --preset win-x64 && cmake --build --preset win-x64-rel && ctest --preset win-x64-rel` — the `12 §2` canonical loop; falsifiable and real (configure + compile + link + **61 passing tests**). Takes ~1 min warm. Per-task probes are **anchored** (`11 §1`): `ctest --preset win-x64-rel -R "^<module>\."` for module ∈ {toolchain, constants, oracle, rng, loaders, geometry, ref} — all seven resolve and are disjoint.
-- **NEXT ACTION:** Execute M1-T3 — implement `physics/eigen` power iteration per `spec/05-module-transport.md` §2: the fission-bank iteration driving `ns::ref::RefTransport` (which already tallies production but deliberately does NOT propagate progeny — that propagation is this task), the fixed 8³ Shannon-entropy mesh (C-908, over the outermost-layer bbox), the dual σ estimate, and the Λ estimator returned in `EigenResult` (including `beta_eff`, ADR-013 — the solver MUST NOT return a β-corrected k); DoD per `05 §2`: bad-source convergence test, Λ(2ρ)/Λ(ρ) ∈ [0.4, 0.6], and 2× batch ⇒ k within 3σ; register as `catch_discover_tests(test_eigen TEST_PREFIX "eigen.")` and add its row to `11 §1`; DoD in `07-milestones.md` M1-T3.
+- **VERIFY:** `cmake --preset win-x64 && cmake --build --preset win-x64-rel && ctest --preset win-x64-rel` — the `12 §2` canonical loop; falsifiable and real (configure + compile + link + **70 passing tests**). Takes ~1 min warm. Per-task probes are **anchored** (`11 §1`): `ctest --preset win-x64-rel -R "^<module>\."` for module ∈ {toolchain, constants, oracle, rng, loaders, geometry, ref} — all seven resolve and are disjoint.
+- **NEXT ACTION:** Execute M1-T4a — author the OPEN-literature benchmark models per `spec/07-milestones.md` M1-T4a and `spec/08-validation.md` §1: Godiva and Jezebel descriptions with citations and retrieval dates into `data/benchmarks/*.md`; finalize `godiva.toml`, `jezebel.toml`, the `pu_ga_jezebel` material (≈4.5 wt% Pu-240 — the loader ERRORS if a scenario named `jezebel` uses `pu_ga_delta`) and an **isotope-complete** cited `fast4` xs set covering all 16 species `08 §1` enumerates; document the collapse method, weighting spectrum and transport correction as a data card (the one-time D4 carve-out); replace every `[M1-T4a]` placeholder in `08 §1`; one ADR per benchmark (MAJ-46). **Autonomous sessions MUST NOT request ICSBEP handbook access — that is owner-gated M1-T4b (BLK-14); use open literature only.**
 
 ## Ready-queue (runnable now)
 
-1. **M1-T3** (recommended — NEXT ACTION) — `physics/eigen` power iteration + entropy + Λ
-2. **M1-T4a** — OPEN-literature benchmark models + the cited `fast4` xs dataset; independent, safe to run in parallel
-3. **M4-T1** — GPU buffers + device Philox; **ADR-009 says it SHOULD start now**, in parallel with M1/M2/M3
-4. *(M1-T5 needs M1-T3 + M1-T4a; M2-T1 needs M1-T4a)*
+1. **M1-T4a** (recommended — NEXT ACTION) — OPEN-literature benchmark models + the cited `fast4` dataset; the last thing blocking M1-T5/G0a and all of M2
+2. **M4-T1** — GPU buffers + device Philox; **ADR-009 says it SHOULD start now**, in parallel with M1/M2/M3
+3. *(M1-T5 needs M1-T4a; M2-T1 needs M1-T4a)*
 
 **Repository:** <https://github.com/bochen2029-pixel/nuclear-sim> — public, MIT (ADR-011). Remote exists, so the full claim protocol (`README §5.3`: branch + PROGRESS edit + pushed `claim:` commit) applies from M0-T2 onward and parallel sessions are now safe.
 
@@ -46,7 +45,7 @@
 | M0-T6 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T5 | `tools/ci/local_ci.{ps1,sh}` + `.github/workflows/ci.yml`; Actions green on `main` (windows-2022 + ubuntu-latest + gate-evidence archive); `.env.example` committed |
 | M1-T1 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T5 | LayerStack + AnalyticSphereTracker + in-tree SHA-256 + `canonical_hash()` (carried per SYNC-M1); 16 tests incl. the nudge-direction pair and the `04 §6` stability matrix |
 | M1-T2 | **done** | session-2026-08-02-b | 2026-08-02 | M1-T1 | E1a–E1e implicit capture; leakage = exp(−Σ_c·R) at 3 depths + a 16-seed bias check; k_inf within 3σ on 3 media; 7 tests |
-| M1-T3 | **in_progress** | session-2026-08-02-b | 2026-08-02 | M1-T2 | eigen (8³ mesh entropy, dual σ, Λ estimator) |
+| M1-T3 | **done** | session-2026-08-02-b | 2026-08-02 | M1-T2 | power iteration + 8³ entropy + dual σ + Λ; **measured that C-901's h_tol=1e-3 is correlation-limited, not batch-limited** — M1-T5 must re-measure at C-900 before G0a; 9 tests |
 | M1-T4a | todo (RUNNABLE) | — | — | M0-T5 | OPEN-literature benchmark models; one ADR per benchmark; xs dataset |
 | M1-T4b | blocked | owner | — | owner ICSBEP access | OPTIONAL, owner-gated; autonomous sessions MUST NOT claim |
 | M1-T5 | todo | — | — | M1-T3, M1-T4a | nukebench + gen_gates → gates.toml |

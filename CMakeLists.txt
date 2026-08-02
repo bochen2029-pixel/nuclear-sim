@@ -247,7 +247,9 @@ add_library(nukesim_core STATIC
     src/core/material/material.cpp
     src/core/scenario/scenario.cpp
     src/core/scenario/canonical_hash.cpp
-    src/ref/ref_transport.cpp)
+    src/ref/ref_transport.cpp
+    src/ref/ref_generation.cpp
+    src/physics/eigen/eigen.cpp)
 target_link_libraries(nukesim_core PUBLIC nukesim_core_constants nukesim_deps)
 target_include_directories(nukesim_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 nukesim_strict(nukesim_core)
@@ -268,6 +270,13 @@ target_include_directories(test_geometry PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
 target_compile_definitions(test_geometry PRIVATE NUKESIM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 nukesim_strict(test_geometry)
 catch_discover_tests(test_geometry TEST_PREFIX "geometry.")
+
+add_executable(test_eigen tests/unit/test_eigen.cpp)
+target_link_libraries(test_eigen PRIVATE nukesim_core Catch2::Catch2WithMain)
+target_include_directories(test_eigen PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
+target_compile_definitions(test_eigen PRIVATE NUKESIM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+nukesim_strict(test_eigen)
+catch_discover_tests(test_eigen TEST_PREFIX "eigen.")
 
 add_executable(test_ref tests/unit/test_ref.cpp)
 target_link_libraries(test_ref PRIVATE nukesim_core Catch2::Catch2WithMain)

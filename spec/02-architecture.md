@@ -35,6 +35,7 @@ C:\NUCLEAR/                       # THIS DIRECTORY IS THE REPO ROOT (BLK-12; git
     physics/   eigen/ kinetics/ hydro/ couple/ tally/
     render/    fields/ raymarch/ color/                  # 09-rendering.md
     app/       nukebench/ nukefarm/samplers/ nukestudio/ nukecinema/
+  scripts/     build.ps1 — developer wrappers around the 12 §2 canonical loop (M0-T2)
   tools/       gen_constants/ verify/ sync_artifacts/ make_film/ ci/ xs_prep(optional)/
   deploy/      Dockerfile, runpod.md                     # M5-T5
   tests/       unit/ golden/ differential/ perf/
@@ -92,7 +93,7 @@ emit run.json + tally.json (+ checkpoint per D9; + fields if enabled)
 
 - **Language/standards:** C++20. Version pins live ONLY in `12-deployment.md` §1 (single source of truth — do not restate versions here or anywhere else). `12 §1` also owns preset naming and `CMAKE_CUDA_ARCHITECTURES`.
 - **Warnings:** `-Wall -Wextra -Werror` (MSVC `/W4 /WX`) apply to **first-party targets only**, set per-target via `target_compile_options`, never globally. Third-party headers via `SYSTEM` includes. CUDA host flags routed with `-Xcompiler`; device `-Werror all-warnings` only on first-party `.cu`.
-- **Dependencies:** vcpkg manifest mode with a committed `builtin-baseline` SHA (`vcpkg-configuration.json`); baseline changes require an ADR. New dependency ⇒ ADR first. Baseline set: fmt, tomlplusplus, nlohmann-json, Catch2, CLI11, SQLite3; M7 adds glfw3, glad, imgui[docking-experimental], implot, tinyexr.
+- **Dependencies:** vcpkg manifest mode with a committed builtin-registry baseline SHA, pinned in `vcpkg-configuration.json` as `default-registry.baseline` (`12 §1`); baseline changes require an ADR. New dependency ⇒ ADR first. Baseline set: fmt, tomlplusplus, nlohmann-json, Catch2, CLI11, SQLite3; M7 adds glfw3, glad, imgui[docking-experimental], implot, tinyexr.
 - **Error handling:** loaders validate and fail with precise diagnostics (file, field, constraint). No silent physics defaults.
 - **Logging:** fmt-based; ERROR/WARN/INFO/DEBUG; headless runs log `run.log` in the artifact bundle.
 - **Determinism:** no `std::random_device` / wall-clock seeds except to GENERATE a recorded seed; effective seed always in `run.json`. Scheduling decisions on integer counters only — equality tests on accumulated floating-point time are forbidden (MAJ-21).

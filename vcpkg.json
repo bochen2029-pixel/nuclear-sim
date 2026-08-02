@@ -1,0 +1,33 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "nuclear-sim",
+  "version": "0.1.0",
+  "description": "Educational math/physics simulator of the 1945 Trinity device, built exclusively from public and declassified literature.",
+  "homepage": "https://github.com/bochen2029-pixel/nuclear-sim",
+  "license": "MIT",
+  "dependencies": [
+    "catch2",
+    "cli11",
+    "fmt",
+    "nlohmann-json",
+    "sqlite3",
+    "tomlplusplus"
+  ],
+  "features": {
+    "render": {
+      "description": "M7 rendering and UI frontends (nukestudio, nukecinema). Not installed before M7.",
+      "dependencies": [
+        "glad",
+        "glfw3",
+        {
+          "name": "imgui",
+          "features": [
+            "docking-experimental"
+          ]
+        },
+        "implot",
+        "tinyexr"
+      ]
+    }
+  }
+}

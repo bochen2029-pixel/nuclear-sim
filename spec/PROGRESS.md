@@ -6,15 +6,15 @@
 ## Current
 
 - **Milestone:** M1 — CPU reference transport + bare-sphere benchmarks (M0 complete; SYNC-M1 run; M1-T1 done)
-- **VERIFY:** `cmake --preset win-x64 && cmake --build --preset win-x64-rel && ctest --preset win-x64-rel` — the `12 §2` canonical loop; falsifiable and real (configure + compile + link + **54 passing tests**). Takes ~1 min warm. Per-task probes: `ctest --preset win-x64-rel -R toolchain|constants|rng|loaders|geometry|oracle` — all six resolve.
-- **NEXT ACTION:** Execute M1-T2 — implement `src/ref/` history-based transport per `spec/05-module-transport.md` §1 (E1a–E1e with **full implicit capture**, ADR-012 item 1 — the analog-with-implicit-absorption variant was explicitly rejected) plus the fixed-source path driven by `SourceSpec`; the DoD is two physics checks, not a smoke test: a pure-capturer point-source leakage of `exp(−Σ_c·R)` within 1σ at three optical depths (**requires Σ_f = Σ_s = 0**, QC-09) AND infinite-medium `k_inf = ν̄Σ_f/(Σ_c+Σ_f)` within 3σ; use `ns::rng::Stream` with the C-907 stream ids and `ns::geom::AnalyticSphereTracker`; register as `catch_discover_tests(test_ref TEST_PREFIX "ref.")` per `11 §1`; DoD in `07-milestones.md` M1-T2.
+- **VERIFY:** `cmake --preset win-x64 && cmake --build --preset win-x64-rel && ctest --preset win-x64-rel` — the `12 §2` canonical loop; falsifiable and real (configure + compile + link + **61 passing tests**). Takes ~1 min warm. Per-task probes are **anchored** (`11 §1`): `ctest --preset win-x64-rel -R "^<module>\."` for module ∈ {toolchain, constants, oracle, rng, loaders, geometry, ref} — all seven resolve and are disjoint.
+- **NEXT ACTION:** Execute M1-T3 — implement `physics/eigen` power iteration per `spec/05-module-transport.md` §2: the fission-bank iteration driving `ns::ref::RefTransport` (which already tallies production but deliberately does NOT propagate progeny — that propagation is this task), the fixed 8³ Shannon-entropy mesh (C-908, over the outermost-layer bbox), the dual σ estimate, and the Λ estimator returned in `EigenResult` (including `beta_eff`, ADR-013 — the solver MUST NOT return a β-corrected k); DoD per `05 §2`: bad-source convergence test, Λ(2ρ)/Λ(ρ) ∈ [0.4, 0.6], and 2× batch ⇒ k within 3σ; register as `catch_discover_tests(test_eigen TEST_PREFIX "eigen.")` and add its row to `11 §1`; DoD in `07-milestones.md` M1-T3.
 
 ## Ready-queue (runnable now)
 
-1. **M1-T2** (recommended — NEXT ACTION) — `src/ref/` history-based transport with implicit capture
+1. **M1-T3** (recommended — NEXT ACTION) — `physics/eigen` power iteration + entropy + Λ
 2. **M1-T4a** — OPEN-literature benchmark models + the cited `fast4` xs dataset; independent, safe to run in parallel
 3. **M4-T1** — GPU buffers + device Philox; **ADR-009 says it SHOULD start now**, in parallel with M1/M2/M3
-4. *(M1-T3 needs M1-T2)*
+4. *(M1-T5 needs M1-T3 + M1-T4a; M2-T1 needs M1-T4a)*
 
 **Repository:** <https://github.com/bochen2029-pixel/nuclear-sim> — public, MIT (ADR-011). Remote exists, so the full claim protocol (`README §5.3`: branch + PROGRESS edit + pushed `claim:` commit) applies from M0-T2 onward and parallel sessions are now safe.
 
@@ -45,7 +45,7 @@
 | M0-T5 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T2, M0-T3-a | xs v2 / materials / scenario loaders; positive tests parse the SPEC'S OWN examples extracted from `03` at run time; one negative test per violation class; 11 tests |
 | M0-T6 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T5 | `tools/ci/local_ci.{ps1,sh}` + `.github/workflows/ci.yml`; Actions green on `main` (windows-2022 + ubuntu-latest + gate-evidence archive); `.env.example` committed |
 | M1-T1 | **done** | session-2026-08-02-b | 2026-08-02 | M0-T5 | LayerStack + AnalyticSphereTracker + in-tree SHA-256 + `canonical_hash()` (carried per SYNC-M1); 16 tests incl. the nudge-direction pair and the `04 §6` stability matrix |
-| M1-T2 | **in_progress** | session-2026-08-02-b | 2026-08-02 | M1-T1 | ref transport (implicit capture); k_inf + leakage tests |
+| M1-T2 | **done** | session-2026-08-02-b | 2026-08-02 | M1-T1 | E1a–E1e implicit capture; leakage = exp(−Σ_c·R) at 3 depths + a 16-seed bias check; k_inf within 3σ on 3 media; 7 tests |
 | M1-T3 | todo | — | — | M1-T2 | eigen (8³ mesh entropy, dual σ, Λ estimator) |
 | M1-T4a | todo (RUNNABLE) | — | — | M0-T5 | OPEN-literature benchmark models; one ADR per benchmark; xs dataset |
 | M1-T4b | blocked | owner | — | owner ICSBEP access | OPTIONAL, owner-gated; autonomous sessions MUST NOT claim |

@@ -7,12 +7,17 @@ Every task's DoD includes its tests. `ctest` is the single entry point; suites a
 - **Unit (Catch2, per module):** per `04 §7`, `05`, `07` task DoDs. Core/ref: no GPU required.
 - **Test naming (normative, M0-T2).** Every Catch2 executable is registered as `catch_discover_tests(<target> TEST_PREFIX "<module>.")`. This is load-bearing, not cosmetic: `catch_discover_tests` names each ctest entry after the Catch2 *test-case text*, so without a module prefix the per-task VERIFY probes this spec already commits to match nothing — and because the test presets set `noTestsAction=error`, `ctest -R <module>` then FAILS on a green tree. That is precisely the lying probe `README §4` exists to prevent. A task that adds a test executable adds its row here.
 
+  **Probes MUST be anchored** (`^<module>\.`), not bare substrings (M1-T2). `-R` is an unanchored regex over the whole test name, and Catch2 names entries after free-prose test cases: `ctest -R ref` matched `constants.runtime lookup resolves, and refuses what it must`, and `-R geometry` matched `constants.canonical geometry radii are strictly nested`. Anchoring is what the `TEST_PREFIX` convention exists to make possible, and it keeps the probes disjoint by construction rather than by policing test prose forever.
+
   | Module (task) | Target | `TEST_PREFIX` | VERIFY probe |
   |---|---|---|---|
-  | toolchain (M0-T2) | `test_toolchain` | `toolchain.` | `ctest -R toolchain` |
-  | constants (M0-T3) | `test_constants` | `constants.` | `ctest -R constants` |
-  | rng (M0-T4) | `test_rng` | `rng.` | `ctest -R rng` |
-  | loaders (M0-T5) | `test_loaders` | `loaders.` | `ctest -R loaders` |
+  | toolchain (M0-T2) | `test_toolchain` | `toolchain.` | `ctest -R "^toolchain\."` |
+  | constants (M0-T3-a) | `test_constants` | `constants.` | `ctest -R "^constants\."` |
+  | oracle (M0-T3-b) | *(python)* | `oracle.` | `ctest -R "^oracle\."` |
+  | rng (M0-T4) | `test_rng` | `rng.` | `ctest -R "^rng\."` |
+  | loaders (M0-T5) | `test_loaders` | `loaders.` | `ctest -R "^loaders\."` |
+  | geometry (M1-T1) | `test_geometry` | `geometry.` | `ctest -R "^geometry\."` |
+  | ref (M1-T2) | `test_ref` | `ref.` | `ctest -R "^ref\."` |
 - **Golden (per-backend, MAJ-42):** goldens recorded as `tests/golden/<artifact>.<backend>.sha256`; a golden test compares against the golden for the backend under test and SKIPs (not FAILs) when none exists. `tally.json` goldens ALSO compare structurally: all fields present, all 9 invariants of `03 §5` hold, floating values within declared tolerance (1e-12 same-backend, 3σ cross-backend). Cinema frame goldens: perceptual-hash with declared threshold, never exact hashes. Intentional changes ⇒ regenerate + CHANGELOG entry + visible diff.
 - **Differential (T-diff):** ref vs gpu per `08 §G0c`; OptiX-vs-analytic parity (M6-T1). Mandatory before M4/M6 gate claims.
 - **Perf (T-perf):** timed gate scenarios per `08 §G4`; results appended to `artifacts/perf_history.jsonl` — **committed** (`02 §2`), because its whole value is the cross-session trend. Rotated at 100 MB into `perf_history_<YYYYMM>.jsonl`, which IS gitignored (history beyond the current file goes to object storage).

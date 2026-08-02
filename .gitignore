@@ -31,6 +31,9 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+# ctest writes this into whatever directory it is invoked from, which is the
+# repo root when running `ctest --preset` (M0-T4).
+Testing/
 .DS_Store
 Thumbs.db
 *.swp

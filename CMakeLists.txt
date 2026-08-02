@@ -237,6 +237,19 @@ add_test(NAME constants.generated_current
 add_test(NAME constants.generator_rejects_missing_provenance
          COMMAND ${Python3_EXECUTABLE}
                  ${CMAKE_SOURCE_DIR}/tools/verify/constants_negative.py)
+add_executable(test_rng tests/unit/test_rng.cpp)
+target_link_libraries(test_rng PRIVATE nukesim_core_constants Catch2::Catch2WithMain)
+target_include_directories(test_rng PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
+nukesim_strict(test_rng)
+catch_discover_tests(test_rng TEST_PREFIX "rng.")
+
+# The frozen vector is only evidence if an independent implementation still
+# agrees with it — this re-runs the Python Philox, which must reproduce the
+# three published Random123 vectors before it will certify anything (04 §2).
+add_test(NAME rng.kat_independent_reference
+         COMMAND ${Python3_EXECUTABLE}
+                 ${CMAKE_SOURCE_DIR}/tools/verify/rng_kat_gen.py --check)
+
 # 01 §8.3 / 11 §4: no compute-path source may reference a crosscheck constant.
 # The ns::consts::crosscheck namespace exists so this grep is possible (04 §1).
 add_test(NAME constants.crosscheck_misuse

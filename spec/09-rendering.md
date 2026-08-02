@@ -13,6 +13,7 @@ Applies to M7. Consumes field dumps (`03 §9`) and live `TallySink` streams (stu
 - Emission–absorption model: per-voxel emission `j = ε·B(T)`, absorption `σ_a ∝ ρ` (scale factor `render_density_scale`, SIM). Step size adaptive: Δx/2 inside high-gradient regions (shock_mask or |∇T| above threshold).
 - Blackbody color: Planckian locus approximation (Krystek/CIE-xy polynomial fit is acceptable; exact Planck integrate→XYZ optional) → linear RGB.
 - Optional: single-scatter from a key light for the casing era shots (pre-detonation cutaways).
+- **Clip plane (ADR-018, M7-T5):** a world-space plane (point + normal, studio view state — NOT scenario data, never in `canonical_hash()`) clips both shell/device rasterization and the volume march: clipped-side voxels contribute no emission or absorption; step-size logic is unchanged. A pure view transform — it reveals computed fields and adds nothing, so the §4 physical-honesty rule is unaffected.
 - OptiX AI denoiser MAY be used on studio frames; cinema MUST also ship an undenoised EXR.
 
 ## 3. Post
@@ -21,8 +22,8 @@ Applies to M7. Consumes field dumps (`03 §9`) and live `TallySink` streams (stu
 
 ## 4. Staged clock visualization (D6)
 
-- BURST phase (0–2 µs): log-time playback; camera inside/cutaway; neutron points + fission heat map dominate.
-- HYDRO phase (µs–ms): cutaway shell motion; shock front from hydro state.
+- BURST phase (0–2 µs): log-time playback; camera inside/cutaway; neutron points + fission heat map dominate. **Neutron trails (ADR-018, M7-T5):** a deterministic sample of transported histories MAY render as fading trajectory trails — the sample is selected by a stream seeded from the run seed (bit-identical across replays) and the sample count is a studio display setting. Trails are exact computed history segments: computed data, not aesthetic noise, so the §4 rule permits them.
+- HYDRO phase (µs–ms): cutaway shell motion; shock front from hydro state. The §2 clip plane applies to every phase (shells and volume alike).
 - FIREBALL phase (ms–s): exterior volumetric fireball; color per §2 palette evolution (blue-white → white/yellow → orange → red-brown). Timebase switch + scrub (studio).
 - **Physical-honesty rule (G4-review):** every visible structure MUST trace to a computed field channel. The physics model is 1D-spherical + scalar ε (05 §4) — it produces NO 3D asymmetry field, so no toroidal/asymmetric structure may be rendered "from asymmetry". Mottling comes ONLY from the fission_rate channel's own MC variance; no aesthetic noise is layered unless an explicit `noise_amplitude` SIM constant (default 0, labeled visualization-only) is set. Early-fireball structure renders from deposition/density/T fields as computed — nothing else.
 

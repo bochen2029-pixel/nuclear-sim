@@ -334,7 +334,13 @@ TEST_CASE("the spec's own scenario example parses and resolves its datasets", "[
     REQUIRE(s.t_zero == "he_initiation");
     REQUIRE(s.compression_tier == 2);
     REQUIRE(s.tallies.size() == 6);
-    REQUIRE(s.ui.size() == 2);
+    // 03 §4's example carries three [ui.*] annotations: initiator.strength_n_per_s,
+    // kinetics.generation_time_s_initial, and lenses.detonators (ADR-018, M7-T5 — the
+    // detonator grid's range bounds delay_s; the path is not numerically exposed, so
+    // the range check skips it by design).
+    REQUIRE(s.ui.size() == 3);
+    REQUIRE(s.ui.contains("lenses.detonators"));
+    REQUIRE(s.ui.at("lenses.detonators").range_hi == 1.0e-6);
     REQUIRE(loaded.xs.name() == "fast4");
     REQUIRE(loaded.materials.contains("pu_ga_delta"));
 

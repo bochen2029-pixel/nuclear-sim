@@ -89,6 +89,7 @@ Task IDs are stable and referenced everywhere (PROGRESS.md, commits, SESSIONS.md
 | M7-T2 | Raymarcher + Planckian color + ACES + optional denoiser | `src/render/` | blackbody hue monotonic in T; per-backend golden frames (perceptual hash); temp calibration band check (09 §1) |
 | M7-T3 | `nukestudio` per `10-ui.md` + snapshot threading + badges | `src/app/nukestudio/` | **G5** parity executed; G4 render criteria |
 | M7-T4 | `nukecinema` shots + EXR/PNG + `tools/make_film` | `src/app/nukecinema/` | burst sequence rendered end-to-end in container |
+| M7-T5 | Sandbox mode (ADR-018): per-detonator `[[lenses.detonators]]` schema + loader validation (`03 §4`); free clip plane on shells + volume (`09 §2`); deterministic seeded neutron trails (BURST, `09 §4`); timeline event markers from computed state (`10 §6`) | `src/core/scenario/`, `src/render/`, `src/app/nukestudio/` | loader validation tests (count match, `delay_s` range, absent = canonical all-fire) + clip-plane golden frame + trail determinism (same seed → identical trails) + marker-derivation unit tests; G5 parity unaffected. VERIFY: `ctest -R "^loaders\."` |
 
 **Milestone gates: G5, G4 (render portion).**
 

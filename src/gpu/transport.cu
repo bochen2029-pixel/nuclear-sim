@@ -10,14 +10,18 @@
 // comparison is statistical only (G0c), because the GPU draws float uniforms and
 // ref draws double ones (different sequences, same physics).
 //
-// This step kernel resolves each event with in-thread branches; splitting into
-// per-event branchless kernels behind a prefix-sum event partition is a
-// warp-divergence optimisation for the M4-T4 perf pass (02 §4: profile first).
-// The prefix-sum COMPACTION of live particles is added next on this same loop.
+// Live particles are compacted between supersteps by an EXCLUSIVE PREFIX SUM over
+// a keep-flag (05 §6 item 2): dead particles fall out and the survivors pack to
+// the front of the active-index list, so each superstep launches only over the
+// still-live count. The compacted order is immaterial (identity/scores/streams
+// are index-keyed) but it is produced by prefix-sum, not an atomic cursor.
+// Splitting the single step kernel into per-event branchless kernels is the
+// M4-T4 warp-divergence pass (02 §4: profile first).
 
 #include "gpu/transport.h"
 
 #include <cmath>
+#include <utility>
 #include <vector>
 
 #include <cuda_runtime.h>
@@ -41,7 +45,14 @@ inline constexpr float kTwoPi = 6.28318530717958648f;
 // physical constant.
 inline constexpr unsigned long long kSourceBase = 1ull;
 
-/// Device SoA view: raw pointers, passed to kernels by value.
+// Scan tile width. A two-level scan (per-tile then a single-block scan of the
+// tile sums) handles up to kTile*kTile ≈ 1.05e6 live particles per superstep,
+// which bounds `histories`.
+inline constexpr int kTile = 1024;
+inline constexpr long long kMaxHistories = static_cast<long long>(kTile) * kTile;
+
+/// Device SoA view: raw pointers, passed to kernels by value. Indexed by the
+/// particle's source id (never compacted); the active-index list is compacted.
 struct SoA {
     float* px;
     float* py;
@@ -52,7 +63,6 @@ struct SoA {
     int* group;
     float* weight;
     int* layer;
-    int* alive;
     unsigned long long* ctr;
     unsigned char* sub;
     float* score_leak;
@@ -64,6 +74,13 @@ __device__ inline DFloat3 d_sample_isotropic(ns::rng::Stream& s) {
     const float phi = kTwoPi * s.uniform_f();
     const float sin_theta = sqrtf(fmaxf(0.0f, 1.0f - mu * mu));
     return {sin_theta * cosf(phi), sin_theta * sinf(phi), mu};
+}
+
+__global__ void k_iota(int* active, int n) {
+    const int stride = static_cast<int>(gridDim.x * blockDim.x);
+    for (int i = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x); i < n; i += stride) {
+        active[i] = i;
+    }
 }
 
 __global__ void k_init(SoA soa, DeviceLayerStack geom, unsigned long long seed, int n, float w0,
@@ -93,7 +110,6 @@ __global__ void k_init(SoA soa, DeviceLayerStack geom, unsigned long long seed, 
         soa.group[p] = grp;
         soa.weight[p] = 1.0f;
         soa.layer[p] = d_locate(geom, {0.0f, 0.0f, 0.0f});
-        soa.alive[p] = 1;
         soa.score_leak[p] = 0.0f;
         soa.score_prod[p] = 0.0f;
 
@@ -103,13 +119,14 @@ __global__ void k_init(SoA soa, DeviceLayerStack geom, unsigned long long seed, 
     }
 }
 
+/// Resolve one flight for each live particle (active[0..num_active)); write
+/// keep[i] = 1 if it survives to the next superstep, else 0.
 __global__ void k_step(SoA soa, DeviceLayerStack geom, DeviceMaterials mat, unsigned long long seed,
-                       int n, int* alive_next) {
+                       const int* active, int num_active, int* keep) {
     const int stride = static_cast<int>(gridDim.x * blockDim.x);
-    for (int p = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x); p < n; p += stride) {
-        if (soa.alive[p] == 0) {
-            continue;
-        }
+    for (int i = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x); i < num_active;
+         i += stride) {
+        const int p = active[i];
         ns::rng::Stream s(seed, ns::rng::fork(kSourceBase, 0, static_cast<unsigned int>(p)),
                           soa.ctr[p], soa.sub[p]);
         DFloat3 pos{soa.px[p], soa.py[p], soa.pz[p]};
@@ -175,8 +192,7 @@ __global__ void k_step(SoA soa, DeviceLayerStack geom, DeviceMaterials mat, unsi
                         w *= gd.sigma_s / sigma_t_i;  // implicit capture (never kill at fission)
                         if (w <= 0.0f) {
                             terminal = true;
-                        } else if (w < kWeightMin
-                                   && s.uniform_f() > w / kWeightSurv) {
+                        } else if (w < kWeightMin && s.uniform_f() > w / kWeightSurv) {
                             terminal = true;  // E1e — rouletted out
                         } else {
                             if (w < kWeightMin) {
@@ -216,11 +232,57 @@ __global__ void k_step(SoA soa, DeviceLayerStack geom, DeviceMaterials mat, unsi
         soa.ctr[p] = st.first;
         soa.sub[p] = st.second;
 
-        if (terminal) {
-            soa.alive[p] = 0;
-        } else {
-            atomicAdd(alive_next, 1);  // integer count — order-independent
-        }
+        keep[i] = terminal ? 0 : 1;
+    }
+}
+
+/// Per-tile exclusive prefix sum of keep[] (Hillis–Steele), writing the local
+/// exclusive scan to `local` and each tile's total to `tilesums`.
+__global__ void k_scan_tiles(const int* keep, int n, int* local, int* tilesums) {
+    __shared__ int sdata[kTile];
+    const int tid = static_cast<int>(threadIdx.x);
+    const int gid = static_cast<int>(blockIdx.x * blockDim.x) + tid;
+    const int v = (gid < n) ? keep[gid] : 0;
+    sdata[tid] = v;
+    __syncthreads();
+    for (int off = 1; off < static_cast<int>(blockDim.x); off <<= 1) {
+        const int add = (tid >= off) ? sdata[tid - off] : 0;
+        __syncthreads();
+        sdata[tid] += add;
+        __syncthreads();
+    }
+    if (gid < n) {
+        local[gid] = sdata[tid] - v;  // inclusive − own = exclusive
+    }
+    if (tid == static_cast<int>(blockDim.x) - 1) {
+        tilesums[blockIdx.x] = sdata[tid];
+    }
+}
+
+/// Single-block exclusive scan of the tile sums (≤ kTile of them) → tilebase.
+__global__ void k_scan_tilesums(const int* tilesums, int nblocks, int* tilebase) {
+    __shared__ int sdata[kTile];
+    const int tid = static_cast<int>(threadIdx.x);
+    const int v = (tid < nblocks) ? tilesums[tid] : 0;
+    sdata[tid] = v;
+    __syncthreads();
+    for (int off = 1; off < static_cast<int>(blockDim.x); off <<= 1) {
+        const int add = (tid >= off) ? sdata[tid - off] : 0;
+        __syncthreads();
+        sdata[tid] += add;
+        __syncthreads();
+    }
+    if (tid < nblocks) {
+        tilebase[tid] = sdata[tid] - v;
+    }
+}
+
+/// Pack survivors to the front of `next_active` at their prefix-sum positions.
+__global__ void k_scatter(const int* active, const int* keep, const int* local,
+                          const int* tilebase, int n, int* next_active) {
+    const int gid = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
+    if (gid < n && keep[gid] != 0) {
+        next_active[tilebase[blockIdx.x] + local[gid]] = active[gid];
     }
 }
 
@@ -261,7 +323,7 @@ bool gpu_fixed_source(const ns::geom::LayerStack& stack,
                       const ns::material::MaterialLib& materials, std::uint64_t seed,
                       std::int64_t histories, const std::array<float, 4>& group_weights,
                       int blocks, int threads, FixedSourceResult& out) {
-    if (histories <= 0 || blocks <= 0 || threads <= 0) {
+    if (histories <= 0 || histories > kMaxHistories || blocks <= 0 || threads <= 0) {
         return false;
     }
 
@@ -275,43 +337,59 @@ bool gpu_fixed_source(const ns::geom::LayerStack& stack,
     const std::size_t ni = static_cast<std::size_t>(n) * sizeof(int);
 
     SoA soa{};
-    int* d_alive_next = nullptr;
+    int* active = nullptr;
+    int* next_active = nullptr;
+    int* keep = nullptr;
+    int* local = nullptr;
+    int* tilesums = nullptr;
+    int* tilebase = nullptr;
     bool ok = cudaMalloc(&soa.px, nf) == cudaSuccess && cudaMalloc(&soa.py, nf) == cudaSuccess
            && cudaMalloc(&soa.pz, nf) == cudaSuccess && cudaMalloc(&soa.dx, nf) == cudaSuccess
            && cudaMalloc(&soa.dy, nf) == cudaSuccess && cudaMalloc(&soa.dz, nf) == cudaSuccess
            && cudaMalloc(&soa.group, ni) == cudaSuccess && cudaMalloc(&soa.weight, nf) == cudaSuccess
-           && cudaMalloc(&soa.layer, ni) == cudaSuccess && cudaMalloc(&soa.alive, ni) == cudaSuccess
+           && cudaMalloc(&soa.layer, ni) == cudaSuccess
            && cudaMalloc(&soa.ctr, static_cast<std::size_t>(n) * sizeof(unsigned long long))
                   == cudaSuccess
            && cudaMalloc(&soa.sub, static_cast<std::size_t>(n) * sizeof(unsigned char)) == cudaSuccess
            && cudaMalloc(&soa.score_leak, nf) == cudaSuccess
-           && cudaMalloc(&soa.score_prod, nf) == cudaSuccess
-           && cudaMalloc(&d_alive_next, sizeof(int)) == cudaSuccess;
+           && cudaMalloc(&soa.score_prod, nf) == cudaSuccess && cudaMalloc(&active, ni) == cudaSuccess
+           && cudaMalloc(&next_active, ni) == cudaSuccess && cudaMalloc(&keep, ni) == cudaSuccess
+           && cudaMalloc(&local, ni) == cudaSuccess
+           && cudaMalloc(&tilesums, static_cast<std::size_t>(kTile) * sizeof(int)) == cudaSuccess
+           && cudaMalloc(&tilebase, static_cast<std::size_t>(kTile) * sizeof(int)) == cudaSuccess;
 
     if (ok) {
         k_init<<<blocks, threads>>>(soa, problem.geometry(), seed, n, group_weights[0],
                                     group_weights[1], group_weights[2], group_weights[3]);
+        k_iota<<<blocks, threads>>>(active, n);
         ok = cudaGetLastError() == cudaSuccess && cudaDeviceSynchronize() == cudaSuccess;
     }
 
+    int num_active = n;
     int supersteps = 0;
     constexpr int kMaxSupersteps = 100000;  // safety net against a non-terminating history
-    while (ok && supersteps < kMaxSupersteps) {
-        ok = cudaMemset(d_alive_next, 0, sizeof(int)) == cudaSuccess;
-        if (!ok) {
-            break;
-        }
-        k_step<<<blocks, threads>>>(soa, problem.geometry(), problem.materials(), seed, n,
-                                    d_alive_next);
+    while (ok && num_active > 0 && supersteps < kMaxSupersteps) {
+        const int step_blocks = (num_active + threads - 1) / threads;
+        k_step<<<step_blocks, threads>>>(soa, problem.geometry(), problem.materials(), seed, active,
+                                         num_active, keep);
+
+        const int nblocks = (num_active + kTile - 1) / kTile;
+        k_scan_tiles<<<nblocks, kTile>>>(keep, num_active, local, tilesums);
+        k_scan_tilesums<<<1, kTile>>>(tilesums, nblocks, tilebase);
+        k_scatter<<<nblocks, kTile>>>(active, keep, local, tilebase, num_active, next_active);
         ok = cudaGetLastError() == cudaSuccess && cudaDeviceSynchronize() == cudaSuccess;
-        int alive_host = 0;
+
+        // New live count = base of the last tile + that tile's own sum.
+        int last_base = 0;
+        int last_sum = 0;
         ok = ok
-          && cudaMemcpy(&alive_host, d_alive_next, sizeof(int), cudaMemcpyDeviceToHost)
+          && cudaMemcpy(&last_base, tilebase + (nblocks - 1), sizeof(int), cudaMemcpyDeviceToHost)
+                 == cudaSuccess
+          && cudaMemcpy(&last_sum, tilesums + (nblocks - 1), sizeof(int), cudaMemcpyDeviceToHost)
                  == cudaSuccess;
+        num_active = last_base + last_sum;
+        std::swap(active, next_active);
         ++supersteps;
-        if (!ok || alive_host == 0) {
-            break;
-        }
     }
 
     std::vector<float> leak(static_cast<std::size_t>(n));
@@ -328,12 +406,16 @@ bool gpu_fixed_source(const ns::geom::LayerStack& stack,
     cudaFree(soa.group);
     cudaFree(soa.weight);
     cudaFree(soa.layer);
-    cudaFree(soa.alive);
     cudaFree(soa.ctr);
     cudaFree(soa.sub);
     cudaFree(soa.score_leak);
     cudaFree(soa.score_prod);
-    cudaFree(d_alive_next);
+    cudaFree(active);
+    cudaFree(next_active);
+    cudaFree(keep);
+    cudaFree(local);
+    cudaFree(tilesums);
+    cudaFree(tilebase);
     if (!ok) {
         return fail();
     }

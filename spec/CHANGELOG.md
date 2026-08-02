@@ -22,4 +22,6 @@
 
 2026-08-02 — 02-architecture (§2 tree gains `.env.example` and `.github/workflows/`), 12-deployment (§1 MSVC row records the `windows-2022` CI runner pin and why it is not `windows-latest`), PROGRESS, SESSIONS, CHANGELOG — M0-T6 executed; **M0 complete**. Clarification class, no ADR — a directory/file addition per `02 §2`'s own rule, and a CI detail recorded where `12 §1` already owns version pins — session-2026-08-02-b.
 
+2026-08-02 — 04-module-core (§3 `mix()` relocated to `core/material` with the reason; §5 `Material` gains `status`/`cite`/`mean_molar_mass` and `fracs` becomes a named `Constituent` struct) — **SYNC-M1 audit** before claiming M1's first task (`07 §SYNC`). Clarification class, no ADR: the implemented shape is strictly richer and the spec's shape could not carry a species that has a molar mass but no cross sections, which appendix §3 requires — session-2026-08-02-b.
+
 2026-08-03 — 07-milestones, DECISIONS, PROGRESS — ADR-014: repository created under owner direction; M0-T6 loses its owner gate and becomes a single task; publication authority clarified (per-action owner instruction; pushing to this repo's main is ordinary work, new public repos / visibility changes / releases / other remotes each need fresh instruction; secret scan required before any first push to a public remote) — ADR-014 — session-2026-08-03-a.

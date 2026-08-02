@@ -52,7 +52,7 @@ public:
 };
 ```
 
-Loader enforces 03 §2: rejects `sigma_a` (migration diagnostic), `sigma_t` present in file, null transfer for non-SIM sets, upscatter, missing `mu_bar`, non-descending bounds. Computes `sigma_t`, `sigma_tr = sigma_t − mu_bar·sigma_s`. `MatXS mix(const Material&, const FewGroupXS&)` builds macroscopic per-group Σ + ν̄Σ_f per material.
+Loader enforces 03 §2: rejects `sigma_a` (migration diagnostic), `sigma_t` present in file, null transfer for non-SIM sets, upscatter, missing `mu_bar`, non-descending bounds. Computes `sigma_t`, `sigma_tr = sigma_t − mu_bar·sigma_s`. `MatXS mix(const Material&, const FewGroupXS&)` builds macroscopic per-group Σ + ν̄Σ_f per material — **declared in `core/material` (SYNC-M1), not here**: it takes a `Material`, so the dependency runs the opposite way to this section's placement. `MaterialLib::load_file` calls it, so `Material::macro` is always populated.
 
 ## 4. `core/geometry`
 
@@ -84,9 +84,15 @@ Analytic math (normative): ray `p + t·d`, |d|=1; `b = p·d`, `c = |p|² − R²
 ## 5. `core/material`
 
 ```cpp
-struct Material { std::string name; double density;
-                  std::vector<std::pair<const IsotopeXS*, double>> fracs;  // atom fractions, sorted-name index
-                  MatXS macro; };
+struct Material { std::string name; double density; std::string status, cite;
+                  // SYNC-M1: a named struct, not pair<const IsotopeXS*, double>. A species
+                  // may have a molar mass but NO cross sections in the set (a structural
+                  // element in an actinide-only dataset), and appendix §3 requires the mass
+                  // per species — a null pointer with no name carries neither.
+                  struct Constituent { std::string species; double atom_fraction, molar_mass;
+                                       const IsotopeXS* iso; };  // null when absent from the set
+                  std::vector<Constituent> fracs;   // atom fractions, sorted-name index
+                  double mean_molar_mass; MatXS macro; };
 class MaterialLib { public:
   static MaterialLib load_dir(const std::filesystem::path&, const FewGroupXS&);
   int index_of(std::string_view name) const; };

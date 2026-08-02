@@ -86,6 +86,39 @@ double Material::number_density(std::size_t index) const {
     return c.atom_fraction * density / mean_molar_mass * consts::avogadro_constant;
 }
 
+MatXS mix(const Material& mat, const xs::FewGroupXS& xs_set) {
+    const auto groups = static_cast<std::size_t>(xs_set.groups());
+    MatXS macro;
+    macro.sigma_f.assign(groups, 0.0);
+    macro.sigma_c.assign(groups, 0.0);
+    macro.sigma_s.assign(groups, 0.0);
+    macro.sigma_t.assign(groups, 0.0);
+    macro.sigma_tr.assign(groups, 0.0);
+    macro.nu_sigma_f.assign(groups, 0.0);
+
+    constexpr double kBarnToCm2 = 1e-24;
+    for (std::size_t i = 0; i < mat.fracs.size(); ++i) {
+        const Constituent& c = mat.fracs[i];
+        if (c.iso == nullptr) {
+            // Has a molar mass but no cross sections in this set (a structural
+            // element in an actinide-only dataset). It contributes mass — and
+            // therefore number density — but nothing to Sigma.
+            continue;
+        }
+        const double n = mat.number_density(i) * kBarnToCm2;
+        for (std::size_t g = 0; g < groups; ++g) {
+            const auto& gd = c.iso->g[g];
+            macro.sigma_f[g] += n * gd.sigma_f;
+            macro.sigma_c[g] += n * gd.sigma_c;
+            macro.sigma_s[g] += n * gd.sigma_s;
+            macro.sigma_t[g] += n * gd.sigma_t();
+            macro.sigma_tr[g] += n * gd.sigma_tr();
+            macro.nu_sigma_f[g] += n * gd.nu * gd.sigma_f;
+        }
+    }
+    return macro;
+}
+
 Material MaterialLib::load_file(const std::filesystem::path& path, const xs::FewGroupXS& xs_set,
                                 std::vector<LoadWarning>* warnings) {
     const json doc = parse_file(path);
@@ -153,31 +186,7 @@ Material MaterialLib::load_file(const std::filesystem::path& path, const xs::Few
     require(mat.mean_molar_mass > 0.0, path, "isotopes",
             "fraction-weighted mean molar mass must be positive");
 
-    const auto groups = static_cast<std::size_t>(xs_set.groups());
-    mat.macro.sigma_f.assign(groups, 0.0);
-    mat.macro.sigma_c.assign(groups, 0.0);
-    mat.macro.sigma_s.assign(groups, 0.0);
-    mat.macro.sigma_t.assign(groups, 0.0);
-    mat.macro.sigma_tr.assign(groups, 0.0);
-    mat.macro.nu_sigma_f.assign(groups, 0.0);
-
-    constexpr double kBarnToCm2 = 1e-24;
-    for (std::size_t i = 0; i < mat.fracs.size(); ++i) {
-        const Constituent& c = mat.fracs[i];
-        if (c.iso == nullptr) {
-            continue;  // no cross sections in this set; contributes mass only
-        }
-        const double n = mat.number_density(i) * kBarnToCm2;
-        for (std::size_t g = 0; g < groups; ++g) {
-            const auto& gd = c.iso->g[g];
-            mat.macro.sigma_f[g] += n * gd.sigma_f;
-            mat.macro.sigma_c[g] += n * gd.sigma_c;
-            mat.macro.sigma_s[g] += n * gd.sigma_s;
-            mat.macro.sigma_t[g] += n * gd.sigma_t();
-            mat.macro.sigma_tr[g] += n * gd.sigma_tr();
-            mat.macro.nu_sigma_f[g] += n * gd.nu * gd.sigma_f;
-        }
-    }
+    mat.macro = mix(mat, xs_set);
 
     check_composition(doc, path, mat, warnings);
     return mat;

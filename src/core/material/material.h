@@ -53,6 +53,12 @@ struct Material {
     double number_density(std::size_t index) const;
 };
 
+/// Builds the macroscopic per-group cross sections for a material (04 §3).
+///
+/// Declared here rather than in core/xs because it needs a Material; 04 §3
+/// names it in the cross-section section, but the dependency runs the other way.
+MatXS mix(const Material& mat, const xs::FewGroupXS& xs);
+
 class MaterialLib {
 public:
     /// Loads every *.json in the directory. `xs` resolves cross sections;

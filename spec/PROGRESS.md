@@ -77,6 +77,9 @@
 
 ## Milestone-boundary SYNC checklist
 
+**SYNC-M1 — run 2026-08-02 by session-2026-08-02-b, before claiming M1-T1.** Compared every implemented module against `04`; `05` has no implementation yet. Three findings: (1) `04 §3` named `MatXS mix(const Material&, const FewGroupXS&)` and it did not exist — the logic was inline in `MaterialLib::load_file`; **fixed**, extracted and declared in `core/material` (the dependency runs opposite to `04 §3`'s placement). (2) `04 §5`'s `Material::fracs` was `vector<pair<const IsotopeXS*, double>>`, which cannot carry a species that has a molar mass but no cross sections in the set — appendix §3 requires the mass per species regardless; **spec amended** to the implemented `Constituent` form. (3) `canonical_hash()` (`04 §6`) remains unimplemented — its test is grouped with geometry in `04 §7`, so **M1-T1 carries it**. Scenario paths vs `03 §4` and constants vs the appendix were already covered by `ctest -R loaders` and `constants.roundtrip_bijection` respectively; both green.
+
+
 Before claiming the first task of a new milestone: run the SYNC audit (`07-milestones.md` §SYNC) — APIs vs `04`/`05`, paths vs `03 §4`, constants vs appendix; log results in SESSIONS.md.
 
 ## Environment notes

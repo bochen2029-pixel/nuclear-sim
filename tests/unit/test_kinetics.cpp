@@ -8,14 +8,17 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include "core/checkpoint/checkpoint.h"
 #include "physics/eigen/eigen.h"
 #include "physics/kinetics/kinetics.h"
 
 #include <nlohmann/json.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "spec_examples.h"
@@ -264,4 +267,48 @@ TEST_CASE("nu_eff and the F_n split from a real mixed-assembly eigen (E3a)", "[k
         sum += sh;
     }
     REQUIRE_THAT(sum, Catch::Matchers::WithinAbs(1.0, 1e-12));
+}
+
+TEST_CASE("a BurstAccumulator resumes BIT-IDENTICALLY from a checkpoint (M5-T1-b)", "[kinetics]") {
+    // The α-burst's core stochastic state is the crux of the T-resume gate. Step an
+    // accumulator through a supercritical stretch (the log-domain state spans many
+    // decades), checkpoint it THROUGH the M5-T1-a container (03 §8), restore, and
+    // continue: the restored accumulator must match the uninterrupted one bit-for-bit
+    // (==, not approx) at every subsequent generation.
+    BurstAccumulator original(1.0);
+    const double nu = 2.9, e_f = 180.0;
+    for (int i = 0; i < 40; ++i) {
+        original.step(1.4, nu, e_f);  // ~40 decades of growth
+    }
+
+    // Serialize the state → a checkpoint section (03 §8 §7) → write → read → restore.
+    ns::checkpoint::CheckpointBlob blob;
+    blob.identity.scenario_sha256 = std::string(64, '0');
+    blob.identity.data_sha256 = std::string(64, '0');
+    blob.put_section(7, ns::physics::serialize_accumulator_state(original.state()));
+    const std::vector<std::uint8_t> bytes = ns::checkpoint::write_checkpoint(blob);
+    const ns::checkpoint::CheckpointBlob rd = ns::checkpoint::read_checkpoint(bytes);
+    const ns::checkpoint::CheckpointSection* sec = rd.section(7);
+    REQUIRE(sec != nullptr);
+    BurstAccumulator restored =
+        BurstAccumulator::from_state(ns::physics::deserialize_accumulator_state(sec->data));
+
+    // The restore is immediately identical (every readout, including the full history).
+    REQUIRE(restored.generations() == original.generations());
+    REQUIRE(restored.log10_N() == original.log10_N());
+    REQUIRE(restored.log10_fissions_last() == original.log10_fissions_last());
+    REQUIRE(restored.log10_fissions_cumulative() == original.log10_fissions_cumulative());
+    REQUIRE(restored.log10_energy_cumulative() == original.log10_energy_cumulative());
+    REQUIRE(restored.log10_N_history() == original.log10_N_history());
+
+    // And it stays bit-identical as BOTH continue through the peak, decay, and quench.
+    for (const double k : {1.4, 1.0, 0.6, 0.6, 0.6}) {
+        original.step(k, nu, e_f);
+        restored.step(k, nu, e_f);
+        REQUIRE(restored.log10_N() == original.log10_N());
+        REQUIRE(restored.log10_fissions_last() == original.log10_fissions_last());
+        REQUIRE(restored.log10_fissions_cumulative() == original.log10_fissions_cumulative());
+    }
+    REQUIRE(restored.generations() == original.generations());
+    REQUIRE(restored.log10_N_history() == original.log10_N_history());
 }

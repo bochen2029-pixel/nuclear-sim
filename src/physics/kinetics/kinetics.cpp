@@ -4,7 +4,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <limits>
+#include <stdexcept>
 
 namespace ns::physics {
 namespace {
@@ -28,6 +31,35 @@ double logsumexp10(double a, double b) {
 // so a long supercritical run never overflows. The choice is invisible to the
 // log-domain cumulants, so it changes no physical result.
 constexpr double kRenormAbove = 1e250;
+
+// --- little-endian byte I/O for the checkpoint section codec (03 §8 §7) ---
+void put_u64(std::vector<std::uint8_t>& v, std::uint64_t x) {
+    for (int i = 0; i < 8; ++i) {
+        v.push_back(static_cast<std::uint8_t>(x >> (8 * i)));
+    }
+}
+void put_f64(std::vector<std::uint8_t>& v, double x) {
+    std::uint64_t bits = 0;
+    std::memcpy(&bits, &x, 8);
+    put_u64(v, bits);
+}
+std::uint64_t read_u64(const std::vector<std::uint8_t>& v, std::size_t& pos) {
+    if (pos + 8 > v.size()) {
+        throw std::runtime_error("accumulator checkpoint: truncated section payload");
+    }
+    std::uint64_t x = 0;
+    for (int i = 0; i < 8; ++i) {
+        x |= static_cast<std::uint64_t>(v[pos + i]) << (8 * i);
+    }
+    pos += 8;
+    return x;
+}
+double read_f64(const std::vector<std::uint8_t>& v, std::size_t& pos) {
+    const std::uint64_t bits = read_u64(v, pos);
+    double x = 0.0;
+    std::memcpy(&x, &bits, 8);
+    return x;
+}
 
 }  // namespace
 
@@ -117,6 +149,55 @@ double BurstAccumulator::log10_N() const noexcept {
 
 double BurstAccumulator::log10_yield_kt(double phi_kt) const noexcept {
     return phi_kt > 0.0 ? log_fcum_ - std::log10(phi_kt) : kNegInf;
+}
+
+BurstAccumulator::State BurstAccumulator::state() const {
+    return State{mant_, off_, log_fcum_, log_ecum_, log_flast_, static_cast<std::int64_t>(n_),
+                 log10_n_hist_};
+}
+
+BurstAccumulator BurstAccumulator::from_state(const State& s) {
+    BurstAccumulator a;  // default-constructed, then overwritten (static ⇒ private access)
+    a.mant_ = s.mant;
+    a.off_ = s.off;
+    a.log_fcum_ = s.log_fcum;
+    a.log_ecum_ = s.log_ecum;
+    a.log_flast_ = s.log_flast;
+    a.n_ = static_cast<int>(s.n);
+    a.log10_n_hist_ = s.log10_n_hist;
+    return a;
+}
+
+std::vector<std::uint8_t> serialize_accumulator_state(const BurstAccumulator::State& s) {
+    std::vector<std::uint8_t> out;
+    put_f64(out, s.mant);
+    put_f64(out, s.off);
+    put_f64(out, s.log_fcum);
+    put_f64(out, s.log_ecum);
+    put_f64(out, s.log_flast);
+    put_u64(out, static_cast<std::uint64_t>(s.n));
+    put_u64(out, static_cast<std::uint64_t>(s.log10_n_hist.size()));
+    for (const double v : s.log10_n_hist) {
+        put_f64(out, v);
+    }
+    return out;
+}
+
+BurstAccumulator::State deserialize_accumulator_state(const std::vector<std::uint8_t>& bytes) {
+    BurstAccumulator::State s;
+    std::size_t pos = 0;
+    s.mant = read_f64(bytes, pos);
+    s.off = read_f64(bytes, pos);
+    s.log_fcum = read_f64(bytes, pos);
+    s.log_ecum = read_f64(bytes, pos);
+    s.log_flast = read_f64(bytes, pos);
+    s.n = static_cast<std::int64_t>(read_u64(bytes, pos));
+    const std::uint64_t hist_len = read_u64(bytes, pos);
+    s.log10_n_hist.resize(static_cast<std::size_t>(hist_len));
+    for (std::uint64_t i = 0; i < hist_len; ++i) {
+        s.log10_n_hist[static_cast<std::size_t>(i)] = read_f64(bytes, pos);
+    }
+    return s;
 }
 
 }  // namespace ns::physics

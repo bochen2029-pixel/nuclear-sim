@@ -243,6 +243,8 @@ add_test(NAME constants.generator_rejects_missing_provenance
 add_library(nukesim_core STATIC
     src/core/geometry/geometry.cpp
     src/core/hash/sha256.cpp
+    src/core/hash/crc32.cpp
+    src/core/checkpoint/checkpoint.cpp
     src/core/xs/xs.cpp
     src/core/material/material.cpp
     src/core/scenario/scenario.cpp
@@ -336,6 +338,13 @@ target_include_directories(test_api PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
 target_compile_definitions(test_api PRIVATE NUKESIM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 nukesim_strict(test_api)
 catch_discover_tests(test_api TEST_PREFIX "api.")
+
+# checkpoint.bin v2 container + CRC32 (M5-T1-a): the resume container (03 §8, D9).
+add_executable(test_checkpoint tests/unit/test_checkpoint.cpp)
+target_link_libraries(test_checkpoint PRIVATE nukesim_core Catch2::Catch2WithMain)
+target_include_directories(test_checkpoint PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
+nukesim_strict(test_checkpoint)
+catch_discover_tests(test_checkpoint TEST_PREFIX "checkpoint.")
 
 add_executable(test_ref tests/unit/test_ref.cpp)
 target_link_libraries(test_ref PRIVATE nukesim_core Catch2::Catch2WithMain)

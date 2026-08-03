@@ -25,8 +25,11 @@
 #include <vector>
 
 #include "core/geometry/geometry.h"
+#include "core/material/material.h"
+#include "core/xs/xs.h"
 #include "physics/eigen/eigen.h"
 #include "physics/tally/tally.h"
+#include "ref/ref_transport.h"
 
 namespace ns::physics {
 
@@ -66,6 +69,17 @@ struct GenerationSample {
     std::vector<double> shell_shares;          // fission shares by shell (Σ = 1)
     bool refreshed = false;                    // eigen recomputed this generation
     double q = 0.0;                            // refresh diagnostic (R-13), 0 if none
+
+    /// A stratified, capped SAMPLE of this generation's fission SITES — the
+    /// spatial positions (+ isotope/layer) where fissions occur, for the 3D
+    /// volumetric chain-reaction view (the owner's core deliverable). Populated
+    /// on refresh generations only: the spatial pattern is quasi-static between
+    /// eigen refreshes (α-mode), while the amplitude (`log10_population`) evolves
+    /// every generation — so a renderer caches the cloud on refresh and scales
+    /// its intensity/instance-count by the population each frame, up to its own
+    /// 10-50k budget. Empty when `!refreshed`. This is the honest tap: every
+    /// site is a real Monte-Carlo fission from the emergent run.
+    std::vector<ns::ref::FissionSite> sites;
 };
 
 /// Streaming tally sink (05 §5), shared by ref/gpu/studio live rendering (D7 —
@@ -133,6 +147,7 @@ struct CoupleConfig {
     double quench_epsilon = 1e-4;     // C-909 (E6)
     double t_max_s = 5e-6;            // 03 §4 [kinetics]
     int max_generations = 200000;     // hard safety cap (never the physical terminator)
+    int max_sites_per_sample = 4096;  // cap on the per-generation fission-site sample (viz stream)
 
     // Tier-1 compression (M2-T2). `ratio = 1` ⇒ fixed geometry (hydro off).
     double compression_ratio = 1.0;   // C-060 final ρ/ρ_0
@@ -164,5 +179,16 @@ struct BurstReport {
 BurstReport run_burst(const CoupleConfig& cfg, const BurstContext& ctx,
                       const ns::geom::LayerStack& geom0, const EigenFn& eigen_fn,
                       TallySink& sink);
+
+/// Adapt the REAL reference transport into an `EigenFn`: each call rebuilds a
+/// `RefTransport` on the given geometry (materials/xs fixed) and runs `run_eigen`
+/// (05 §2). This is what makes `run_burst` drive a real Monte-Carlo eigenvalue
+/// solve — fission sites and all — instead of a scripted stub; the honesty step
+/// from "real contract, fake numbers" to "real transport" (cited numbers arrive
+/// with the `fast4` xs). `materials`, `xs` and `spec` MUST outlive the returned
+/// function. Backend-agnostic (05 §2): a GPU eigen (M4-T3) supplies an equivalent
+/// `EigenFn` without changing the loop.
+EigenFn ref_eigen_fn(const ns::material::MaterialLib& materials, const ns::xs::FewGroupXS& xs,
+                     const EigenSpec& spec, std::uint64_t seed);
 
 }  // namespace ns::physics

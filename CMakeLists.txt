@@ -249,7 +249,8 @@ add_library(nukesim_core STATIC
     src/core/scenario/canonical_hash.cpp
     src/ref/ref_transport.cpp
     src/ref/ref_generation.cpp
-    src/physics/eigen/eigen.cpp)
+    src/physics/eigen/eigen.cpp
+    src/physics/kinetics/kinetics.cpp)
 target_link_libraries(nukesim_core PUBLIC nukesim_core_constants nukesim_deps)
 target_include_directories(nukesim_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 nukesim_strict(nukesim_core)
@@ -284,6 +285,13 @@ target_include_directories(test_eigen PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
 target_compile_definitions(test_eigen PRIVATE NUKESIM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 nukesim_strict(test_eigen)
 catch_discover_tests(test_eigen TEST_PREFIX "eigen.")
+
+add_executable(test_kinetics tests/unit/test_kinetics.cpp)
+target_link_libraries(test_kinetics PRIVATE nukesim_core Catch2::Catch2WithMain)
+target_include_directories(test_kinetics PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
+target_compile_definitions(test_kinetics PRIVATE NUKESIM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+nukesim_strict(test_kinetics)
+catch_discover_tests(test_kinetics TEST_PREFIX "kinetics.")
 
 add_executable(test_ref tests/unit/test_ref.cpp)
 target_link_libraries(test_ref PRIVATE nukesim_core Catch2::Catch2WithMain)

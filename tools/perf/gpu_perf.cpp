@@ -149,6 +149,7 @@ struct Args {
     std::string task = "M4-T4-a";
     int reps = 3;
     bool profile = false;  // minimal launches for `ncu` (no file writes, no sweep)
+    bool golden = false;   // print eigen k/checksum/entropy for the test config
 };
 
 Args parse(int argc, char** argv) {
@@ -168,6 +169,8 @@ Args parse(int argc, char** argv) {
             a.reps = std::max(1, std::atoi(next().c_str()));
         } else if (s == "--profile") {
             a.profile = true;
+        } else if (s == "--golden") {
+            a.golden = true;
         }
     }
     return a;
@@ -193,6 +196,16 @@ int main(int argc, char** argv) {
     const ns::geom::LayerStack source_sphere({ns::geom::Layer{"medium", 200.0, 0, "SIM"}});
     const std::uint64_t seed = 20260802;
     const std::array<float, 4> g0{1.0f, 0.0f, 0.0f, 0.0f};
+
+    // --- Golden mode: print the eigen's exact deterministic outputs for the
+    // differential-test config, so a rewrite can assert bit-identity. ----------
+    if (args.golden) {
+        ns::gpu::EigenResultGpu g;
+        ns::gpu::gpu_eigen(eigen_sphere, *fuel.materials, seed, 3000, 20, 40, 64, 128, g);
+        std::printf("GOLDEN k=%.17g checksum=%llu entropy=%.17g\n", g.k,
+                    static_cast<unsigned long long>(g.source_checksum), g.entropy_final);
+        return 0;
+    }
 
     // --- Profile mode: a handful of kernel launches for `ncu` to sample. -------
     if (args.profile) {

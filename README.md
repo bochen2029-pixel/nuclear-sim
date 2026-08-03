@@ -2,13 +2,25 @@
 
 **A 3D, physics-based educational simulator of the 1945 Trinity "Gadget" / Fat Man device** — GPU Monte Carlo neutron transport → k-eigenvalue criticality → supercritical burst kinetics → simplified implosion/disassembly hydrodynamics → volumetric fireball rendering.
 
+**The destination is an interactive 3D studio.** Zoom into the plutonium pit, slow time down, and watch the fission chain reaction and the fireball evolve — a bundled volumetric representation of the neutron cascade (nuclei splitting and releasing neutrons that strike others), every frame driven by the *same* validated transport math, never hand-painted. The hard part — the physics engine that has to be right for that picture to mean anything — is what most of this repository is. The rendering and UI (`nukestudio`) sit on top of it.
+
 Built **exclusively on public and declassified literature**. Every physical constant carries a citation and a source-status tag, and the generator refuses to emit any constant lacking either.
 
 ```
-Status:  specification v0.3 — implementation has NOT started; first task is M0-T1
+Status:  implementation well underway. The CPU + GPU Monte-Carlo transport,
+         the k-eigenvalue criticality solver, α-mode burst kinetics, both hydro
+         tiers, and the burst coupling loop are built and validated against the
+         reference oracle — 114 tests green (101 CPU + 13 GPU). The GPU backend
+         is differentially checked against the CPU reference.
+Next:    a cited fast-group cross-section dataset (open multigroup library or an
+         ENDF+collapse) unblocks the formal Godiva/Jezebel benchmark gates; then
+         M5-M7 add the sweep engine, the GPU raymarcher, and the interactive
+         3D studio described above.
 Target:  C++20 + CUDA 13.1, sm_89 (RTX 4070 Ti SUPER) primary, sm_80/90 cloud
 Licence: MIT (code) — see NOTICE.md for sources and scope
 ```
+
+Progress in detail — task table, dependency graph and the single next action — lives in [`spec/PROGRESS.md`](spec/PROGRESS.md); it is the authority, this line is a snapshot.
 
 ---
 

@@ -90,6 +90,12 @@ inline std::string tally_example() {
     return fenced_block(contracts(), "## 5. `tally.json`", "json");
 }
 
+/// The 03 §6 run.json example. Read from the spec so the provenance contract's
+/// test cannot drift from the documented schema (M3-T3-f).
+inline std::string run_example() {
+    return fenced_block(contracts(), "## 6. `run.json`", "json");
+}
+
 inline void write_file(const std::filesystem::path& path, const std::string& text) {
     std::filesystem::create_directories(path.parent_path());
     std::ofstream stream(path, std::ios::binary);

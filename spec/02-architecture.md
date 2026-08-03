@@ -35,6 +35,7 @@ C:\NUCLEAR/                       # THIS DIRECTORY IS THE REPO ROOT (BLK-12; git
     ref/       transport + eigen (CPU oracle)            # 05-module-transport.md
     gpu/       event-based CUDA kernels; optix/ (M6, compile-guarded NUKESIM_WITH_OPTIX)
     physics/   eigen/ kinetics/ hydro/ couple/ tally/
+    api/       run.json provenance + evaluate/generate_run — nscore's studio/binding surface (06 §frontends)
     render/    fields/ raymarch/ color/                  # 09-rendering.md
     app/       nukebench/ nukefarm/samplers/ nukestudio/ nukecinema/
   scripts/     build.ps1 — developer wrappers around the 12 §2 canonical loop (M0-T2)

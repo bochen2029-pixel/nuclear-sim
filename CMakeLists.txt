@@ -254,7 +254,8 @@ add_library(nukesim_core STATIC
     src/physics/hydro/tier1.cpp
     src/physics/hydro/tier2.cpp
     src/physics/tally/tally.cpp
-    src/physics/couple/couple.cpp)
+    src/physics/couple/couple.cpp
+    src/api/run_provenance.cpp)
 target_link_libraries(nukesim_core PUBLIC nukesim_core_constants nukesim_deps)
 target_include_directories(nukesim_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 nukesim_strict(nukesim_core)
@@ -324,6 +325,16 @@ target_include_directories(test_couple PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
 target_compile_definitions(test_couple PRIVATE NUKESIM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 nukesim_strict(test_couple)
 catch_discover_tests(test_couple TEST_PREFIX "couple.")
+
+# nscore fusion API (M3-T3-f onward): run.json provenance + the evaluate /
+# generate_run surface (03 §6, 06 §frontends). Part of nscore, not a frontend
+# (D7) — it composes physics/couple; frontends (src/app/) call it.
+add_executable(test_api tests/unit/test_api.cpp)
+target_link_libraries(test_api PRIVATE nukesim_core Catch2::Catch2WithMain)
+target_include_directories(test_api PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
+target_compile_definitions(test_api PRIVATE NUKESIM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+nukesim_strict(test_api)
+catch_discover_tests(test_api TEST_PREFIX "api.")
 
 add_executable(test_ref tests/unit/test_ref.cpp)
 target_link_libraries(test_ref PRIVATE nukesim_core Catch2::Catch2WithMain)

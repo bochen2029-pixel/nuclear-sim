@@ -39,6 +39,7 @@ std::string to_json(const RunProvenance& r, int indent) {
     }
     j["data_hashes"] = {{"xs", r.data_hashes.xs}, {"materials", std::move(materials)}};
 
+    j["scenario_overrides"] = r.scenario_overrides;  // 03 §4 (empty for a canonical run)
     j["seed"] = r.seed;
     j["code_version"] = r.code_version;
     j["spec_version"] = r.spec_version;
@@ -71,6 +72,10 @@ RunProvenance parse_run_json(const std::string& text) {
         r.data_hashes.materials.emplace_back(name, hash.get<std::string>());
     }
 
+    // 03 §4: overrides recorded verbatim. Optional (empty for a canonical run).
+    if (const auto it = j.find("scenario_overrides"); it != j.end() && it->is_array()) {
+        r.scenario_overrides = it->get<std::vector<std::string>>();
+    }
     r.seed = require_field(j, "seed").get<std::uint64_t>();
     r.code_version = require_field(j, "code_version").get<std::string>();
     r.spec_version = require_field(j, "spec_version").get<std::string>();

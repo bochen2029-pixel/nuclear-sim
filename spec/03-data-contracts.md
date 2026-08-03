@@ -236,11 +236,11 @@ Validation rules: `layers` is TOP-LEVEL and the loader rejects it under `[data]`
 ```json
 { "schema_version": 1, "run_id": "...", "unit_id": "…", "scenario_file": "scenarios/trinity_canonical.toml",
   "scenario_sha256": "…", "data_hashes": { "xs": "…", "materials": { "pu_ga_delta": "…" } },
-  "seed": 12345, "code_version": "0.1.0", "spec_version": "0.2", "git": "a1b2c3d", "dirty": false,
+  "scenario_overrides": [], "seed": 12345, "code_version": "0.1.0", "spec_version": "0.2", "git": "a1b2c3d", "dirty": false,
   "backend": "gpu", "device": "NVIDIA GeForce RTX 4070 Ti SUPER", "started": "…", "finished": "…" }
 ```
 
-`unit_id` = sha256(scenario canonical hash ‖ overrides ‖ seed) — the idempotent dedup key and artifact directory name (sweeps). Every run emits `run.json` + `tally.json` (+ `checkpoint.bin`) into `artifacts/<unit_id>/`. `code_version` tracks the app; `spec_version` tracks this spec; both bump independently (who bumps: the milestone-closing session).
+`unit_id` = sha256(scenario canonical hash ‖ overrides ‖ seed) — the idempotent dedup key and artifact directory name (sweeps). `scenario_overrides` records the applied `[overrides]` (03 §4) verbatim — an empty list for a canonical run; the same overrides in any order are the same run (they are sorted in the `unit_id` derivation). Every run emits `run.json` + `tally.json` (+ `checkpoint.bin`) into `artifacts/<unit_id>/`. `code_version` tracks the app; `spec_version` tracks this spec; both bump independently (who bumps: the milestone-closing session).
 
 ## 7. `sweep.toml` — batch manifest (schema v1)
 

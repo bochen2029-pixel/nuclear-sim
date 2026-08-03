@@ -42,6 +42,7 @@ struct RunProvenance {
     std::string scenario_file;
     std::string scenario_sha256;
     RunDataHashes data_hashes;
+    std::vector<std::string> scenario_overrides;  // 03 §4: applied overrides, recorded verbatim
     std::uint64_t seed = 0;
     std::string code_version;    // tracks the app (03 §6)
     std::string spec_version;    // tracks this spec (03 §6)
@@ -62,7 +63,8 @@ std::string to_json(const RunProvenance& r, int indent = 2);
 /// unit_id, scenario_file, scenario_sha256, data_hashes{xs, materials}, seed,
 /// code_version, spec_version, git, dirty, backend, device, started, finished) —
 /// because a provenance record missing one of them cannot reproduce or dedup a
-/// run. `schema_version` defaults to 1 when absent (03 §12 migration).
+/// run. `schema_version` defaults to 1 and `scenario_overrides` to empty when
+/// absent (03 §12 migration; overrides are empty for a canonical run).
 RunProvenance parse_run_json(const std::string& text);
 
 /// unit_id = sha256(scenario_canonical_hash ‖ overrides ‖ seed) — 03 §6. The

@@ -206,6 +206,77 @@ def section_layer_masses(c: dict) -> tuple[list[str], list[str]]:
             f"C-102 over-determination measures {over * 100:+.2f}%, not the ~2.4% the "
             "appendix note records."
         )
+
+    # --- Per-layer mass = geometry × material density vs appendix §2 (M2-T1) ---
+    def mat_density(name: str) -> float | None:
+        p = MATERIALS / f"{name}.json"
+        return json.loads(p.read_text())["density_g_cm3"] if p.exists() else None
+
+    if have_materials:
+        r102 = c["C-102"]["value"] / 2.0
+        r103 = c["C-103"]["value"] / 2.0
+        r104 = c["C-104"]["value"] / 2.0
+        r105 = c["C-105"]["value"] / 2.0
+        r106 = c["C-106"]["value"] / 2.0
+        # (label, material, r_in, r_out, appendix mass spec)
+        layers = [
+            ("pit (C-102)", "pu_ga_delta", 0.0, r102, ("point", c["C-102"]["mass_kg"])),
+            ("tamper (C-103)", "u_natural", r102, r103,
+             ("band", c["C-103"]["mass_lo_kg"], c["C-103"]["mass_hi_kg"])),
+            ("B-shell (C-104)", "b10_acrylic", r103, r104, None),
+            ("pusher (C-105)", "aluminum", r104, r105,
+             ("band", c["C-105"]["mass_lo_kg"], c["C-105"]["mass_hi_kg"])),
+            ("HE booster (C-106)", "he_compb", r105, r106, ("point", c["C-106"]["mass_kg"])),
+        ]
+        tol = 0.03  # C-104-class mass_tolerance_pct (3%, SIM); WARN, never error
+        lines += [
+            "### Canonical assembly per-layer mass (M2-T1)",
+            "",
+            "mass = material density × shell volume ((4/3)π(r_out³ − r_in³)), r = appendix",
+            "OD / 2; compared to the appendix §2 Mass column. Reconstructed masses carry",
+            "real spread, so the tolerance is 3% (a WARN in the loader, never an error).",
+            "",
+            "```",
+            f"  {'layer':<20}{'rho g/cm3':>10}{'mass kg':>10}{'appendix':>15}{'dev':>10}",
+        ]
+        for label, mat, r_in, r_out, spec in layers:
+            rho = mat_density(mat)
+            if rho is None:
+                continue
+            vol = 4.0 / 3.0 * math.pi * (r_out**3 - r_in**3)
+            m = rho * vol / 1000.0  # kg
+            if spec is None:
+                app_s, dev_s = "—", "—"
+            elif spec[0] == "point":
+                point = spec[1]
+                dev = (m - point) / point
+                app_s, dev_s = f"{point:g} kg", f"{dev * 100:+.2f}%"
+                if abs(dev) > tol:
+                    findings.append(
+                        f"{label} mass {m:.2f} kg deviates {dev * 100:+.2f}% from "
+                        f"appendix {point} kg (> 3%)."
+                    )
+            else:
+                lo, hi = spec[1], spec[2]
+                dev = (m - lo) / lo if m < lo else (m - hi) / hi if m > hi else 0.0
+                app_s = f"{lo:g}-{hi:g} kg"
+                dev_s = "in band" if dev == 0.0 else f"{dev * 100:+.2f}%"
+                if abs(dev) > tol:
+                    findings.append(
+                        f"{label} mass {m:.2f} kg is {dev * 100:+.2f}% outside "
+                        f"appendix {lo}-{hi} kg (> 3%)."
+                    )
+            lines.append(f"  {label:<20}{rho:>10.3f}{m:>10.2f}{app_s:>15}{dev_s:>10}")
+        lines += [
+            "```",
+            "",
+            "The pit density is the derived 15.23 (above), so its mass check is consistent",
+            "by construction. The B-10 shell (C-104) has no appendix mass (not gated). The",
+            "urchin (C-100, hollow ~7 g) and the HE lens / cork / case (C-107..C-109) sit",
+            "outside this solid-layer check — see data/materials/README.md.",
+            "",
+        ]
+
     return lines, findings
 
 

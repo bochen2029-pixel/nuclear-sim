@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "name": "b10_acrylic",
+  "density_g_cm3": 1.20,
+  "status": "SIM",
+  "cite": "B-10-loaded acrylic (PMMA C5H8O2) slow-neutron-capture shell, layer C-104 (research doc: '~0.32 cm B-10 in acrylic', predetonation-background reduction). The B-10 LOADING FRACTION is NOT cited numerically in open sources; 5 wt% B-10 is a SIM placeholder pending a cited value (see data/materials/README.md). Layer C-104 has no appendix mass, so this material is NOT mass-gated. Density 1.20 g/cm3 (acrylic ~1.18 + B loading, SIM).",
+  "isotopes": {
+    "C12": 0.322040,
+    "H1": 0.515268,
+    "O16": 0.128815,
+    "B10": 0.033877
+  }
+}

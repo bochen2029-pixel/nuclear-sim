@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "name": "aluminum",
+  "density_g_cm3": 2.70,
+  "status": "PUBLIC",
+  "cite": "Aluminium pusher, layer C-105 (research doc Trinity technical reference; ~12 cm thick, ~128-130 kg, density ratio ~1.64 to the explosive). Aluminium metal, monoisotopic Al-27, density 2.70 g/cm3 (public).",
+  "isotopes": {
+    "Al27": 1.0
+  }
+}

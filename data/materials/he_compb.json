@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "name": "he_compb",
+  "density_g_cm3": 1.70,
+  "status": "RECONSTRUCTED",
+  "cite": "Composition B HE surrogate, inner booster layer C-106 (research doc Trinity technical reference): 60% RDX (C3H6N6O6) / 39% TNT (C7H5N3O6) / 1% wax (~CH2) by mass; detonation velocity ~7.9 km/s. Cast density 1.70 g/cm3 (public Comp B ordnance range 1.65-1.72; consistent with C-106 ~608 kg to -1.0%, see README). Element-averaged C/H/N/O per appendix section 3 completeness rule.",
+  "isotopes": {
+    "C12": 0.219501,
+    "H1": 0.276208,
+    "N14": 0.225010,
+    "O16": 0.279281
+  }
+}

@@ -58,15 +58,6 @@ U-235. The appendix convention note records both figures.
 
 ## 2. Layer masses from geometry × density
 
-**PENDING — requires the canonical assembly materials, `data/materials/pu_ga_delta.json` and siblings (M2-T1).**
-
-This section recomputes each layer's mass from its `02 §2` geometry and its
-material density and compares it against the appendix §2 Mass column. The
-densities do not exist yet, so it is deliberately marked pending rather than
-silently omitted — an absent section reads as "checked and fine".
-
-What it will check, and the one number already computable:
-
 ### C-102 pit: density is over-determined, and by how much
 
 Mass (6.15 kg) and OD (9.17 cm) are both authoritative declassified values, so
@@ -86,6 +77,26 @@ against the commonly quoted δ-phase alloy density. Reproduced, not hidden:
 Attributed to the initiator cavity, the inter-hemisphere gasket and rounding in
 public figures. Recorded, not resolved — a simulation that quietly adopted 15.6
 with this mass and radius would be internally inconsistent from the first step.
+
+### Canonical assembly per-layer mass (M2-T1)
+
+mass = material density × shell volume ((4/3)π(r_out³ − r_in³)), r = appendix
+OD / 2; compared to the appendix §2 Mass column. Reconstructed masses carry
+real spread, so the tolerance is 3% (a WARN in the loader, never an error).
+
+```
+  layer                rho g/cm3   mass kg       appendix       dev
+  pit (C-102)             15.230      6.15        6.15 kg    -0.02%
+  tamper (C-103)          19.050    111.47     108-111 kg    +0.42%
+  B-shell (C-104)          1.200      0.65              —         —
+  pusher (C-105)           2.700    128.34     128-130 kg   in band
+  HE booster (C-106)       1.700    602.46         608 kg    -0.91%
+```
+
+The pit density is the derived 15.23 (above), so its mass check is consistent
+by construction. The B-10 shell (C-104) has no appendix mass (not gated). The
+urchin (C-100, hollow ~7 g) and the HE lens / cork / case (C-107..C-109) sit
+outside this solid-layer check — see data/materials/README.md.
 
 ## 3. Tier-1 compression map (E4 / `01 §5`)
 

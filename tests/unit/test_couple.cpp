@@ -9,13 +9,23 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <nlohmann/json.hpp>
+
 #include "core/constants/constants.h"
 #include "core/geometry/geometry.h"
+#include "core/material/material.h"
+#include "core/xs/xs.h"
 #include "physics/couple/couple.h"
+#include "physics/eigen/eigen.h"
 #include "physics/tally/tally.h"
 
+#include "spec_examples.h"
+
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
+#include <filesystem>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -93,6 +103,75 @@ EigenFn scripted(const std::vector<double>& ks, int& calls, double lambda_s = 1.
         return make_eigen(k, lambda_s);
     };
 }
+
+// A REAL (loader-built) bare Pu-239 sphere with a synthetic-but-cited-shaped
+// few-group xs — enough for `ref_eigen_fn` to run a genuine Monte-Carlo eigen and
+// bank real fission SITES. Not physical data (SIM); the pipeline is what's real.
+namespace fs = std::filesystem;
+using nlohmann::json;
+
+class RealSphere {
+public:
+    RealSphere() {
+        root_ = fs::temp_directory_path() / ("nukesim_couple_" + std::to_string(counter()++));
+        fs::remove_all(root_);
+        fs::create_directories(root_ / "xs");
+        fs::create_directories(root_ / "materials");
+        const auto four = [](double v) { return json::array({v, v, v, v}); };
+        const json identity = json::array({json::array({1.0, 0.0, 0.0, 0.0}),
+                                           json::array({0.0, 1.0, 0.0, 0.0}),
+                                           json::array({0.0, 0.0, 1.0, 0.0}),
+                                           json::array({0.0, 0.0, 0.0, 1.0})});
+        const json pu = {{"nu", four(2.9)},
+                         {"chi", json::array({1.0, 0.0, 0.0, 0.0})},
+                         {"sigma_f", four(1.4)},
+                         {"sigma_c", four(0.15)},
+                         {"sigma_s", four(4.0)},
+                         {"sigma_n2n", four(0.0)},
+                         {"mu_bar", four(0.0)},
+                         {"beta", 0.0021},
+                         {"transfer", identity},
+                         {"cite", "synthetic test medium — not physical data"},
+                         {"status", "SIM"}};
+        const json xs = {{"schema_version", 2},
+                         {"name", "pu"},
+                         {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3})},
+                         {"isotopes", {{"Pu239", pu}}}};
+        spec_examples::write_file(root_ / "xs" / "pu.json", xs.dump(2));
+        const json mat = {{"schema_version", 1},
+                          {"name", "pit"},
+                          {"density_g_cm3", 15.6},
+                          {"status", "SIM"},
+                          {"cite", "synthetic"},
+                          {"isotopes", {{"Pu239", 1.0}}}};
+        spec_examples::write_file(root_ / "materials" / "pit.json", mat.dump(2));
+        xs_ = std::make_unique<ns::xs::FewGroupXS>(ns::xs::FewGroupXS::load(root_ / "xs" / "pu.json"));
+        materials_ = std::make_unique<ns::material::MaterialLib>(
+            ns::material::MaterialLib::load_dir(root_ / "materials", *xs_));
+        stack_ = LayerStack({Layer{"pit", radius_cm(), 0, "SIM"}});
+    }
+    ~RealSphere() {
+        std::error_code ec;
+        fs::remove_all(root_, ec);
+    }
+    RealSphere(const RealSphere&) = delete;
+    RealSphere& operator=(const RealSphere&) = delete;
+
+    const ns::material::MaterialLib& materials() const { return *materials_; }
+    const ns::xs::FewGroupXS& xs() const { return *xs_; }
+    const LayerStack& geometry() const { return stack_; }
+    double radius_cm() const { return 6.0; }
+
+private:
+    static int& counter() {
+        static int v = 0;
+        return v;
+    }
+    fs::path root_;
+    std::unique_ptr<ns::xs::FewGroupXS> xs_;
+    std::unique_ptr<ns::material::MaterialLib> materials_;
+    LayerStack stack_;
+};
 
 }  // namespace
 
@@ -231,4 +310,62 @@ TEST_CASE("the streaming sink reconciles per-isotope and per-shell fissions to t
     // Per-isotope split matches the production shares (Pu-239 dominant).
     REQUIRE(t.fissions_by_isotope.get("Pu239") > t.fissions_by_isotope.get("U238"));
     REQUIRE(t.fissions_by_isotope.get("U238") > t.fissions_by_isotope.get("Pu240"));
+}
+
+TEST_CASE("the real-transport adapter drives the loop and streams real fission sites", "[couple]") {
+    // The honesty step: no scripted k. `ref_eigen_fn` runs a genuine Monte-Carlo
+    // eigen on a loader-built Pu sphere each geometry, and the loop streams the
+    // eigen's spatial fission SITES — the volumetric chain-reaction data a 3D
+    // renderer consumes. (No hydro/disassembly here, so it need not quench; the
+    // point is that the sites are REAL positions from real transport.)
+    const RealSphere sphere;
+    ns::physics::EigenSpec espec;
+    espec.batch = 3000;
+    espec.inactive = 6;
+    espec.active = 12;
+    espec.h_tol = 0.05;
+    const EigenFn eigen = ns::physics::ref_eigen_fn(sphere.materials(), sphere.xs(), espec, 20260803);
+
+    CoupleConfig cfg;
+    cfg.e_f_mev = ns::consts::e_f_prompt_deposited;
+    cfg.phi_kt = ns::consts::phi_kt_fissions_per_kiloton;
+    cfg.eigen_refresh_gens = 5;
+    cfg.t_max_s = 2.0e-7;              // caps the run (no disassembly to quench it)
+    cfg.max_sites_per_sample = 512;
+
+    ns::physics::BurstContext ctx;
+    ctx.run_id = "real_sphere";
+    ctx.isotope_names = {"Pu239"};
+    ctx.shell_edges_cm = {0.0, sphere.radius_cm()};
+    ctx.phi_kt = cfg.phi_kt;
+
+    Recorder rec;
+    const BurstReport report = run_burst(cfg, ctx, sphere.geometry(), eigen, rec);
+
+    REQUIRE(report.generations > 0);
+    REQUIRE(report.eigen_calls >= 1);
+    REQUIRE_FALSE(rec.samples.empty());
+
+    // The initial generation carries a real, capped fission-site sample.
+    const GenerationSample& first = rec.samples.front();
+    REQUIRE_FALSE(first.sites.empty());
+    REQUIRE(static_cast<int>(first.sites.size()) <= cfg.max_sites_per_sample);
+
+    // Every sampled site is a real position INSIDE the sphere, isotope-tagged.
+    const double R = sphere.radius_cm();
+    for (const auto& s : first.sites) {
+        const double r = std::sqrt(s.pos.x * s.pos.x + s.pos.y * s.pos.y + s.pos.z * s.pos.z);
+        REQUIRE(r <= R + 1e-6);
+        REQUIRE(s.isotope >= 0);
+    }
+
+    // Non-refresh generations carry no site copy (the renderer caches on refresh);
+    // at least the initial + one refresh do.
+    int gens_with_sites = 0;
+    for (const auto& g : rec.samples) {
+        if (!g.sites.empty()) {
+            ++gens_with_sites;
+        }
+    }
+    REQUIRE(gens_with_sites >= 1);
 }

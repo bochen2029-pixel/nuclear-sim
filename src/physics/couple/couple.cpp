@@ -39,6 +39,21 @@ std::vector<double> shell_shares_of(const std::vector<double>& by_layer) {
     return shares;
 }
 
+// Stratified, capped sample of fission sites for the viz stream: a uniform stride
+// through the source's sites preserves the spatial/isotope distribution (a faithful
+// representative subset, not the first-N). Deterministic.
+std::vector<ns::ref::FissionSite> sample_sites(const std::vector<ns::ref::FissionSite>& all, int cap) {
+    if (cap <= 0 || all.empty()) return {};
+    if (static_cast<int>(all.size()) <= cap) return all;
+    std::vector<ns::ref::FissionSite> out;
+    out.reserve(static_cast<std::size_t>(cap));
+    const double stride = static_cast<double>(all.size()) / cap;
+    for (int i = 0; i < cap; ++i) {
+        out.push_back(all[static_cast<std::size_t>(static_cast<double>(i) * stride)]);
+    }
+    return out;
+}
+
 // Tier-1 compressed geometry at time t (s(0)=0 ⇒ scale 1 ⇒ geom0).
 ns::geom::LayerStack geometry_at(const ns::geom::LayerStack& geom0,
                                  const Tier1Compression& comp, double t_s) {
@@ -282,6 +297,11 @@ BurstReport run_burst(const CoupleConfig& cfg, const BurstContext& ctx,
         g.shell_shares = shell_shares_of(er.source.by_layer);
         g.refreshed = refreshed;
         g.q = q;
+        // Spatial fission-site sample: fresh at the initial eigen (n==0) and at
+        // each refresh (the quasi-static pattern), empty otherwise — the viz seam.
+        if (refreshed || n == 0) {
+            g.sites = sample_sites(er.source.sites, cfg.max_sites_per_sample);
+        }
         sink.on_generation(g);
 
         t += lambda;
@@ -310,6 +330,14 @@ BurstReport run_burst(const CoupleConfig& cfg, const BurstContext& ctx,
     report.eigen_calls = eigen_calls;
     report.max_q = max_q;
     return report;
+}
+
+EigenFn ref_eigen_fn(const ns::material::MaterialLib& materials, const ns::xs::FewGroupXS& xs,
+                     const EigenSpec& spec, std::uint64_t seed) {
+    return [&materials, &xs, spec, seed](const ns::geom::LayerStack& geom) {
+        ns::ref::RefTransport transport(geom, materials, xs, seed);
+        return run_eigen(transport, spec);
+    };
 }
 
 }  // namespace ns::physics

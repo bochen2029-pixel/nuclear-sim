@@ -3,6 +3,7 @@
 #include "api/studio.h"
 
 #include "core/constants/constants.h"
+#include "core/hash/sha256.h"
 #include "physics/couple/couple.h"
 #include "physics/eigen/eigen.h"
 
@@ -10,10 +11,14 @@
 
 #include <atomic>
 #include <cmath>
+#include <cstdint>
 #include <fstream>
+#include <iomanip>
 #include <numbers>
+#include <sstream>
 #include <string>
 #include <system_error>
+#include <vector>
 
 namespace ns::api {
 
@@ -100,7 +105,9 @@ DemonCoreAssembly::DemonCoreAssembly(const StudioConfig& cfg) {
                      {"isotopes",
                       {{"Pu239", sim_isotope(2.9, 1.4, 0.15, 4.0)},
                        {"Pu240", sim_isotope(2.5, 0.5, 0.80, 4.0)}}}};
-    write_text(root_ / "xs" / "pu.json", xs.dump(2));
+    const std::string xs_text = xs.dump(2);
+    write_text(root_ / "xs" / "pu.json", xs_text);
+    xs_sha256_ = ns::hash::sha256_hex(xs_text);
 
     // Pu-240 atom fraction from cfg; Pu-239 the balance (Σ = 1). Ga (3.35 at% in
     // the real card) is omitted in the bare-core SIM stand-in — noted; the real
@@ -113,7 +120,9 @@ DemonCoreAssembly::DemonCoreAssembly(const StudioConfig& cfg) {
                       {"cite", "bare demon-core Pu sphere; density DERIVED from C-101 OD + "
                                "C-102 mass; SIM xs pending fast4"},
                       {"isotopes", {{"Pu239", 1.0 - x}, {"Pu240", x}}}};
-    write_text(root_ / "materials" / "pit.json", mat.dump(2));
+    const std::string mat_text = mat.dump(2);
+    write_text(root_ / "materials" / "pit.json", mat_text);
+    material_sha256_ = ns::hash::sha256_hex(mat_text);
 
     xs_ = std::make_unique<ns::xs::FewGroupXS>(ns::xs::FewGroupXS::load(root_ / "xs" / "pu.json"));
     materials_ = std::make_unique<ns::material::MaterialLib>(
@@ -175,6 +184,7 @@ StudioConfig StudioConfig::from_json(const std::string& cfg_json) {
     cfg.initiator_strength_n_per_s = num("initiator.strength_n_per_s", cfg.initiator_strength_n_per_s);
     cfg.generation_time_s_initial =
         num("kinetics.generation_time_s_initial", cfg.generation_time_s_initial);
+    cfg.burst_t_max_s = num("kinetics.t_max_s", cfg.burst_t_max_s);
     cfg.tamper_scale = num("tamper.scale", cfg.tamper_scale);
     cfg.lens_jitter_ns = num("lenses.jitter_ns", cfg.lens_jitter_ns);
     if (const auto it = j.find("seed"); it != j.end() && it->is_number()) {
@@ -188,6 +198,189 @@ StudioConfig StudioConfig::from_json(const std::string& cfg_json) {
 
 std::string evaluate_json(const std::string& cfg_json) {
     return to_json(evaluate(StudioConfig::from_json(cfg_json)));
+}
+
+namespace {
+
+// Compact human-readable number for `reasons`.
+std::string short_num(double v, int prec = 4) {
+    std::ostringstream ss;
+    ss << std::setprecision(prec) << v;
+    return ss.str();
+}
+
+// A stable canonical hash of the demon-core StudioConfig — its scenario identity
+// (there is no scenario TOML for the bare-core cfg path; this stands in for
+// Scenario::canonical_hash() so unit_id / scenario_sha256 are deterministic).
+std::string cfg_canonical_hash(const StudioConfig& cfg) {
+    std::ostringstream ss;
+    ss << std::setprecision(17) << "demon_core"
+       << ";pit_mass_kg=" << cfg.pit_mass_kg << ";pu240=" << cfg.pu240_fraction
+       << ";compression=" << cfg.compression_ratio << ";initiator=" << cfg.initiator_strength_n_per_s
+       << ";gen_time=" << cfg.generation_time_s_initial;
+    return ns::hash::sha256_hex(ss.str());
+}
+
+// One GenerationSample → the simstub.js `samples[]` shape (the pitscope tap).
+nlohmann::ordered_json sample_to_json(const ns::physics::GenerationSample& g) {
+    nlohmann::ordered_json sites = nlohmann::ordered_json::array();
+    for (const auto& s : g.sites) {
+        sites.push_back({{"pos", nlohmann::ordered_json::array({s.pos.x, s.pos.y, s.pos.z})},
+                         {"group", s.group},
+                         {"isotope", s.isotope},
+                         {"layer", s.layer}});
+    }
+    return {{"n", g.n},
+            {"t_s", g.t_s},
+            {"lambda_s", g.lambda_s},
+            {"k_eff", g.k_eff},
+            {"k_prompt", g.k_prompt},
+            {"log10_population", g.log10_population},
+            {"log10_fissions", g.log10_fissions},
+            {"isotope_shares", g.isotope_shares},
+            {"shell_shares", g.shell_shares},
+            {"refreshed", g.refreshed},
+            {"q", g.q},
+            {"sites", std::move(sites)}};
+}
+
+// The sink assembles the 03 §5 tally AND keeps the per-generation sample/site
+// stream (the viz "main course" tap) — a BurstTally that also records.
+class CollectingTally : public ns::physics::BurstTally {
+public:
+    void on_generation(const ns::physics::GenerationSample& g) override {
+        ns::physics::BurstTally::on_generation(g);
+        samples_.push_back(g);
+    }
+    std::vector<ns::physics::GenerationSample>& samples() noexcept { return samples_; }
+
+private:
+    std::vector<ns::physics::GenerationSample> samples_;
+};
+
+}  // namespace
+
+GenerateRunResult generate_run(const StudioConfig& cfg) {
+    const DemonCoreAssembly assembly(cfg);
+    const double r0 = assembly.r0_cm();
+    const ns::geom::LayerStack geom0 = assembly.compressed_geometry();  // the burst starts compressed
+    const double r_comp = geom0.outermost_radius();
+
+    // Mass-conserving burst eigen with r_ref = the UNCOMPRESSED r0: the compressed
+    // start reads as ρ × compression (prompt-super if compression suffices), and
+    // disassembly (radius > r0) drops density below critical → the E6 quench.
+    ns::physics::EigenSpec espec;
+    espec.batch = assembly.eigen_batch();
+    espec.inactive = 6;
+    espec.active = 12;
+    espec.h_tol = 0.05;
+    espec.seed = cfg.seed;
+    const ns::physics::EigenFn eigen = ns::physics::ref_eigen_fn_masscons(
+        assembly.materials(), assembly.xs(), espec, cfg.seed, r0);
+
+    ns::physics::CoupleConfig cc;
+    cc.n0 = 1.0;
+    cc.e_f_mev = ns::consts::e_f_prompt_deposited;                 // C-040
+    cc.phi_kt = ns::consts::phi_kt_fissions_per_kiloton;           // C-041
+    cc.lambda_s_initial = cfg.generation_time_s_initial;           // C-030
+    cc.eigen_refresh_gens = 8;
+    cc.quench_epsilon = ns::consts::quench_epsilon;                // C-909
+    cc.t_max_s = cfg.burst_t_max_s;
+    cc.max_generations = static_cast<int>(cfg.burst_max_generations);
+    cc.initiator_rate_n_per_s = cfg.initiator_strength_n_per_s;    // C-051
+    cc.initiator_t_fire_s = 0.0;
+    cc.disassembly = true;
+    cc.core_mass_kg = cfg.pit_mass_kg;                             // the real disassembling core mass
+    cc.core_radius0_cm = r_comp;                                  // shell start = the compressed pit
+    cc.disassembly_gamma = 5.0 / 3.0;
+    cc.e_f_joules = ns::consts::e_f_prompt_deposited * ns::consts::mev_to_joule;  // C-040·C-917
+
+    const std::string canon = cfg_canonical_hash(cfg);
+    const std::string unit_id = compute_unit_id(canon, {}, cfg.seed);
+
+    ns::physics::BurstContext ctx;
+    ctx.isotope_names = {"Pu239", "Pu240"};
+    ctx.isotope_molar_mass_g = {ns::consts::molar_mass_pu239, ns::consts::molar_mass_pu240};
+    ctx.core_pu_isotopes = {0, 1};
+    ctx.tamper_isotope = -1;                                       // bare core, no tamper
+    ctx.shell_edges_cm = {0.0, r_comp};                           // one radial shell (the pit)
+    ctx.phi_kt = cc.phi_kt;
+    ctx.n_a = ns::consts::avogadro_constant;
+    ctx.m_pit_g = cfg.pit_mass_kg * 1000.0;
+    ctx.non_canonical = false;
+    ctx.run_id = "demoncore_" + unit_id.substr(0, 16);
+
+    CollectingTally sink;
+    const ns::physics::BurstReport report = run_burst(cc, ctx, geom0, eigen, sink);
+
+    GenerateRunResult out;
+    out.tally = sink.result();
+    out.samples = std::move(sink.samples());
+    out.yield_kt = out.tally.yield_kt;
+    out.k_eff_peak = out.tally.k_eff.peak;
+    out.k_prompt_peak = out.tally.k_prompt.peak;
+    out.supercritical = report.supercritical_reached;
+    out.quenched = report.quenched;
+    out.non_canonical = ctx.non_canonical;
+
+    // EMERGENT outcome — read OFF the real burst, never a hardcoded rule.
+    out.detonate = report.supercritical_reached && report.quenched && out.yield_kt > 0.0;
+    if (!report.supercritical_reached) {
+        out.reasons.push_back("k_prompt never reached 1.000 at peak compression (ratio " +
+                              short_num(cfg.compression_ratio) + ", pit " + short_num(cfg.pit_mass_kg) +
+                              " kg) — the assembly stayed subcritical; the excursion fizzles");
+    } else {
+        out.reasons.push_back("prompt-supercritical excursion (k_eff peak = " +
+                              short_num(out.k_eff_peak) + ") — a runaway alpha burst ignited");
+        if (report.quenched) {
+            out.reasons.push_back("self-terminated by disassembly (k_eff fell to " +
+                                  short_num(out.tally.k_eff.at_quench) +
+                                  " as the core expanded); finite yield " + short_num(out.yield_kt) + " kt");
+        } else {
+            out.reasons.push_back("did not quench within t_max — the window was too short to capture "
+                                  "the full disassembly");
+        }
+    }
+
+    // run.json (03 §6) — the physics-determinable provenance. Environment fields
+    // (code/spec version, git, dirty, timestamps) are the frontend's to fill.
+    RunProvenance& run = out.run;
+    run.run_id = ctx.run_id;
+    run.unit_id = unit_id;
+    run.scenario_file = "demon_core";                             // cfg-driven; no scenario TOML
+    run.scenario_sha256 = canon;
+    run.data_hashes.xs = assembly.xs_sha256();
+    run.data_hashes.materials = {{"pit", assembly.material_sha256()}};
+    run.scenario_overrides = {};                                  // canonical bare-core run
+    run.seed = cfg.seed;
+    run.backend = "ref";                                          // CPU reference transport
+    run.device = "";
+
+    return out;
+}
+
+std::string to_json(const GenerateRunResult& r, int indent) {
+    json samples = json::array();
+    for (const auto& g : r.samples) {
+        samples.push_back(sample_to_json(g));
+    }
+    json j;
+    j["detonate"] = r.detonate;
+    j["reasons"] = r.reasons;
+    j["yield_kt"] = r.yield_kt;
+    j["k_eff_peak"] = r.k_eff_peak;
+    j["k_prompt_peak"] = r.k_prompt_peak;
+    j["supercritical"] = r.supercritical;
+    j["quenched"] = r.quenched;
+    j["non_canonical"] = r.non_canonical;
+    j["tally"] = json::parse(ns::physics::to_json(r.tally));      // 03 §5, embedded object
+    j["run"] = json::parse(ns::api::to_json(r.run));              // 03 §6, embedded object
+    j["samples"] = std::move(samples);
+    return j.dump(indent);
+}
+
+std::string generate_run_json(const std::string& cfg_json) {
+    return to_json(generate_run(StudioConfig::from_json(cfg_json)));
 }
 
 }  // namespace ns::api

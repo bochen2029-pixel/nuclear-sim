@@ -16,10 +16,14 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <vector>
 
+#include "api/run_provenance.h"
 #include "core/geometry/geometry.h"
 #include "core/material/material.h"
 #include "core/xs/xs.h"
+#include "physics/couple/couple.h"
+#include "physics/tally/tally.h"
 
 namespace ns::api {
 
@@ -37,7 +41,9 @@ struct StudioConfig {
     double tamper_scale = 1.0;                     // full-device knob; recorded, not modelled here
     double lens_jitter_ns = 10.0;                 // full-device knob; recorded, not modelled here
     std::uint64_t seed = 20260803;                // deterministic; the binding may override
-    std::int64_t eigen_batch = 4000;              // gauge eigen batch (speed vs σ_pcm); not a viz key
+    std::int64_t eigen_batch = 4000;              // eigen batch (speed vs σ_pcm); not a viz key
+    double burst_t_max_s = 5.0e-6;                // generate_run: 03 §4 [kinetics] t_max_s
+    std::int64_t burst_max_generations = 4000;    // generate_run: safety cap (never the terminator)
 
     /// Parse the viz cfg JSON (scenario.js dotted keys, e.g. "pit.mass_kg").
     /// Missing keys keep the canonical default; unknown keys are ignored.
@@ -76,6 +82,9 @@ public:
     double compression_ratio() const noexcept { return compression_ratio_; }
     std::uint64_t seed() const noexcept { return seed_; }
     std::int64_t eigen_batch() const noexcept { return eigen_batch_; }
+    /// sha256 of the generated xs / material JSON — the run.json data_hashes (03 §6).
+    const std::string& xs_sha256() const noexcept { return xs_sha256_; }
+    const std::string& material_sha256() const noexcept { return material_sha256_; }
 
     /// The compressed geometry the eigen runs on: radius r0·ratio^(-1/3), so
     /// ref_eigen_fn_masscons(r_ref = r0) scales ρ by exactly the compression ratio
@@ -92,6 +101,8 @@ private:
     double compression_ratio_ = 1.0;
     std::uint64_t seed_ = 0;
     std::int64_t eigen_batch_ = 4000;
+    std::string xs_sha256_;
+    std::string material_sha256_;
 };
 
 /// evaluate(cfg) → the criticality gauge, but REAL: builds the demon-core assembly
@@ -105,5 +116,38 @@ EvaluateResult evaluate(const DemonCoreAssembly& assembly);
 /// JSON in / JSON out — the exact `evaluate(cfg)` seam the binding calls: parse the
 /// viz cfg JSON, evaluate, return the EvaluateResult JSON.
 std::string evaluate_json(const std::string& cfg_json);
+
+/// The full demon-core burst as DATA (simstub.js generateRun, but REAL). The
+/// visualizer's "main course" tap. Physics only — the JS binding reconstructs the
+/// presentation closures (flux(t)/compression(t)) from `samples`/`tally`, so
+/// `main.js` is unchanged (see viz README §seam).
+struct GenerateRunResult {
+    ns::physics::TallyResult tally;                       // 03 §5
+    RunProvenance run;                                    // 03 §6
+    std::vector<ns::physics::GenerationSample> samples;   // per-generation stream (+ fission sites)
+    bool detonate = false;      // EMERGENT: prompt-supercritical + self-quenched + finite yield
+    std::vector<std::string> reasons;                     // human-readable outcome explanation
+    double yield_kt = 0.0;
+    double k_eff_peak = 0.0;
+    double k_prompt_peak = 0.0;
+    bool supercritical = false;
+    bool quenched = false;
+    bool non_canonical = false;
+};
+
+/// generate_run(cfg) → the emergent demon-core burst. Builds the assembly, runs the
+/// disassembly `run_burst` from the COMPRESSED pit (eigen r_ref = the uncompressed
+/// r0, so compression raises k and disassembly quenches it), collects the tally +
+/// the per-generation sample/site stream, and reads the outcome OFF the burst:
+/// `detonate` iff it went prompt-supercritical, self-terminated, and produced a
+/// finite yield — never a hardcoded rule (contrast simstub's faults/symmetry). A
+/// low-compression / low-mass cfg fizzles (never prompt-critical). fast4-independent.
+/// (Bare demon core: detonator/lens asymmetry is step 5 + fast4, not modelled here.)
+GenerateRunResult generate_run(const StudioConfig& cfg);
+
+std::string to_json(const GenerateRunResult& r, int indent = 2);
+
+/// JSON in / JSON out — the `generateRun(cfg)` seam.
+std::string generate_run_json(const std::string& cfg_json);
 
 }  // namespace ns::api

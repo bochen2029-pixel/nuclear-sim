@@ -253,7 +253,8 @@ add_library(nukesim_core STATIC
     src/physics/kinetics/kinetics.cpp
     src/physics/hydro/tier1.cpp
     src/physics/hydro/tier2.cpp
-    src/physics/tally/tally.cpp)
+    src/physics/tally/tally.cpp
+    src/physics/couple/couple.cpp)
 target_link_libraries(nukesim_core PUBLIC nukesim_core_constants nukesim_deps)
 target_include_directories(nukesim_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 nukesim_strict(nukesim_core)
@@ -316,6 +317,13 @@ target_include_directories(test_tally PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
 target_compile_definitions(test_tally PRIVATE NUKESIM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 nukesim_strict(test_tally)
 catch_discover_tests(test_tally TEST_PREFIX "tally.")
+
+add_executable(test_couple tests/unit/test_couple.cpp)
+target_link_libraries(test_couple PRIVATE nukesim_core Catch2::Catch2WithMain)
+target_include_directories(test_couple PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
+target_compile_definitions(test_couple PRIVATE NUKESIM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+nukesim_strict(test_couple)
+catch_discover_tests(test_couple TEST_PREFIX "couple.")
 
 add_executable(test_ref tests/unit/test_ref.cpp)
 target_link_libraries(test_ref PRIVATE nukesim_core Catch2::Catch2WithMain)

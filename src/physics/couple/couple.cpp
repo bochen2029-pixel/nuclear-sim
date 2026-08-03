@@ -3,6 +3,7 @@
 #include "physics/couple/couple.h"
 
 #include "physics/hydro/tier1.h"
+#include "physics/hydro/tier2.h"
 #include "physics/kinetics/kinetics.h"
 
 #include <algorithm>
@@ -58,6 +59,18 @@ std::vector<ns::ref::FissionSite> sample_sites(const std::vector<ns::ref::Fissio
 ns::geom::LayerStack geometry_at(const ns::geom::LayerStack& geom0,
                                  const Tier1Compression& comp, double t_s) {
     return compress(geom0, comp.radius_scale(comp.s_of(t_s)));
+}
+
+// Mass-conserving density ratio ρ/ρ₀ from the uniform geometry scale: (r_ref/r)³.
+// Mode-agnostic — works for tier-1 compression (r < r_ref ⇒ >1) and tier-2
+// disassembly (r > r_ref ⇒ <1) alike; the E3b Λ rescale reads it.
+double density_ratio_of(const ns::geom::LayerStack& geom, double r_ref_cm) {
+    const double r = geom.outermost_radius();
+    if (r <= 0.0 || r_ref_cm <= 0.0) {
+        return 1.0;
+    }
+    const double s = r / r_ref_cm;
+    return 1.0 / (s * s * s);
 }
 
 // Initiator source term S_n (C-051): neutrons injected during the fire pulse.
@@ -228,6 +241,14 @@ BurstReport run_burst(const CoupleConfig& cfg, const BurstContext& ctx,
     const Tier1Compression comp{cfg.compression_ratio, cfg.compression_t0_s, cfg.compression_t_c_s};
     ns::geom::LayerStack geom = geometry_at(geom0, comp, 0.0);
 
+    // Tier-2 disassembly state (used only when cfg.disassembly): a SnowplowShell
+    // whose interior energy is fed by deposited fission energy (E5) and which
+    // expands per E4, driving the geometry the mass-conserving eigen dilutes.
+    const double r_ref_cm = geom0.outermost_radius();
+    const double r0_m = cfg.core_radius0_cm > 0.0 ? cfg.core_radius0_cm / 100.0 : r_ref_cm / 100.0;
+    const SnowplowShell shell{cfg.core_mass_kg, cfg.disassembly_gamma, 0.0, 0.0};
+    ShellState shell_state{r0_m, 0.0, cfg.e_int0_j};
+
     // Initial eigen (02 §3): k_eff, Λ, β_eff, source at t = 0.
     EigenResult er = eigen_fn(geom);
     int eigen_calls = 1;
@@ -235,7 +256,7 @@ BurstReport run_burst(const CoupleConfig& cfg, const BurstContext& ctx,
     double nu = nu_eff(er.source);
     double lambda = er.lambda_s > 0.0 ? er.lambda_s : cfg.lambda_s_initial;
     double lambda_at_refresh = lambda;
-    double rho_at_refresh = comp.density_ratio(comp.s_of(0.0));
+    double rho_at_refresh = density_ratio_of(geom, r_ref_cm);
     double last_k = er.k;
 
     BurstAccumulator acc(cfg.n0);
@@ -268,13 +289,13 @@ BurstReport run_burst(const CoupleConfig& cfg, const BurstContext& ctx,
             if (q > 0.02) refresh_gens = std::max(1, refresh_gens / 2);  // auto-halve (R-13)
             last_k = er.k;
             lambda_at_refresh = lambda;
-            rho_at_refresh = comp.density_ratio(comp.s_of(t));
+            rho_at_refresh = density_ratio_of(geom, r_ref_cm);
             marked_radius = cur_radius;
             gens_since_refresh = 0;
             refreshed = true;
         } else if (n > 0) {
             // E3b: hold Λ, rescale by the density ratio since the last refresh (Λ ∝ 1/ρ).
-            const double rho_now = comp.density_ratio(comp.s_of(t));
+            const double rho_now = density_ratio_of(geom, r_ref_cm);
             if (rho_now > 0.0) lambda = lambda_at_refresh * rho_at_refresh / rho_now;
         }
 
@@ -307,7 +328,20 @@ BurstReport run_burst(const CoupleConfig& cfg, const BurstContext& ctx,
         t += lambda;
         ++n;
         ++gens_since_refresh;
-        geom = geometry_at(geom0, comp, t);
+        if (cfg.disassembly) {
+            // E5: impulse-deposit this generation's fission energy (F_n·e_f, Joules)
+            // into the interior, then E4-expand the shell over Λ. As R grows the
+            // mass-conserving eigen sees ρ = ρ₀·(r₀/R)³ drop → k falls → E6 quench.
+            const double e_n_j = std::pow(10.0, log_f_n) * cfg.e_f_joules;
+            if (std::isfinite(e_n_j)) {
+                shell_state.E_int += e_n_j;
+            }
+            shell_state = shell.rk4_step(shell_state, lambda);
+            const double rscale = r0_m > 0.0 && std::isfinite(shell_state.R) ? shell_state.R / r0_m : 1.0;
+            geom = compress(geom0, std::max(rscale, 1e-6));
+        } else {
+            geom = geometry_at(geom0, comp, t);
+        }
 
         // E6 (BLK-03): terminate when the fission rate has fallen ε_quench below
         // its own peak — NOT at k = 1. Requires having gone prompt-supercritical.

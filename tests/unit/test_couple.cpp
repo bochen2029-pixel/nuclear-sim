@@ -112,7 +112,7 @@ using nlohmann::json;
 
 class RealSphere {
 public:
-    RealSphere() {
+    explicit RealSphere(double r_cm = 6.0) : radius_(r_cm) {
         root_ = fs::temp_directory_path() / ("nukesim_couple_" + std::to_string(counter()++));
         fs::remove_all(root_);
         fs::create_directories(root_ / "xs");
@@ -148,7 +148,7 @@ public:
         xs_ = std::make_unique<ns::xs::FewGroupXS>(ns::xs::FewGroupXS::load(root_ / "xs" / "pu.json"));
         materials_ = std::make_unique<ns::material::MaterialLib>(
             ns::material::MaterialLib::load_dir(root_ / "materials", *xs_));
-        stack_ = LayerStack({Layer{"pit", radius_cm(), 0, "SIM"}});
+        stack_ = LayerStack({Layer{"pit", radius_, 0, "SIM"}});
     }
     ~RealSphere() {
         std::error_code ec;
@@ -160,13 +160,14 @@ public:
     const ns::material::MaterialLib& materials() const { return *materials_; }
     const ns::xs::FewGroupXS& xs() const { return *xs_; }
     const LayerStack& geometry() const { return stack_; }
-    double radius_cm() const { return 6.0; }
+    double radius_cm() const { return radius_; }
 
 private:
     static int& counter() {
         static int v = 0;
         return v;
     }
+    double radius_ = 6.0;
     fs::path root_;
     std::unique_ptr<ns::xs::FewGroupXS> xs_;
     std::unique_ptr<ns::material::MaterialLib> materials_;
@@ -399,4 +400,64 @@ TEST_CASE("mass-conserving density scaling raises k on compression, lowers it on
     INFO("k0=" << k0 << " compressed=" << k_compressed << " expanded=" << k_expanded);
     REQUIRE(k_compressed > k0);   // compression raises reactivity
     REQUIRE(k_expanded < k0);     // disassembly lowers it — the quench mechanism
+}
+
+TEST_CASE("the demon-core burst self-limits: ignite, disassemble, quench (step 3)", "[couple]") {
+    // The emergent self-termination, end to end on real transport: a prompt-super-
+    // critical Pu sphere ignites; deposited fission energy expands a SnowplowShell;
+    // ρ = ρ0·(r0/R)^3 drops (via ref_eigen_fn_masscons); k falls below 1; E6 quenches
+    // it with a finite yield. No scripted k, no hardcoded stop. (Test-scale core mass
+    // for a fast quench; e_f is physical — the real ~kg core gives the real timescale.)
+    const RealSphere sphere(10.0);  // larger radius ⇒ prompt-supercritical (6 cm is k≈0.74)
+    ns::physics::EigenSpec espec;
+    espec.batch = 2000;
+    espec.inactive = 6;
+    espec.active = 12;
+    espec.h_tol = 0.05;
+    const double R0 = sphere.radius_cm();
+    const EigenFn eigen =
+        ns::physics::ref_eigen_fn_masscons(sphere.materials(), sphere.xs(), espec, 20260803, R0);
+
+    const double k0 = eigen(sphere.geometry()).k;
+    INFO("k0=" << k0);
+    REQUIRE(k0 > 1.0);  // prompt-supercritical, so a burst ignites
+
+    CoupleConfig cfg;
+    cfg.e_f_mev = ns::consts::e_f_prompt_deposited;
+    cfg.phi_kt = ns::consts::phi_kt_fissions_per_kiloton;
+    cfg.eigen_refresh_gens = 8;
+    cfg.quench_epsilon = ns::consts::quench_epsilon;
+    cfg.t_max_s = 1.0e-5;
+    cfg.max_generations = 4000;
+    cfg.disassembly = true;
+    cfg.core_radius0_cm = R0;
+    cfg.core_mass_kg = 0.05;  // TEST-SCALE: a light shell quenches fast; the physical
+                              // ~kg core gives the real (longer) timescale + yield.
+    cfg.disassembly_gamma = 5.0 / 3.0;
+    cfg.e_f_joules = ns::consts::e_f_prompt_deposited * ns::consts::mev_to_joule;  // C-040·C-917
+
+    ns::physics::BurstContext ctx;
+    ctx.run_id = "demon_core";
+    ctx.isotope_names = {"Pu239"};
+    ctx.isotope_molar_mass_g = {ns::consts::molar_mass_pu239};
+    ctx.core_pu_isotopes = {0};
+    ctx.shell_edges_cm = {0.0, R0};
+    ctx.phi_kt = cfg.phi_kt;
+    ctx.n_a = ns::consts::avogadro_constant;
+    ctx.m_pit_g = ns::consts::od_pu_ga_core_mass_kg * 1000.0;
+
+    BurstTally tally;
+    const BurstReport report = run_burst(cfg, ctx, sphere.geometry(), eigen, tally);
+
+    INFO("gens=" << report.generations << " eigen_calls=" << report.eigen_calls << " quenched="
+                 << report.quenched << " yield_kt=" << tally.result().yield_kt
+                 << " k_peak=" << tally.result().k_eff.peak << " k_quench=" << tally.result().k_eff.at_quench);
+
+    REQUIRE(report.supercritical_reached);                 // it ignited
+    REQUIRE(report.quenched);                              // E6 fired — self-terminated
+    REQUIRE(report.generations < cfg.max_generations);     // not the safety cap
+    REQUIRE(std::isfinite(tally.result().yield_kt));
+    REQUIRE(tally.result().yield_kt > 0.0);
+    REQUIRE(tally.result().k_eff.at_quench < tally.result().k_eff.peak);  // disassembly dropped k
+    REQUIRE(tally.result().yield_split.post_peak_kt > 0.0);               // BLK-03 decay phase
 }

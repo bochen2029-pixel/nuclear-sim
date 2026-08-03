@@ -158,6 +158,18 @@ struct CoupleConfig {
     double initiator_rate_n_per_s = 0.0;
     double initiator_t_fire_s = 0.0;
     double initiator_pulse_width_s = 1.0e-8;
+
+    // Tier-2 disassembly (demon-core burst self-termination). When `disassembly`
+    // is set, the geometry is driven by a `SnowplowShell` (E4) fed by deposited
+    // fission energy (E5), INSTEAD of the tier-1 compression schedule — the core
+    // heats, expands, dilutes, and quenches ITSELF (E6). Pass
+    // `ref_eigen_fn_masscons` as the eigen so the density drop is seen. SI units.
+    bool disassembly = false;
+    double core_mass_kg = 0.0;             // SnowplowShell mass M
+    double disassembly_gamma = 5.0 / 3.0;  // EOS index (γ)
+    double core_radius0_cm = 0.0;          // r₀ (uncompressed core radius) → R₀ = r₀/100 m
+    double e_int0_j = 0.0;                 // initial internal energy, Joules
+    double e_f_joules = 0.0;               // energy per fission, JOULES (= C-040·C-917); E_n = F_n·this
 };
 
 /// One α-mode burst (02 §3). Drives `BurstAccumulator` (E3a) from `eigen_fn`'s

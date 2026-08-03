@@ -239,4 +239,23 @@ const Material& MaterialLib::at(std::string_view name) const {
     return materials_[static_cast<std::size_t>(index)];
 }
 
+MaterialLib MaterialLib::with_density_scale(double factor) const {
+    MaterialLib out = *this;  // deep-copies materials_ (Constituent::iso points into the stable xs set)
+    const auto scale = [factor](std::vector<double>& v) {
+        for (double& x : v) {
+            x *= factor;
+        }
+    };
+    for (Material& m : out.materials_) {
+        m.density *= factor;  // number_density() reads this, so the transport picks it up
+        scale(m.macro.sigma_f);
+        scale(m.macro.sigma_c);
+        scale(m.macro.sigma_s);
+        scale(m.macro.sigma_t);
+        scale(m.macro.sigma_tr);
+        scale(m.macro.nu_sigma_f);
+    }
+    return out;
+}
+
 }  // namespace ns::material

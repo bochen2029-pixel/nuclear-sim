@@ -191,4 +191,18 @@ BurstReport run_burst(const CoupleConfig& cfg, const BurstContext& ctx,
 EigenFn ref_eigen_fn(const ns::material::MaterialLib& materials, const ns::xs::FewGroupXS& xs,
                      const EigenSpec& spec, std::uint64_t seed);
 
+/// Mass-conserving real-transport `EigenFn`. Like `ref_eigen_fn`, but each call
+/// also scales the material DENSITY by the mass-conserving factor implied by the
+/// uniform geometry change: with `s = geom.outermost_radius() / r_ref_cm`, ρ/ρ₀ =
+/// s⁻³ (`MaterialLib::with_density_scale`). This is the physically-correct
+/// reactivity: compression (s < 1) raises k (Σ ∝ ρ dominates the smaller radius),
+/// disassembly (s > 1) lowers it — NOT just a bigger/smaller sphere at fixed ρ,
+/// which reads backwards. Uniform (single effective scale) — exact for a bare
+/// core; the full multi-layer device needs per-layer scaling (a later refinement).
+/// `r_ref_cm` is the uncompressed outermost radius; `materials`, `xs`, `spec` MUST
+/// outlive the returned function.
+EigenFn ref_eigen_fn_masscons(const ns::material::MaterialLib& materials,
+                              const ns::xs::FewGroupXS& xs, const EigenSpec& spec,
+                              std::uint64_t seed, double r_ref_cm);
+
 }  // namespace ns::physics

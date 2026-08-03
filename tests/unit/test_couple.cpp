@@ -369,3 +369,34 @@ TEST_CASE("the real-transport adapter drives the loop and streams real fission s
     }
     REQUIRE(gens_with_sites >= 1);
 }
+
+TEST_CASE("mass-conserving density scaling raises k on compression, lowers it on expansion", "[couple]") {
+    // The physics that makes disassembly QUENCH (and compression IGNITE): Σ ∝ ρ,
+    // and ρ = ρ0·(r0/r)^3 (mass conserved). A smaller radius at higher density is
+    // MORE reactive; a larger radius at lower density is LESS reactive — the
+    // opposite of a fixed-density sphere. Same seed ⇒ the MC noise in the k
+    // differences largely cancels (common random numbers), so the ordering is firm.
+    const RealSphere sphere;
+    ns::physics::EigenSpec espec;
+    espec.batch = 4000;
+    espec.inactive = 8;
+    espec.active = 15;
+    espec.h_tol = 0.05;
+    const double R0 = sphere.radius_cm();
+    const EigenFn eigen =
+        ns::physics::ref_eigen_fn_masscons(sphere.materials(), sphere.xs(), espec, 20260803, R0);
+
+    const double k0 = eigen(sphere.geometry()).k;
+
+    LayerStack compressed = sphere.geometry();
+    compressed.scale_radii(0.85);  // s=0.85 ⇒ ρ×1.63
+    const double k_compressed = eigen(compressed).k;
+
+    LayerStack expanded = sphere.geometry();
+    expanded.scale_radii(1.20);  // s=1.20 ⇒ ρ×0.58
+    const double k_expanded = eigen(expanded).k;
+
+    INFO("k0=" << k0 << " compressed=" << k_compressed << " expanded=" << k_expanded);
+    REQUIRE(k_compressed > k0);   // compression raises reactivity
+    REQUIRE(k_expanded < k0);     // disassembly lowers it — the quench mechanism
+}

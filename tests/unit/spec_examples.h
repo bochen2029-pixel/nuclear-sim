@@ -84,6 +84,12 @@ inline std::string scenario_example() {
     return fenced_block(contracts(), "## 4. `scenarios/", "toml");
 }
 
+/// The 03 §5 tally example — a normative fixture (QC-04 / 11 §4): it MUST
+/// satisfy all nine tally invariants. Read from the spec so it cannot drift.
+inline std::string tally_example() {
+    return fenced_block(contracts(), "## 5. `tally.json`", "json");
+}
+
 inline void write_file(const std::filesystem::path& path, const std::string& text) {
     std::filesystem::create_directories(path.parent_path());
     std::ofstream stream(path, std::ios::binary);

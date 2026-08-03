@@ -51,6 +51,24 @@ class BurstAccumulator {
 public:
     explicit BurstAccumulator(double n0 = 1.0);
 
+    /// The full serializable state (03 §8 §7 checkpoint): every field, so
+    /// from_state() reconstructs an IDENTICAL accumulator and a resume is
+    /// bit-identical — the two-part mantissa/offset population and the log-domain
+    /// cumulants (both ±inf-capable) round-trip exactly.
+    struct State {
+        double mant = 1.0;
+        double off = 0.0;
+        double log_fcum = 0.0;
+        double log_ecum = 0.0;
+        double log_flast = 0.0;
+        std::int64_t n = 0;
+        std::vector<double> log10_n_hist;
+    };
+    /// Snapshot the current state (for a checkpoint).
+    State state() const;
+    /// Reconstruct an accumulator identical to a snapshot (for a resume).
+    static BurstAccumulator from_state(const State& s);
+
     /// One generation n → n+1 (01 §4 E3a), all quantities exact:
     ///   F_n       = k_prompt · N_n / ν̄_eff        (fissions this generation)
     ///   E_n       = F_n · E_f                       (energy this generation)
@@ -81,5 +99,14 @@ private:
     int n_ = 0;
     std::vector<double> log10_n_hist_;
 };
+
+/// Serialize / parse a BurstAccumulator::State to/from a checkpoint section payload
+/// (03 §8 §7 tally/kinetics accumulators), little-endian and bit-exact (IEEE
+/// doubles via their bit patterns, so ±inf round-trips), which makes a restore
+/// identical to the snapshot. The generic checkpoint container (core/checkpoint)
+/// holds the payload as an OPAQUE section — the codec lives here because the state
+/// is physics and core must not depend on physics.
+std::vector<std::uint8_t> serialize_accumulator_state(const BurstAccumulator::State& s);
+BurstAccumulator::State deserialize_accumulator_state(const std::vector<std::uint8_t>& bytes);
 
 }  // namespace ns::physics

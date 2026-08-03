@@ -1,11 +1,11 @@
 # GadgetLab — visualization gallery
 
 Screenshots of **GadgetLab**, the schematic browser (Three.js) visualization layer
-for NUCLEAR-SIM, developed in parallel at `C:\nukeviz`. This is an **early
-mock-up / sketch** — a quick in-browser proof-of-concept for the interactive
-device view. It is **not yet wired to the simulation core**; the physics readouts
-shown (`k_eff`, yield) are the app's own **synthetic stub**, not the `nscore`
-Monte-Carlo engine.
+for NUCLEAR-SIM. The source is in [`viz/`](../../viz/) (run it: `cd viz && python
+-m http.server 8099`). This is an **early mock-up / sketch** — a quick in-browser
+proof-of-concept for the interactive device view. It is **not yet wired to the
+simulation core**; the physics readouts shown (`k_eff`, yield) are the app's own
+**synthetic stub**, not the `nscore` Monte-Carlo engine.
 
 > **All data synthetic · schematic only.** Every geometry and number here is
 > museum-style / illustrative, from public educational framing — **no real weapon
@@ -46,6 +46,6 @@ End of the sequence: the fireball flash and the DETONATION summary card —
 
 ---
 
-*Layer: `C:\nukeviz` — `index.html` + Three.js r160 + a synthetic `simstub.js`.
-Rendered proportions and physics are schematic placeholders pending integration
-with the `nscore` engine.*
+*Layer: [`viz/`](../../viz/) — `index.html` + Three.js r160 + a synthetic
+`simstub.js`. Rendered proportions and physics are schematic placeholders pending
+integration with the `nscore` engine.*

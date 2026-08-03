@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<!--
+  GADGET LAB — schematic implosion-device visualizer (SYNTHETIC DATA)
+  -------------------------------------------------------------------
+  Museum-style schematic. Proportions illustrative. Every number is fake.
+  The SimStub (js/simstub.js) is the seam: swap it for a WebSocket/HTTP
+  adapter to your CUDA core later — same interface, zero UI changes.
+
+  RUN:  cd C:\nukeviz  &&  python -m http.server 8000
+        open http://localhost:8000
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GADGET LAB — schematic visualizer</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="labels"></div>
+<div id="flash"></div>
+
+<header id="topbar">
+  <div class="title">GADGET<span>LAB</span></div>
+  <div class="subtitle">schematic implosion-device visualizer &nbsp;·&nbsp; <b>all data synthetic</b></div>
+  <div class="modelsel">
+    <label>DEVICE</label>
+    <select id="deviceType" disabled>
+      <option>FAT MAN · implosion type (schematic)</option>
+      <option>GUN TYPE — coming (extension point)</option>
+    </select>
+  </div>
+</header>
+
+<aside id="left" class="panel">
+  <h2>PARAMETERS <span class="tag">sim stub</span></h2>
+  <div class="slider"><label>core mass</label><input id="p_mass" type="range" min="0" max="1" step="0.01" value="0.62"><span></span></div>
+  <div class="slider"><label>enrichment</label><input id="p_enrich" type="range" min="0" max="1" step="0.01" value="0.70"><span></span></div>
+  <div class="slider"><label>reflector</label><input id="p_refl" type="range" min="0" max="1" step="0.01" value="0.55"><span></span></div>
+  <div class="slider"><label>compression</label><input id="p_comp" type="range" min="0" max="1" step="0.01" value="0.60"><span></span></div>
+  <div class="slider"><label>HE timing jitter σ</label><input id="p_jitter" type="range" min="0" max="1" step="0.01" value="0.15"><span></span></div>
+  <div class="slider"><label>initiator</label><input id="p_init" type="range" min="0" max="1" step="0.01" value="0.65"><span></span></div>
+
+  <div class="gauge">
+    <div class="glabel">k<sub>eff</sub> <em>(synthetic)</em> <b id="kval">—</b></div>
+    <div class="gtrack"><div id="kfill"></div><div class="gmark" style="left:62.5%"></div></div>
+  </div>
+  <div id="lamp" class="lamp sub">SUBCRITICAL</div>
+  <button id="commit">⟡ &nbsp;COMMIT — FIRE SEQUENCE</button>
+</aside>
+
+<aside id="right" class="panel">
+  <h2>LAYERS</h2>
+  <div class="checks">
+    <label><input type="checkbox" data-layer="casing" checked> casing + fins</label>
+    <label><input type="checkbox" data-layer="lens" checked> HE lens array <i>(32 blocks)</i></label>
+    <label><input type="checkbox" data-layer="pusher" checked> pusher / tamper</label>
+    <label><input type="checkbox" data-layer="reflector" checked> reflector</label>
+    <label><input type="checkbox" data-layer="core" checked> core <i>(schematic)</i></label>
+    <label><input type="checkbox" data-layer="initiator" checked> initiator <i>(schematic)</i></label>
+  </div>
+  <div class="slider"><label>exploded view</label><input id="explode" type="range" min="0" max="1" step="0.01" value="0"><span></span></div>
+  <div class="slider"><label>cross-section Y</label><input id="clip" type="range" min="-1" max="1" step="0.005" value="1"><span></span></div>
+  <div class="clipnote">drag slider below top to slice ↓</div>
+
+  <h2 style="margin-top:14px">LENS FAULTS</h2>
+  <div class="faults">
+    <div><b id="faultCount">0</b> / 32 blocks disabled</div>
+    <div class="hint">click any lens block in 3D to disable/restore it</div>
+    <button id="clearFaults">clear faults</button>
+  </div>
+</aside>
+
+<footer id="transport">
+  <button id="play" disabled>▶</button>
+  <button id="restart" disabled>⟲</button>
+  <div class="track"><div id="scrub"></div><div id="phaseMarks"></div></div>
+  <div class="tinfo"><span id="phaseLabel">idle — configure &amp; commit</span><span id="clock">0.00</span></div>
+  <div class="speed"><label>time warp</label><input id="speed" type="range" min="-2" max="2" step="0.01" value="0"><span id="speedVal">1×</span></div>
+</footer>
+
+<div id="outcome" class="hidden">
+  <div class="card">
+    <div id="outcomeTitle">—</div>
+    <ul id="outcomeReasons"></ul>
+    <div id="outcomeYield"></div>
+    <button id="outcomeClose">replay / reconfigure</button>
+  </div>
+</div>
+
+<div id="disclaimer">SCHEMATIC — museum-style proportions, illustrative only · synthetic physics stub, no real data · three.js r160</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

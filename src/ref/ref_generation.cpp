@@ -70,6 +70,7 @@ void RefTransport::run_generation(const std::vector<FissionSite>& bank, double k
 
     out = GenerationResult{};
     out.source.by_isotope.assign(isotope_names_.size(), 0.0);
+    out.source.by_isotope_fissions.assign(isotope_names_.size(), 0.0);
     out.source.by_layer.assign(layers_.size(), 0.0);
     out.source.mesh.assign(512, 0.0);  // C-908: fixed 8x8x8
     out.source.sites.reserve(bank.size());
@@ -152,8 +153,11 @@ void RefTransport::run_generation(const std::vector<FissionSite>& bank, double k
             }
 
             const double expected = p.weight * gd.nu * gd.sigma_f / sigma_t_i;
+            const double fissions = p.weight * gd.sigma_f / sigma_t_i;  // no ν — for ν̄_eff (E3a)
             out.production += expected;
             out.source.by_isotope[static_cast<std::size_t>(chosen->global_index)] += expected;
+            out.source.by_isotope_fissions[static_cast<std::size_t>(chosen->global_index)] +=
+                fissions;
             out.source.by_layer[static_cast<std::size_t>(layer)] += expected;
 
             // E1c: bank floor(expected/k_gen + xi) progeny at the collision site.

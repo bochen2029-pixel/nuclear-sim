@@ -43,7 +43,12 @@ struct FissionSite {
 /// 8^3 mesh drives the Shannon-entropy convergence test).
 struct FissionSource {
     std::vector<FissionSite> sites;
-    std::vector<double> by_isotope;
+    std::vector<double> by_isotope;  // per-isotope fission-neutron PRODUCTION (w·ν·σ_f/σ_t)
+    /// Per-isotope FISSIONS (w·σ_f/σ_t, no ν factor). With by_isotope, the
+    /// kinetics forms ν̄_eff = Σ by_isotope / Σ by_isotope_fissions exactly (01 §4,
+    /// E3a) — no per-isotope ν̄ lookup, and group-correct because both are tallied
+    /// at the collision's own group. Added at M3-T1 (SYNC-M3).
+    std::vector<double> by_isotope_fissions;
     std::vector<double> by_layer;
     std::vector<double> mesh;  // 8*8*8 = 512, C-908
 };

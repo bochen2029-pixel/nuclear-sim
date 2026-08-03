@@ -1,0 +1,78 @@
+# Trinity "Gadget" — canonical implosion burst scenario (G2).
+#
+# The canonical α-mode burst on the reconstructed Trinity assembly (research doc
+# Trinity technical reference; appendix §2 geometry C-100..C-109). Materials
+# authored at M2-T1; each layer's mass is cross-checked against the appendix in
+# data/materials/README.md (and docs/VERIFICATION.md §2).
+#
+# NEUTRONIC STACK (solid-pit model): the eigen/transport region is the pit through
+# the HE booster. The ~1 cm central initiator cavity (C-101) is NOT a geometry
+# layer — the initiator is a timed source ([initiator] below), and the cavity is
+# the documented MAJ-28 pit density perturbation (~2.4%), not a neutronic void
+# worth a layer. The HE lens / cork liner / duralumin case (C-107..C-109) are
+# outside the neutronically-active region (implosion geometry = M6, rendering =
+# M7) and are omitted from the eigen scenario. Layer radii = appendix OD / 2.
+#
+# BLOCKED: this scenario references xs_set = "fast4", which does not exist yet
+# (M1-T4a-2, owner cited data). It is a schema-valid DEFINITION; it cannot be
+# loaded/run until fast4 lands. M2-T1's mass checks are xs-free (oracle.py §2).
+
+schema_version = 1
+name = "trinity_canonical"
+seed = 20260802
+mode = "alpha"
+
+layers = [
+  { id = "pit",        r_outer_cm = 4.585,   material = "pu_ga_delta",  status = "DECLASSIFIED" },
+  { id = "tamper",     r_outer_cm = 11.43,   material = "u_natural",    status = "RECONSTRUCTED" },
+  { id = "b_shell",    r_outer_cm = 11.75,   material = "b10_acrylic",  status = "SIM" },
+  { id = "pusher",     r_outer_cm = 23.495,  material = "aluminum",     status = "PUBLIC" },
+  { id = "he_booster", r_outer_cm = 46.0375, material = "he_compb",     status = "RECONSTRUCTED" },
+]
+
+[data]
+xs_set        = "fast4"
+materials_dir = "data/materials"
+
+[time]
+t_zero = "he_initiation"
+
+# Urchin modulated neutron initiator (C-051 output 1.5e8; research doc: Po-Be,
+# ~one neutron every 5-10 ns timed to peak compression). t_fire is locked to peak
+# compression at M3-T4 (sweep); the placeholder here is a small positive time.
+[initiator]
+strength_n_per_s = 1.5e8
+t_fire_s         = 2.0e-6
+pulse_width_s    = 1.0e-8
+
+# Tier-2 implosion to the canonical compression ratio C-060 = 2.2.
+[compression]
+tier  = 2
+ratio = 2.2
+
+[kinetics]
+generation_time_s_initial = 1.0e-8
+eigen_refresh_gens        = 10
+eigen_refresh_dr_frac     = 0.005
+t_max_s                   = 1.0e-6
+quench_epsilon            = 1.0e-4
+
+# C-900 gate eigen configuration (C-900b interactive is NEVER valid for a gate).
+[eigen]
+batch    = 1000000
+inactive = 50
+active   = 200
+
+[transport]
+sim_neutrons = 1000000
+
+[hydro]
+every_gens = 10
+
+[output]
+tallies = ["k", "population", "yield", "burnup", "fissions_by_isotope"]
+checkpoint_every_gens = 100
+dump_fields = false
+dump_stride = 10
+dump_max_frames = 0
+dump_budget_gb = 20

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "name": "pu_ga_delta",
+  "density_g_cm3": 15.23,
+  "status": "DECLASSIFIED",
+  "cite": "LA-3067 pit: mass 6.15 kg, OD 9.17 cm (C-102). MAJ-28: density DERIVED = 15.23 g/cm3 (solid sphere); the commonly quoted delta-phase Pu-Ga alloy density 15.6 is inconsistent with the mass/OD pair by ~2.4%, recorded not resolved. Composition: 3.35 at% Ga total (~1.0 wt%), Pu-240 = 1.0 wt% of Pu (super-grade, ~150-day Hanford irradiation) per the research doc Trinity technical reference. Ga split Ga-69/Ga-71 = 60.108/39.892 (IUPAC standard) by explicit author choice per 03 section 3.",
+  "isotopes": {
+    "Pu239": 0.956875,
+    "Pu240": 0.009625,
+    "Ga69": 0.020136,
+    "Ga71": 0.013364
+  },
+  "composition_check": {
+    "Ga_wt_pct": 1.0008,
+    "Pu240_wt_pct_of_Pu": 1.0000
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "name": "be_po_urchin",
+  "density_g_cm3": 1.85,
+  "status": "DECLASSIFIED",
+  "cite": "Po-Be modulated neutron initiator ('Urchin'), layer C-100 (research doc Trinity technical reference): ~2 cm Be sphere with 50 Ci (~11 mg) Po-210 in 15 grooves, Au+Ni plating separating Po from Be. Atom fractions from 6.989 g Be-9 + 0.011 g Po-210 (~7 g total). Be metal density 1.85 g/cm3 (public); the ~7 g figure is a hollow shell + inner pellet, so a solid-density mass estimate overshoots (README).",
+  "isotopes": {
+    "Be9": 0.999932,
+    "Po210": 0.000068
+  }
+}

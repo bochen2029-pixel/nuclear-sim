@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "u_natural",
+  "density_g_cm3": 19.05,
+  "status": "RECONSTRUCTED",
+  "cite": "Natural-uranium tamper, layer C-103 (research doc Trinity technical reference; ~108-111 kg, ~6.56 cm thick). Isotopic abundances U-238 99.2742 / U-235 0.7204 / U-234 0.0054 atom% (IUPAC/public). alpha-uranium metal density 19.05 g/cm3 (public); see data/materials/README.md for the mass-deviation record.",
+  "isotopes": {
+    "U238": 0.992742,
+    "U235": 0.007204,
+    "U234": 0.000054
+  }
+}

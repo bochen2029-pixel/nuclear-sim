@@ -340,4 +340,16 @@ EigenFn ref_eigen_fn(const ns::material::MaterialLib& materials, const ns::xs::F
     };
 }
 
+EigenFn ref_eigen_fn_masscons(const ns::material::MaterialLib& materials,
+                              const ns::xs::FewGroupXS& xs, const EigenSpec& spec,
+                              std::uint64_t seed, double r_ref_cm) {
+    return [&materials, &xs, spec, seed, r_ref_cm](const ns::geom::LayerStack& geom) {
+        const double s = r_ref_cm > 0.0 ? geom.outermost_radius() / r_ref_cm : 1.0;
+        const double density_scale = s > 0.0 ? 1.0 / (s * s * s) : 1.0;  // ρ/ρ₀, mass conserved
+        const ns::material::MaterialLib scaled = materials.with_density_scale(density_scale);
+        ns::ref::RefTransport transport(geom, scaled, xs, seed);
+        return run_eigen(transport, spec);
+    };
+}
+
 }  // namespace ns::physics

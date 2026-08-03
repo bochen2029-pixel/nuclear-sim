@@ -75,6 +75,14 @@ public:
     const Material& at(std::string_view name) const;
     const std::vector<Material>& all() const noexcept { return materials_; }
 
+    /// A copy with every material's number density scaled by `factor` — models
+    /// uniform compression (factor > 1) or disassembly (factor < 1) at fixed
+    /// isotopics. Σ ∝ ρ (n_i = frac_i·ρ/Mbar·N_A), so this is the reactivity
+    /// handle the hydro drives; mass conservation links it to the radius scale
+    /// (ρ/ρ₀ = (r₀/r)³). Scales `density` and the precomputed `macro` (∝ ρ)
+    /// together so the two stay consistent, whichever a consumer reads.
+    MaterialLib with_density_scale(double factor) const;
+
 private:
     std::vector<Material> materials_;  // sorted by name — 04 §4's name->index order
 };

@@ -255,7 +255,8 @@ add_library(nukesim_core STATIC
     src/physics/hydro/tier2.cpp
     src/physics/tally/tally.cpp
     src/physics/couple/couple.cpp
-    src/api/run_provenance.cpp)
+    src/api/run_provenance.cpp
+    src/api/studio.cpp)
 target_link_libraries(nukesim_core PUBLIC nukesim_core_constants nukesim_deps)
 target_include_directories(nukesim_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 nukesim_strict(nukesim_core)

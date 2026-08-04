@@ -12,13 +12,17 @@
 
 namespace ns::nukefarm {
 
-ns::api::StudioConfig apply_point(const ParamSet& point) {
-    // Build a flat-dotted-key cfg JSON from the point and let from_json map it
-    // onto the demon-core defaults (missing keys keep their default; a fixed seed
-    // means distinct params -> distinct cfg -> distinct unit_id).
+std::string param_json(const ParamSet& point) {
+    // A flat-dotted-key object; from_json maps it onto the demon-core defaults
+    // (missing keys keep their default; a fixed seed means distinct params ->
+    // distinct cfg -> distinct unit_id).
     nlohmann::json ov = nlohmann::json::object();
     for (const auto& a : point) ov[a.param] = a.value;
-    return ns::api::StudioConfig::from_json(ov.dump());
+    return ov.dump();
+}
+
+ns::api::StudioConfig apply_point(const ParamSet& point) {
+    return ns::api::StudioConfig::from_json(param_json(point));
 }
 
 RunOutcome default_evaluator(const ns::api::StudioConfig& cfg) {

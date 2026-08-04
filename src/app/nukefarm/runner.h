@@ -39,6 +39,11 @@ using Evaluator = std::function<RunOutcome(const ns::api::StudioConfig&)>;
 /// time it. Each call runs a Monte-Carlo burst (seconds).
 RunOutcome default_evaluator(const ns::api::StudioConfig& cfg);
 
+/// The flat dotted-key override JSON for one ParamSet (`{"compression.ratio": 2.3,
+/// ...}`) — what `StudioConfig::from_json` reads and what a queued unit's payload
+/// carries (M5-T3-d submit/worker).
+std::string param_json(const ParamSet& point);
+
 /// Map one ParamSet onto a StudioConfig, starting from the default demon-core cfg,
 /// via the flat dotted keys `StudioConfig::from_json` understands
 /// ("compression.ratio", "pit.mass_kg", "materials.pu_ga_delta.Pu240", ...). A

@@ -5,6 +5,7 @@
 #include <sqlite3.h>
 
 #include <string>
+#include <vector>
 
 namespace ns::store {
 
@@ -49,6 +50,11 @@ public:
     void bind_double(int idx, double v) {
         if (sqlite3_bind_double(stmt_, idx, v) != SQLITE_OK) {
             throw StoreError(std::string("sqlite3_bind_double failed: ") + sqlite3_errmsg(db_));
+        }
+    }
+    void bind_int64(int idx, std::int64_t v) {
+        if (sqlite3_bind_int64(stmt_, idx, v) != SQLITE_OK) {
+            throw StoreError(std::string("sqlite3_bind_int64 failed: ") + sqlite3_errmsg(db_));
         }
     }
 
@@ -165,6 +171,15 @@ std::int64_t SweepStore::count_with_status(const std::string& status) const {
     s.bind_text(1, status);
     s.step();
     return s.col_int64(0);
+}
+
+std::vector<double> SweepStore::recent_wall_s(std::int64_t limit) const {
+    Stmt s(db_, "SELECT wall_s FROM runs WHERE status = ? ORDER BY rowid DESC LIMIT ?;");
+    s.bind_text(1, std::string(status::kDone));
+    s.bind_int64(2, limit);
+    std::vector<double> out;
+    while (s.step() == SQLITE_ROW) out.push_back(s.col_double(0));
+    return out;
 }
 
 void SweepStore::set_cursor(const std::string& state_json) {

@@ -387,6 +387,24 @@ add_executable(nukefarm src/app/nukefarm/main.cpp)
 target_link_libraries(nukefarm PRIVATE nukesim_nukefarm)
 nukesim_strict(nukefarm)
 
+# nukebench (M1-T5): the formal gate runner. M1-T5-a = the nukesim_nukebench lib — the
+# gates.toml (03 §10) loader with the constant-drift + spec_sha256 integrity guards.
+# M1-T5-b adds the run/gate/diff CLI + gate_report.json (03 §11).
+add_library(nukesim_nukebench STATIC src/app/nukebench/gates.cpp)
+target_link_libraries(nukesim_nukebench PUBLIC nukesim_core)
+target_include_directories(nukesim_nukebench PUBLIC ${CMAKE_SOURCE_DIR}/src)
+nukesim_strict(nukesim_nukebench)
+
+add_executable(test_nukebench tests/unit/test_nukebench.cpp)
+target_link_libraries(test_nukebench PRIVATE nukesim_nukebench Catch2::Catch2WithMain)
+target_compile_definitions(test_nukebench PRIVATE NUKESIM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+nukesim_strict(test_nukebench)
+catch_discover_tests(test_nukebench TEST_PREFIX "nukebench.")
+
+# gates.toml is GENERATED (tools/gen_gates) and committed; this fails if it drifts (03 §10).
+add_test(NAME nukebench.gates_generated_current
+         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/gen_gates/gen_gates.py --check)
+
 # The fusion-binding bridge: the demon-core studio API (evaluate / generate_run) as
 # JSON in/out — the mechanism-independent DATA surface the visualizer's binding
 # calls (a dev-server shell / WASM / native addon all wrap this). A non-test binary

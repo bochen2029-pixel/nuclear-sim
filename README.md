@@ -7,15 +7,19 @@
 Built **exclusively on public and declassified literature**. Every physical constant carries a citation and a source-status tag, and the generator refuses to emit any constant lacking either.
 
 ```
-Status:  implementation well underway. The CPU + GPU Monte-Carlo transport,
-         the k-eigenvalue criticality solver, α-mode burst kinetics, both hydro
-         tiers, and the burst coupling loop are built and validated against the
-         reference oracle — 114 tests green (101 CPU + 13 GPU). The GPU backend
-         is differentially checked against the CPU reference.
+Status:  implementation well underway. The CPU + GPU Monte-Carlo transport, the
+         k-eigenvalue criticality solver, α-mode burst kinetics, both hydro tiers,
+         and the burst coupling loop are built and validated against the reference
+         oracle. On top of them: an emergent demon-core burst (a real Monte-Carlo
+         pit that ignites, self-limits and quenches — detonate-vs-fizzle emerges
+         from the physics, not a script), a fusion API (`evaluate`/`generate_run`)
+         for the visualizer, a bit-identical checkpoint/resume, and the batch
+         sweep store + run loop — 158 tests green (145 CPU + 13 GPU), the GPU
+         backend differentially checked against the CPU reference.
 Next:    a cited fast-group cross-section dataset (open multigroup library or an
-         ENDF+collapse) unblocks the formal Godiva/Jezebel benchmark gates; then
-         M5-M7 add the sweep engine, the GPU raymarcher, and the interactive
-         3D studio described above.
+         ENDF+collapse) unblocks the formal Godiva/Jezebel benchmark gates and
+         real (non-synthetic) yields; the rest of M5-M7 is the distributed sweep
+         queue, the GPU raymarcher, and the interactive 3D studio above.
 Target:  C++20 + CUDA 13.1, sm_89 (RTX 4070 Ti SUPER) primary, sm_80/90 cloud
 Licence: MIT (code) — see NOTICE.md for sources and scope
 ```
@@ -46,6 +50,14 @@ The project is built to be implemented across dozens of independent agent sessio
 - **A generated verification oracle.** Constants, headers, test goldens and a first-principles verification document are emitted from one source, so a number cannot drift between code, test and documentation.
 
 The specification has been through three independent adversarial reviews (kept in [`spec/reviews/`](spec/reviews/)), an omnibus triage, and a QC pass. Their findings — among them a quench criterion that discarded roughly half the yield, a compression formula that collapsed the geometry to a point at t₀, and a generation time that failed to scale with density — are recorded in the changelog rather than quietly fixed.
+
+## The visualizer (preview)
+
+[`GadgetLab`](docs/gallery/) is an early in-browser (Three.js) sketch of the interactive device view — the schematic front-end the physics engine is being wired to drive. Its headline is the **pit microscope**: zoom into the pit and watch the fission chain reaction as a volumetric cloud of representative fission events.
+
+![GadgetLab pit microscope — the fission chain reaction (schematic · synthetic)](docs/gallery/05-pit-microscope.png)
+
+> **Schematic · all data synthetic.** Museum-style proportions and a placeholder physics curve — **no real weapon data**. The front-end is not yet wired to the `nscore` Monte-Carlo engine; the fusion (the real `evaluate` / `generate_run` API replacing the synthetic stub) is the work in [`src/api/`](src/api/). More frames in the [visualization gallery](docs/gallery/).
 
 ## Where to start
 

@@ -14,6 +14,19 @@ simulation core**; the physics readouts shown (`k_eff`, yield) are the app's own
 > project later moves to an Unreal Engine renderer, this browser sketch remains a
 > useful low-friction mock-up.
 
+## The headline — pit microscope (the fission chain reaction)
+
+Zoom into the plutonium pit during the α-mode excursion and watch the chain
+reaction: a bundled volumetric cloud of representative fission events (each marker
+≈ 10²¹ atoms), with live readouts — neutrons alive, cumulative fissions, generation
+number, log₁₀ N, k_eff, and the generation time Λ. This is the preview of
+NUCLEAR-SIM's "main course." The real `nscore` engine already streams the
+underlying per-generation fission **sites** (`ref::FissionSource::sites`) and the
+temporal `population_series` (03 §5); the frame below is the synthetic stub's,
+pending the fusion.
+
+![GadgetLab — pit microscope, the fission chain reaction](05-pit-microscope.png)
+
 ## Views
 
 ### Armed idle — assembled device
@@ -40,9 +53,19 @@ Mid-sequence after COMMIT–FIRE: the schematic core glows through the
 
 ### Detonation (synthetic)
 End of the sequence: the fireball flash and the DETONATION summary card —
-*"estimated yield 12.8 kt · synthetic stub — not a real calculation."*
+*"convergent compression achieved — runaway excursion · estimated yield 20.1 kt ·
+synthetic stub — not a real calculation."*
 
 ![GadgetLab — detonation summary (synthetic)](04-detonation.png)
+
+### Fizzle (synthetic)
+The other emergent outcome — asymmetric implosion (lens blocks disabled) breaks the
+compression wave: *"2 lens blocks inert — implosion wave breaks symmetry · nuclear
+yield ≈ 0."* In the real engine, detonate-vs-fizzle is not a scripted branch; it
+**emerges** from whether the core goes prompt-supercritical and then self-quenches
+(`generate_run`, M3-T3-h).
+
+![GadgetLab — fizzle (synthetic)](06-fizzle.png)
 
 ---
 

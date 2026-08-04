@@ -4,6 +4,7 @@
 
 #include "app/nukefarm/sweep.h"
 
+#include "app/nukefarm/cli.h"
 #include "app/nukefarm/queue.h"
 #include "app/nukefarm/runner.h"
 #include "app/nukefarm/worker.h"
@@ -14,6 +15,7 @@
 #include <cmath>
 #include <cstddef>
 #include <filesystem>
+#include <fstream>
 #include <map>
 #include <optional>
 #include <string>
@@ -611,6 +613,59 @@ TEST_CASE("run_worker reclaims a stale lease and runs the unit", "[nukefarm]") {
     REQUIRE(q.done_count() == 1);
 
     std::filesystem::remove_all(dir);
+}
+
+// --- M5-T3-e: the nukefarm CLI handlers ---
+
+TEST_CASE("the CLI submit-worker-status round-trip drives a sweep", "[nukefarm]") {
+    namespace fs = std::filesystem;
+    const fs::path base = fs::temp_directory_path() / "nukesim_cli_test";
+    fs::remove_all(base);
+    fs::create_directories(base);
+    const std::string sweep_toml = (base / "sweep.toml").string();
+    const std::string queue_dir = (base / "queue").string();
+    const std::string db = (base / "sweep.db").string();  // a real file: two connections share it
+
+    // A 3x3 grid over two modelled axes -> 9 distinct units.
+    {
+        std::ofstream f(sweep_toml);
+        f << "name = \"cli_grid\"\n"
+             "base_scenario = \"demon_core\"\n"
+             "[sweep]\nsampler = \"grid\"\nbudget_runs = 9\n"
+             "[objective]\nkind = \"sensitivity\"\n"
+             "[[space]]\nparam = \"compression.ratio\"\naxis_class = \"numerical\"\nrange = [2.0, 2.5]\n"
+             "[[space]]\nparam = \"pit.mass_kg\"\naxis_class = \"numerical\"\nrange = [5.0, 7.0]\n";
+    }
+
+    REQUIRE(cli_submit(sweep_toml, queue_dir, db) == 9);
+
+    const StatusReport before = cli_status(db, queue_dir);
+    REQUIRE(before.store_done == 0);
+    REQUIRE(before.queue_pending == 9);
+
+    const WorkerResult w = cli_worker(queue_dir, db, 600.0, stub_eval);  // stub: no real burst
+    REQUIRE(w.processed == 9);
+
+    const StatusReport after = cli_status(db, queue_dir);
+    REQUIRE(after.store_done == 9);
+    REQUIRE(after.queue_pending == 0);
+    REQUIRE(after.queue_done == 9);
+
+    fs::remove_all(base);
+}
+
+TEST_CASE("the CLI status reports zero for a fresh store", "[nukefarm]") {
+    namespace fs = std::filesystem;
+    const fs::path base = fs::temp_directory_path() / "nukesim_cli_test_empty";
+    fs::remove_all(base);
+    fs::create_directories(base);
+    const std::string db = (base / "sweep.db").string();
+
+    const StatusReport s = cli_status(db, "");  // no queue dir
+    REQUIRE(s.store_done == 0);
+    REQUIRE(s.queue_pending == 0);
+
+    fs::remove_all(base);
 }
 
 

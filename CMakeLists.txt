@@ -369,7 +369,8 @@ add_library(nukesim_nukefarm STATIC
     src/app/nukefarm/samplers/builtin.cpp
     src/app/nukefarm/runner.cpp
     src/app/nukefarm/queue.cpp
-    src/app/nukefarm/worker.cpp)
+    src/app/nukefarm/worker.cpp
+    src/app/nukefarm/cli.cpp)
 target_link_libraries(nukesim_nukefarm PUBLIC nukesim_core)
 target_include_directories(nukesim_nukefarm PUBLIC ${CMAKE_SOURCE_DIR}/src)
 nukesim_strict(nukesim_nukefarm)
@@ -378,6 +379,13 @@ add_executable(test_nukefarm tests/unit/test_nukefarm.cpp)
 target_link_libraries(test_nukefarm PRIVATE nukesim_nukefarm Catch2::Catch2WithMain)
 nukesim_strict(test_nukefarm)
 catch_discover_tests(test_nukefarm TEST_PREFIX "nukefarm.")
+
+# The nukefarm CLI (M5-T3-e): the first src/app executable — a thin CLI11 dispatch
+# over the tested nukesim_nukefarm handlers. A non-test binary (like gpu_perf), so
+# the ctest count is unchanged.
+add_executable(nukefarm src/app/nukefarm/main.cpp)
+target_link_libraries(nukefarm PRIVATE nukesim_nukefarm)
+nukesim_strict(nukefarm)
 
 add_executable(test_ref tests/unit/test_ref.cpp)
 target_link_libraries(test_ref PRIVATE nukesim_core Catch2::Catch2WithMain)

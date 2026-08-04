@@ -260,6 +260,10 @@ private:
 
 }  // namespace
 
+std::string studio_unit_id(const StudioConfig& cfg) {
+    return compute_unit_id(cfg_canonical_hash(cfg), {}, cfg.seed);
+}
+
 GenerateRunResult generate_run(const StudioConfig& cfg) {
     const DemonCoreAssembly assembly(cfg);
     const double r0 = assembly.r0_cm();
@@ -296,7 +300,7 @@ GenerateRunResult generate_run(const StudioConfig& cfg) {
     cc.e_f_joules = ns::consts::e_f_prompt_deposited * ns::consts::mev_to_joule;  // C-040·C-917
 
     const std::string canon = cfg_canonical_hash(cfg);
-    const std::string unit_id = compute_unit_id(canon, {}, cfg.seed);
+    const std::string unit_id = studio_unit_id(cfg);  // == compute_unit_id(canon, {}, seed)
 
     ns::physics::BurstContext ctx;
     ctx.isotope_names = {"Pu239", "Pu240"};

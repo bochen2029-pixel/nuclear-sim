@@ -366,7 +366,8 @@ catch_discover_tests(test_store TEST_PREFIX "store.")
 # ---------------------------------------------------------------------------
 add_library(nukesim_nukefarm STATIC
     src/app/nukefarm/sweep.cpp
-    src/app/nukefarm/samplers/builtin.cpp)
+    src/app/nukefarm/samplers/builtin.cpp
+    src/app/nukefarm/runner.cpp)
 target_link_libraries(nukesim_nukefarm PUBLIC nukesim_core)
 target_include_directories(nukesim_nukefarm PUBLIC ${CMAKE_SOURCE_DIR}/src)
 nukesim_strict(nukesim_nukefarm)

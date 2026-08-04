@@ -4,7 +4,10 @@
 
 #include "app/nukefarm/sweep.h"
 
+#include "app/nukefarm/runner.h"
+
 #include <catch2/catch_test_macros.hpp>
+#include <nlohmann/json.hpp>
 
 #include <cmath>
 #include <cstddef>
@@ -345,3 +348,95 @@ range = [2.1, 2.4]
     SweepManifest m = SweepManifest::parse(doc);  // a valid manifest...
     REQUIRE_THROWS_AS(make_sampler(m), SweepError);  // ...but the sampler is M5-T4
 }
+
+// --- M5-T3-b: the store-backed run-loop engine ---
+
+namespace {
+
+// A 5x5 grid over two MODELLED demon-core axes -> 25 distinct cfgs / unit_ids.
+const char* kRunnerGrid = R"(
+name = "runner_grid"
+base_scenario = "demon_core"
+[sweep]
+sampler = "grid"
+budget_runs = 25
+[objective]
+kind = "sensitivity"
+[[space]]
+param = "compression.ratio"
+axis_class = "numerical"
+range = [2.0, 2.5]
+[[space]]
+param = "pit.mass_kg"
+axis_class = "numerical"
+range = [5.0, 7.0]
+)";
+
+// A fast deterministic stub evaluator (no real burst).
+RunOutcome stub_eval(const ns::api::StudioConfig&) {
+    RunOutcome o;
+    o.tally.timing.generations = 3;  // mark that a run happened
+    o.wall_s = 0.001;
+    return o;
+}
+
+}  // namespace
+
+TEST_CASE("run_sweep records each sampled point once", "[nukefarm]") {
+    SweepManifest m = SweepManifest::parse(kRunnerGrid);
+    ns::store::SweepStore store(":memory:");
+
+    SweepProgress p = run_sweep(m, store, stub_eval);
+    REQUIRE(p.total == 25);
+    REQUIRE(p.ran == 25);
+    REQUIRE(p.skipped == 0);
+    REQUIRE(store.count() == 25);              // 25 distinct unit_ids
+    REQUIRE(store.count_with_status(ns::store::status::kDone) == 25);
+}
+
+TEST_CASE("run_sweep resume skips done units and never double-counts", "[nukefarm]") {
+    SweepManifest m = SweepManifest::parse(kRunnerGrid);
+    ns::store::SweepStore store(":memory:");
+
+    // Pre-seed 10 of the 25 units as already done (a partial prior run).
+    std::vector<std::string> uids;
+    {
+        auto s = make_sampler(m);
+        while (auto pt = s->next()) uids.push_back(ns::api::studio_unit_id(apply_point(*pt)));
+    }
+    REQUIRE(uids.size() == 25);
+    for (std::size_t i = 0; i < 10; ++i) store.record_run({uids[i], "seed", "seed", 0.0});
+    REQUIRE(store.count() == 10);
+
+    // Resume: only the remaining 15 run; nothing is double-counted.
+    SweepProgress p1 = run_sweep(m, store, stub_eval);
+    REQUIRE(p1.total == 25);
+    REQUIRE(p1.skipped == 10);
+    REQUIRE(p1.ran == 15);
+    REQUIRE(store.count() == 25);
+
+    // Re-run the completed sweep: every unit is skipped, count is unchanged.
+    SweepProgress p2 = run_sweep(m, store, stub_eval);
+    REQUIRE(p2.total == 25);
+    REQUIRE(p2.ran == 0);
+    REQUIRE(p2.skipped == 25);
+    REQUIRE(store.count() == 25);
+}
+
+TEST_CASE("the default evaluator runs a real burst keyed by studio_unit_id", "[nukefarm]") {
+    // The runner skips by studio_unit_id computed UP FRONT; it must equal the
+    // unit_id the run itself records, or resume would skip the wrong units.
+    ns::api::StudioConfig cfg;
+    cfg.eigen_batch = 300;  // keep the real-MC smoke fast
+    cfg.compression_ratio = 2.4;
+    cfg.pit_mass_kg = 6.5;
+    const std::string uid = ns::api::studio_unit_id(cfg);
+
+    const RunOutcome out = default_evaluator(cfg);
+    REQUIRE(out.tally.timing.generations >= 1);  // a genuine burst ran
+    REQUIRE(out.wall_s >= 0.0);
+
+    const auto runj = nlohmann::json::parse(out.run_json);
+    REQUIRE(runj.at("unit_id").get<std::string>() == uid);
+}
+

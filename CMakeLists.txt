@@ -355,6 +355,27 @@ target_link_libraries(test_store PRIVATE nukesim_core Catch2::Catch2WithMain)
 nukesim_strict(test_store)
 catch_discover_tests(test_store TEST_PREFIX "store.")
 
+# ---------------------------------------------------------------------------
+# nukefarm (M5-T3): the batch/cloud sweep driver (06 §2, D8). A FRONTEND (D7) —
+# no physics; it composes nscore outputs (scores a ns::physics::TallyResult).
+# M5-T3-a: the sweep.toml loader + the axis_class/ScoreKind enforcement + the
+# Sampler interface + grid/lhs/random. The FS work-queue + store-backed run loop
+# + the submit/worker/status/resume CLI are M5-T3-b. Built as a static lib so the
+# CLI (M5-T3-b) and the tests link the same code; toml++/constants/rng/tally all
+# arrive through nukesim_core (PUBLIC).
+# ---------------------------------------------------------------------------
+add_library(nukesim_nukefarm STATIC
+    src/app/nukefarm/sweep.cpp
+    src/app/nukefarm/samplers/builtin.cpp)
+target_link_libraries(nukesim_nukefarm PUBLIC nukesim_core)
+target_include_directories(nukesim_nukefarm PUBLIC ${CMAKE_SOURCE_DIR}/src)
+nukesim_strict(nukesim_nukefarm)
+
+add_executable(test_nukefarm tests/unit/test_nukefarm.cpp)
+target_link_libraries(test_nukefarm PRIVATE nukesim_nukefarm Catch2::Catch2WithMain)
+nukesim_strict(test_nukefarm)
+catch_discover_tests(test_nukefarm TEST_PREFIX "nukefarm.")
+
 add_executable(test_ref tests/unit/test_ref.cpp)
 target_link_libraries(test_ref PRIVATE nukesim_core Catch2::Catch2WithMain)
 target_include_directories(test_ref PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)

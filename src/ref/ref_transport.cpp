@@ -244,7 +244,6 @@ void RefTransport::run_fixed_source(const SourceSpec& spec, TallyAcc& tally) {
             const std::size_t g = static_cast<std::size_t>(p.group);
 
             const double sigma_tr = data.sigma_tr[g];
-            const double sigma_t = data.sigma_t[g];
             if (sigma_tr <= 0.0) {
                 // A void: stream straight to the boundary rather than sampling
                 // an infinite flight.
@@ -277,11 +276,18 @@ void RefTransport::run_fixed_source(const SourceSpec& spec, TallyAcc& tally) {
             tally.add_track_length(p.weight * flight, layer);
             p.pos = p.pos + p.dir * flight;
 
-            // E1c — collision. Sample the isotope proportional to n_i*sigma_t,i.
-            double pick = p.stream.uniform_d() * sigma_t;
+            // E1c — collision on the TRANSPORT-CORRECTED medium (ADR-021). The flight
+            // used sigma_tr, so the collision must too, or fission/absorption get scaled
+            // by sigma_tr/sigma_t relative to the collision density. Select the isotope
+            // prop. to n_i*sigma_tr,i and split reactions on sigma_tr,i, with the scatter
+            // share REDUCED to sigma_s,tr = sigma_s - mu*sigma_s = sigma_s - (sigma_t -
+            // sigma_tr) (the forward-scattered part is folded into the longer sigma_tr
+            // flight). For an isotropic set (mu_bar = 0 => sigma_tr = sigma_t) this is
+            // byte-identical to the analog split, so mu=0 sets are unchanged.
+            double pick = p.stream.uniform_d() * sigma_tr;
             const IsotopeSlot* chosen = &data.isotopes.front();
             for (const auto& slot : data.isotopes) {
-                pick -= slot.number_density * slot.iso->g[g].sigma_t();
+                pick -= slot.number_density * slot.iso->g[g].sigma_tr();
                 if (pick <= 0.0) {
                     chosen = &slot;
                     break;
@@ -289,8 +295,8 @@ void RefTransport::run_fixed_source(const SourceSpec& spec, TallyAcc& tally) {
             }
 
             const auto& gd = chosen->iso->g[g];
-            const double sigma_t_i = gd.sigma_t();
-            if (sigma_t_i <= 0.0) {
+            const double sigma_tr_i = gd.sigma_tr();
+            if (sigma_tr_i <= 0.0) {
                 break;  // transparent isotope; nothing to score
             }
 
@@ -299,14 +305,14 @@ void RefTransport::run_fixed_source(const SourceSpec& spec, TallyAcc& tally) {
             // propagating them is a fission-source iteration, i.e. the eigen
             // solver (M1-T3) — so what accumulates here is production per
             // source neutron, which is k_inf when there is no leakage.
-            const double fission_share = gd.sigma_f / sigma_t_i;
+            const double fission_share = gd.sigma_f / sigma_tr_i;
             tally.add_fission_events(p.weight * fission_share, chosen->global_index);
             tally.add_fission_production(p.weight * gd.nu * fission_share, chosen->global_index);
 
-            // Implicit capture: reduce the weight by the scattering share. The
+            // Implicit capture: survive as the transport-reduced scatter share. The
             // neutron is NOT killed at fission, and sigma_c never terminates a
             // history directly (E1c, BLK-05).
-            p.weight *= gd.sigma_s / sigma_t_i;
+            p.weight *= (gd.sigma_s - (gd.sigma_t() - sigma_tr_i)) / sigma_tr_i;
             if (p.weight <= 0.0) {
                 break;
             }

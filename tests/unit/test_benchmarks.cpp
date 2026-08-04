@@ -12,9 +12,12 @@
 
 #include "core/constants/constants.h"
 #include "core/diagnostics.h"
+#include "core/geometry/geometry.h"
 #include "core/material/material.h"
 #include "core/scenario/scenario.h"
 #include "core/xs/xs.h"
+#include "physics/eigen/eigen.h"
+#include "ref/ref_transport.h"
 
 #include <nlohmann/json.hpp>
 
@@ -246,5 +249,44 @@ TEST_CASE("the benchmark data cards carry their source and retrieval date", "[be
         // BLK-14: no autonomous session may seek Handbook access, and the card
         // must say the model was not taken from it.
         REQUIRE_THAT(card, Catch::Matchers::ContainsSubstring("BLK-14"));
+    }
+}
+
+TEST_CASE("fast4 gives a sane fast-metal k on Godiva and Jezebel", "[benchmarks]") {
+    // A regression guard on the cited fast4 set + the ADR-021 transport correction. NOT the
+    // precision gate (that is gate_probe / nukebench, M1-T5): the honest 4-group set lands
+    // Godiva ~1.026 / Jezebel ~1.016 (ADR-022, both ~1.5-2.5% high, outside +/-500 pcm). This
+    // asserts only that a bare fast-metal critical assembly comes out NEAR critical -- which a
+    // broken transport correction does not: mu_bar=0 gives k~1.12, and the INCONSISTENT split
+    // (pre-ADR-021, collide on sigma_t while flying on sigma_tr) gives k~0.84. Both fail this.
+    const auto fast4 = repo() / "data" / "xs" / "fast4.json";
+    if (!fs::exists(fast4)) {
+        WARN("data/xs/fast4.json absent (authored by M1-T4a-2a) — skipping the eigen guard");
+        return;
+    }
+    const auto xs = ns::xs::FewGroupXS::load(fast4);
+    std::vector<ns::LoadWarning> warnings;
+    const auto lib = ns::material::MaterialLib::load_dir(repo() / "data" / "materials", xs,
+                                                         &warnings);
+
+    for (const auto& [name, radius, material] :
+         std::vector<std::tuple<std::string, double, std::string>>{
+             {"godiva", 8.741, "u_godiva"}, {"jezebel", 6.385, "pu_ga_jezebel"}}) {
+        INFO("benchmark " << name);
+        const int mid = lib.index_of(material);
+        REQUIRE(mid >= 0);
+        const ns::geom::LayerStack stack(
+            {ns::geom::Layer{"core", radius, mid, "PUBLIC-DERIVED"}});
+        ns::ref::RefTransport transport(stack, lib, xs, 20260802ull);
+
+        ns::physics::EigenSpec spec;
+        spec.batch = 30000;
+        spec.inactive = 25;
+        spec.active = 60;
+        spec.seed = 20260802ull;
+        const auto res = ns::physics::run_eigen(transport, spec);
+        INFO("k_eff = " << res.k);
+        REQUIRE(res.k > 0.95);
+        REQUIRE(res.k < 1.06);
     }
 }

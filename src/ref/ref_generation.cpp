@@ -102,7 +102,6 @@ void RefTransport::run_generation(const std::vector<FissionSite>& bank, double k
             const auto& data = layers_[static_cast<std::size_t>(layer)];
             const auto g = static_cast<std::size_t>(p.group);
             const double sigma_tr = data.sigma_tr[g];
-            const double sigma_t = data.sigma_t[g];
             const double speed = group_speed_cm_s(p.group);
 
             if (sigma_tr <= 0.0) {
@@ -136,10 +135,15 @@ void RefTransport::run_generation(const std::vector<FissionSite>& bank, double k
             out.time_weight += p.weight * flight / speed;
             p.pos = p.pos + p.dir * flight;
 
-            double pick = p.stream.uniform_d() * sigma_t;
+            // Collision on the TRANSPORT-CORRECTED medium (ADR-021): the flight used
+            // sigma_tr, so isotope selection AND the reaction split must too, or the
+            // fission source is scaled by sigma_tr/sigma_t relative to the collision
+            // density (which suppresses k as forward-peaking grows). mu_bar = 0 =>
+            // sigma_tr = sigma_t, so isotropic sets are byte-identical to the analog.
+            double pick = p.stream.uniform_d() * sigma_tr;
             const IsotopeSlot* chosen = &data.isotopes.front();
             for (const auto& slot : data.isotopes) {
-                pick -= slot.number_density * slot.iso->g[g].sigma_t();
+                pick -= slot.number_density * slot.iso->g[g].sigma_tr();
                 if (pick <= 0.0) {
                     chosen = &slot;
                     break;
@@ -147,13 +151,13 @@ void RefTransport::run_generation(const std::vector<FissionSite>& bank, double k
             }
 
             const auto& gd = chosen->iso->g[g];
-            const double sigma_t_i = gd.sigma_t();
-            if (sigma_t_i <= 0.0) {
+            const double sigma_tr_i = gd.sigma_tr();
+            if (sigma_tr_i <= 0.0) {
                 break;
             }
 
-            const double expected = p.weight * gd.nu * gd.sigma_f / sigma_t_i;
-            const double fissions = p.weight * gd.sigma_f / sigma_t_i;  // no ν — for ν̄_eff (E3a)
+            const double expected = p.weight * gd.nu * gd.sigma_f / sigma_tr_i;
+            const double fissions = p.weight * gd.sigma_f / sigma_tr_i;  // no ν — for ν̄_eff (E3a)
             out.production += expected;
             out.source.by_isotope[static_cast<std::size_t>(chosen->global_index)] += expected;
             out.source.by_isotope_fissions[static_cast<std::size_t>(chosen->global_index)] +=
@@ -190,7 +194,9 @@ void RefTransport::run_generation(const std::vector<FissionSite>& bank, double k
                 out.source.mesh[mesh_index] += 1.0;
             }
 
-            p.weight *= gd.sigma_s / sigma_t_i;  // implicit capture
+            // implicit capture: survive as the transport-reduced scatter share
+            // sigma_s,tr = sigma_s - (sigma_t - sigma_tr) = sigma_s - mu*sigma_s.
+            p.weight *= (gd.sigma_s - (gd.sigma_t() - sigma_tr_i)) / sigma_tr_i;
             if (p.weight <= 0.0) {
                 break;
             }

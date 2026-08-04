@@ -12,6 +12,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <filesystem>
@@ -350,8 +351,127 @@ axis_class = "uncertainty"
 constant_id = "C-060"
 range = [2.1, 2.4]
 )";
-    SweepManifest m = SweepManifest::parse(doc);  // a valid manifest...
-    REQUIRE_THROWS_AS(make_sampler(m), SweepError);  // ...but the sampler is M5-T4
+    SweepManifest m = SweepManifest::parse(doc);
+    auto s = make_sampler(m);  // mcts is available (M5-T4); calibrate band present
+    REQUIRE(s->score_kind() == ScoreKind::BandCenter);
+    auto p = s->next();
+    REQUIRE(p.has_value());
+    REQUIRE(p->size() == 1);
+    REQUIRE(p->front().value >= 2.1);  // the first box centre lies inside the axis range
+    REQUIRE(p->front().value <= 2.4);
+}
+
+// --- M5-T4: the MCTS/PUCT sampler ---
+
+TEST_CASE("the mcts sampler converges faster than random on a synthetic landscape", "[nukefarm]") {
+    // A smooth landscape peaked at (7, 3): yield equals the band centre there, so
+    // BandCenter scoring (-|yield - centre|) is maximised at the optimum.
+    const char* mcts_doc = R"(
+name = "mcts_conv"
+base_scenario = "s.toml"
+[sweep]
+sampler = "mcts"
+budget_runs = 300
+[objective]
+kind = "calibrate"
+target_yield_kt = [10.0, 30.0]
+[[space]]
+param = "a"
+axis_class = "numerical"
+range = [0.0, 10.0]
+[[space]]
+param = "b"
+axis_class = "numerical"
+range = [0.0, 10.0]
+)";
+    const double center = 20.0;  // (10 + 30) / 2
+    auto landscape = [&](const ParamSet& p) {
+        double x = 0.0;
+        double y = 0.0;
+        for (const auto& a : p) {
+            if (a.param == "a") x = a.value;
+            else if (a.param == "b") y = a.value;
+        }
+        return center - 0.1 * ((x - 7.0) * (x - 7.0) + (y - 3.0) * (y - 3.0));
+    };
+
+    SweepManifest m = SweepManifest::parse(mcts_doc);
+    auto mcts = make_sampler(m);
+    double mcts_best = 1e300;
+    for (int i = 0; i < 300; ++i) {
+        const auto p = mcts->next();
+        REQUIRE(p.has_value());
+        ns::physics::TallyResult t;
+        t.yield_kt = landscape(*p);
+        mcts->report(*p, t);
+        mcts_best = std::min(mcts_best, std::abs(t.yield_kt - center));
+    }
+
+    // Random baseline over the same axes/budget (the seeded random sampler).
+    const char* rnd_doc = R"(
+name = "rnd_conv"
+base_scenario = "s.toml"
+[sweep]
+sampler = "random"
+budget_runs = 300
+[objective]
+kind = "sensitivity"
+[[space]]
+param = "a"
+axis_class = "numerical"
+range = [0.0, 10.0]
+[[space]]
+param = "b"
+axis_class = "numerical"
+range = [0.0, 10.0]
+)";
+    auto rnd = make_sampler(SweepManifest::parse(rnd_doc));
+    double rnd_best = 1e300;
+    while (const auto p = rnd->next()) {
+        rnd_best = std::min(rnd_best, std::abs(landscape(*p) - center));
+    }
+
+    // MCTS refines toward the optimum; its best point is markedly closer to the
+    // band centre than uniform random's after the same number of evaluations.
+    REQUIRE(mcts_best < rnd_best);
+}
+
+TEST_CASE("mcts requires a calibrate objective with a target band", "[nukefarm]") {
+    const char* doc = R"(
+name = "x"
+base_scenario = "s.toml"
+[sweep]
+sampler = "mcts"
+budget_runs = 10
+[objective]
+kind = "sensitivity"
+[[space]]
+param = "a"
+axis_class = "numerical"
+range = [0.0, 1.0]
+)";
+    SweepManifest m = SweepManifest::parse(doc);  // loader-valid (mcts+sensitivity+numerical)
+    REQUIRE_THROWS_AS(make_sampler(m), SweepError);  // ...but BandCenter needs a target band
+}
+
+TEST_CASE("mcts with a pedagogical axis is rejected at load", "[nukefarm]") {
+    const char* doc = R"(
+name = "x"
+base_scenario = "s.toml"
+[sweep]
+sampler = "mcts"
+budget_runs = 10
+[objective]
+kind = "calibrate"
+target_yield_kt = [10.0, 30.0]
+[[space]]
+param = "p"
+axis_class = "pedagogical"
+range = [1.0, 9.0]
+)";
+    // A pedagogical axis is permitted only with sampler=grid -> the loader rejects
+    // this before mcts is ever instantiated.
+    REQUIRE_THROWS_AS(SweepManifest::parse(doc), SweepError);
 }
 
 // --- M5-T3-b: the store-backed run-loop engine ---

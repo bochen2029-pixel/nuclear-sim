@@ -387,6 +387,14 @@ add_executable(nukefarm src/app/nukefarm/main.cpp)
 target_link_libraries(nukefarm PRIVATE nukesim_nukefarm)
 nukesim_strict(nukefarm)
 
+# The fusion-binding bridge: the demon-core studio API (evaluate / generate_run) as
+# JSON in/out — the mechanism-independent DATA surface the visualizer's binding
+# calls (a dev-server shell / WASM / native addon all wrap this). A non-test binary
+# over nukesim_core's src/api; ctest count unchanged.
+add_executable(studio_bridge src/app/studio_bridge/main.cpp)
+target_link_libraries(studio_bridge PRIVATE nukesim_core)
+nukesim_strict(studio_bridge)
+
 add_executable(test_ref tests/unit/test_ref.cpp)
 target_link_libraries(test_ref PRIVATE nukesim_core Catch2::Catch2WithMain)
 target_include_directories(test_ref PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)

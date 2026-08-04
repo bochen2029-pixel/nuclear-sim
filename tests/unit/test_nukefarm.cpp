@@ -4,6 +4,7 @@
 
 #include "app/nukefarm/sweep.h"
 
+#include "app/nukefarm/queue.h"
 #include "app/nukefarm/runner.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -11,6 +12,7 @@
 
 #include <cmath>
 #include <cstddef>
+#include <filesystem>
 #include <map>
 #include <optional>
 #include <string>
@@ -439,4 +441,105 @@ TEST_CASE("the default evaluator runs a real burst keyed by studio_unit_id", "[n
     const auto runj = nlohmann::json::parse(out.run_json);
     REQUIRE(runj.at("unit_id").get<std::string>() == uid);
 }
+
+// --- M5-T3-c: the filesystem work-queue ---
+
+namespace {
+
+// A case-unique temp queue dir (parallel-ctest safe); cleared before + after.
+std::filesystem::path fresh_queue_dir(const char* name) {
+    std::filesystem::path d = std::filesystem::temp_directory_path() / name;
+    std::filesystem::remove_all(d);
+    return d;
+}
+
+}  // namespace
+
+TEST_CASE("the work queue moves a unit through pending claimed done", "[nukefarm]") {
+    const auto dir = fresh_queue_dir("nukesim_queue_test_lifecycle");
+    WorkQueue q(dir);
+    REQUIRE(q.enqueue("u1", "payload1") == true);
+    REQUIRE(q.enqueue("u1", "payload1-again") == false);  // re-enqueue of a pending unit
+    REQUIRE(q.pending_count() == 1);
+
+    auto item = q.claim(100.0);
+    REQUIRE(item.has_value());
+    REQUIRE(item->unit_id == "u1");
+    REQUIRE(item->payload == "payload1-again");
+    REQUIRE(q.pending_count() == 0);
+    REQUIRE(q.claimed_count() == 1);
+
+    q.complete("u1");
+    REQUIRE(q.claimed_count() == 0);
+    REQUIRE(q.done_count() == 1);
+
+    // A unit already done is not re-enqueued.
+    REQUIRE(q.enqueue("u1", "payload1") == false);
+    REQUIRE(q.pending_count() == 0);
+
+    std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("an empty queue claim returns nothing", "[nukefarm]") {
+    const auto dir = fresh_queue_dir("nukesim_queue_test_empty");
+    WorkQueue q(dir);
+    REQUIRE_FALSE(q.claim(1.0).has_value());
+    std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("reclaim_stale requeues a lease older than the threshold", "[nukefarm]") {
+    const auto dir = fresh_queue_dir("nukesim_queue_test_stale");
+    WorkQueue q(dir);
+    q.enqueue("u1", "p");
+    REQUIRE(q.claim(100.0).has_value());  // leased at t=100
+    REQUIRE(q.claimed_count() == 1);
+
+    // Age 5 (< threshold 10) -> not stale.
+    REQUIRE(q.reclaim_stale(105.0, 10.0) == 0);
+    REQUIRE(q.claimed_count() == 1);
+    REQUIRE(q.pending_count() == 0);
+
+    // Age 20 (> threshold 10) -> reclaimed back to pending.
+    REQUIRE(q.reclaim_stale(120.0, 10.0) == 1);
+    REQUIRE(q.claimed_count() == 0);
+    REQUIRE(q.pending_count() == 1);
+
+    std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("an induced reclaim does not double-count in the store", "[nukefarm]") {
+    const auto dir = fresh_queue_dir("nukesim_queue_test_reclaim");
+    WorkQueue q(dir);
+    ns::store::SweepStore store(":memory:");
+    const std::string uid = "unit-reclaim";
+    q.enqueue(uid, R"({"compression.ratio":2.3})");
+
+    // Worker A claims at t=100 but stalls (never completes).
+    auto a = q.claim(100.0);
+    REQUIRE(a.has_value());
+    REQUIRE(a->unit_id == uid);
+
+    // The lease goes stale; a supervisor reclaims it back to pending.
+    REQUIRE(q.reclaim_stale(200.0, 50.0) == 1);
+    REQUIRE(q.pending_count() == 1);
+
+    // Worker B claims the requeued unit, records it, and completes it.
+    auto b = q.claim(200.0);
+    REQUIRE(b.has_value());
+    REQUIRE(b->unit_id == uid);
+    REQUIRE(store.record_run({uid, b->payload, "tallyB", 1.0}) == true);  // first finisher wins
+    q.complete(uid);
+    REQUIRE(q.done_count() == 1);
+
+    // Worker A wakes up late and records the SAME unit — the store's INSERT-OR-IGNORE
+    // idempotency (M5-T2) makes it a NO-OP: no double-count.
+    REQUIRE(store.record_run({uid, a->payload, "tallyA", 9.0}) == false);
+    REQUIRE(store.count() == 1);
+    auto row = store.get_run(uid);
+    REQUIRE(row.has_value());
+    REQUIRE(row->tally_json == "tallyB");  // B's result stands, A's late write ignored
+
+    std::filesystem::remove_all(dir);
+}
+
 

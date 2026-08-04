@@ -11,6 +11,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/checkpoint/checkpoint.h"
 #include "core/constants/constants.h"
 #include "core/geometry/geometry.h"
 #include "core/material/material.h"
@@ -24,6 +25,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -460,4 +462,90 @@ TEST_CASE("the demon-core burst self-limits: ignite, disassemble, quench (step 3
     REQUIRE(tally.result().yield_kt > 0.0);
     REQUIRE(tally.result().k_eff.at_quench < tally.result().k_eff.peak);  // disassembly dropped k
     REQUIRE(tally.result().yield_split.post_peak_kt > 0.0);               // BLK-03 decay phase
+}
+
+TEST_CASE("run_burst resumes BIT-IDENTICALLY from a checkpoint (T-resume gate)", "[couple]") {
+    // The D9 resume gate (11 §T-resume): a real SIM demon-core disassembly burst run
+    // three ways — (1) full; (2) interrupted at a refresh boundary near the middle;
+    // (3) resumed from the checkpoint, serialized THROUGH the checkpoint.bin container.
+    // The resumed tally must equal the full tally BIT-FOR-BIT.
+    const RealSphere sphere(10.0);  // prompt-supercritical (the M3-T3-e config)
+    ns::physics::EigenSpec espec;
+    espec.batch = 2000;
+    espec.inactive = 6;
+    espec.active = 12;
+    espec.h_tol = 0.05;
+    const double R0 = sphere.radius_cm();
+    const EigenFn eigen =
+        ns::physics::ref_eigen_fn_masscons(sphere.materials(), sphere.xs(), espec, 20260803, R0);
+
+    CoupleConfig cfg;
+    cfg.e_f_mev = ns::consts::e_f_prompt_deposited;
+    cfg.phi_kt = ns::consts::phi_kt_fissions_per_kiloton;
+    cfg.eigen_refresh_gens = 8;
+    cfg.quench_epsilon = ns::consts::quench_epsilon;
+    cfg.t_max_s = 1.0e-5;
+    cfg.max_generations = 4000;
+    cfg.disassembly = true;
+    cfg.core_radius0_cm = R0;
+    cfg.core_mass_kg = 0.05;
+    cfg.disassembly_gamma = 5.0 / 3.0;
+    cfg.e_f_joules = ns::consts::e_f_prompt_deposited * ns::consts::mev_to_joule;
+
+    ns::physics::BurstContext ctx;
+    ctx.run_id = "resume_test";
+    ctx.isotope_names = {"Pu239"};
+    ctx.isotope_molar_mass_g = {ns::consts::molar_mass_pu239};
+    ctx.core_pu_isotopes = {0};
+    ctx.shell_edges_cm = {0.0, R0};
+    ctx.phi_kt = cfg.phi_kt;
+    ctx.n_a = ns::consts::avogadro_constant;
+    ctx.m_pit_g = ns::consts::od_pu_ga_core_mass_kg * 1000.0;
+
+    // (1) Full run.
+    BurstTally tally_full;
+    const BurstReport report_full = run_burst(cfg, ctx, sphere.geometry(), eigen, tally_full);
+    REQUIRE(report_full.quenched);
+    REQUIRE(report_full.generations > 60);
+
+    // (2) Interrupted: capture at the first refresh boundary at-or-after gen 40, then stop.
+    BurstTally tally_a;
+    ns::physics::BurstResume interrupt;
+    interrupt.checkpoint_at = 40;
+    run_burst(cfg, ctx, sphere.geometry(), eigen, tally_a, &interrupt);
+    REQUIRE(interrupt.did_capture);
+    REQUIRE(interrupt.captured.n >= 40);
+    REQUIRE(static_cast<int>(interrupt.captured.n) < report_full.generations);
+
+    // Serialize {loop checkpoint + sink state} THROUGH the checkpoint.bin container.
+    const std::vector<std::uint8_t> payload =
+        ns::physics::serialize_burst_state(interrupt.captured, tally_a.state());
+    ns::checkpoint::CheckpointBlob blob;
+    blob.identity.scenario_sha256 = std::string(64, '0');
+    blob.identity.data_sha256 = std::string(64, '0');
+    blob.put_section(1, payload);
+    const std::vector<std::uint8_t> bytes = ns::checkpoint::write_checkpoint(blob);
+    const ns::checkpoint::CheckpointBlob rd = ns::checkpoint::read_checkpoint(bytes);
+    const ns::checkpoint::CheckpointSection* sec = rd.section(1);
+    REQUIRE(sec != nullptr);
+    ns::physics::BurstCheckpoint cp;
+    BurstTally::State tstate;
+    ns::physics::deserialize_burst_state(sec->data, cp, tstate);
+
+    // (3) Resume: restore the sink, then run_burst from the checkpoint to completion.
+    BurstTally tally_b;
+    tally_b.on_begin(ctx);
+    tally_b.load_state(tstate);
+    ns::physics::BurstResume res;
+    res.restore = &cp;
+    const BurstReport report_resumed = run_burst(cfg, ctx, sphere.geometry(), eigen, tally_b, &res);
+
+    // Bit-identical: the full and resumed tallies serialize to the SAME JSON, and the
+    // reports agree.
+    INFO("gens full=" << report_full.generations << " resumed=" << report_resumed.generations
+                      << " checkpoint@=" << interrupt.captured.n);
+    REQUIRE(report_resumed.generations == report_full.generations);
+    REQUIRE(report_resumed.quenched == report_full.quenched);
+    REQUIRE(report_resumed.eigen_calls == report_full.eigen_calls);
+    REQUIRE(ns::physics::to_json(tally_b.result()) == ns::physics::to_json(tally_full.result()));
 }

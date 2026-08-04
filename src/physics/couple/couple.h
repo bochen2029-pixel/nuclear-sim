@@ -28,6 +28,7 @@
 #include "core/material/material.h"
 #include "core/xs/xs.h"
 #include "physics/eigen/eigen.h"
+#include "physics/kinetics/kinetics.h"
 #include "physics/tally/tally.h"
 #include "ref/ref_transport.h"
 
@@ -113,6 +114,30 @@ public:
     void on_end() override;
     const TallyResult& result() const noexcept { return result_; }
 
+    /// The sink's accumulated state (03 §8 §7 checkpoint) — the log-domain sums,
+    /// peak trackers, k readouts, and the per-generation series accumulated during
+    /// the run. NOT the static `ctx_` (re-provided by on_begin on resume).
+    struct State {
+        double log_total = 0.0;
+        std::vector<double> log_by_isotope;
+        std::vector<double> log_by_shell;
+        double log_f_peak = 0.0;
+        double log_total_at_peak = 0.0;
+        double k_eff_peak = 0.0, k_prompt_peak = 0.0;
+        double k_eff_first = 0.0, k_prompt_first = 0.0;
+        double k_eff_last = 0.0, k_prompt_last = 0.0;
+        double last_t = 0.0;
+        std::int64_t generations = 0;
+        std::vector<double> population_log10_N;
+        double max_q = 0.0;
+        std::int64_t eigen_calls = 0;
+    };
+    /// Snapshot the accumulated state (for a checkpoint).
+    State state() const;
+    /// Restore the accumulated state into a sink that has already had on_begin()
+    /// called (keeps its ctx_); overwrites the numeric accumulators (for a resume).
+    void load_state(const State& s);
+
 private:
     BurstContext ctx_;
     TallyResult result_;
@@ -188,9 +213,50 @@ struct BurstReport {
     double max_q = 0.0;
 };
 
+/// The full resumable `run_burst` loop state (03 §8, D9) — captured at a REFRESH
+/// boundary so the cached eigen (k_p/ν/Λ/shares) can be RE-DERIVED by re-running
+/// the deterministic eigen on resume rather than serialized, and the geometry is
+/// reconstructed from `geom0` + the shell/time. Pair with a `BurstTally::State`
+/// (the sink) for a bit-identical resume.
+struct BurstCheckpoint {
+    double t = 0.0;
+    std::int64_t n = 0;
+    bool supercritical = false;
+    double log_f_peak = 0.0;
+    std::int64_t gens_since_refresh = 0;
+    std::int64_t refresh_gens = 0;
+    double marked_radius = 0.0;
+    double last_k = 0.0;
+    std::int64_t eigen_calls = 0;
+    double max_q = 0.0;
+    BurstAccumulator::State acc;
+    double shell_R = 0.0, shell_Rdot = 0.0, shell_E_int = 0.0;
+};
+
+/// Resume control for `run_burst`. `checkpoint_at ≥ 0` captures the state at the
+/// first refresh boundary at-or-after that generation and STOPS (into `captured`).
+/// `restore != nullptr` resumes from a checkpoint (skips on_begin + the initial
+/// eigen; the caller must have already restored the sink via `load_state`).
+struct BurstResume {
+    int checkpoint_at = -1;
+    const BurstCheckpoint* restore = nullptr;
+    BurstCheckpoint captured;
+    bool did_capture = false;
+};
+
 BurstReport run_burst(const CoupleConfig& cfg, const BurstContext& ctx,
                       const ns::geom::LayerStack& geom0, const EigenFn& eigen_fn,
-                      TallySink& sink);
+                      TallySink& sink, BurstResume* resume = nullptr);
+
+/// Serialize / parse a {BurstCheckpoint + BurstTally::State} pair to/from a
+/// checkpoint section payload (03 §8), little-endian and bit-exact — a run resumes
+/// bit-identically. The generic checkpoint container (core/checkpoint) holds the
+/// payload as an OPAQUE section; the codec lives here (core must not depend on
+/// physics).
+std::vector<std::uint8_t> serialize_burst_state(const BurstCheckpoint& cp,
+                                                const BurstTally::State& tally);
+void deserialize_burst_state(const std::vector<std::uint8_t>& bytes, BurstCheckpoint& cp,
+                             BurstTally::State& tally);
 
 /// Adapt the REAL reference transport into an `EigenFn`: each call rebuilds a
 /// `RefTransport` on the given geometry (materials/xs fixed) and runs `run_eigen`

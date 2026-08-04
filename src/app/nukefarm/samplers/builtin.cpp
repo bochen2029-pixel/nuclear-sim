@@ -145,6 +145,143 @@ std::vector<ParamSet> lhs_points(const SweepManifest& m) {
     return out;
 }
 
+// mcts: PUCT over a k-d box tree (06 §2 "continuous axes node-discretized then
+// refined"). Each node is a hyperrectangle; it bisects its longest axis into two
+// child half-boxes, added by progressive widening. next() descends by PUCT
+// (Q + c·sqrt(N_parent)/(1+N_child)) — expanding a new child or selecting the best
+// — and returns the leaf box's CENTRE (deterministic + reproducible; refinement,
+// not randomness, drives it toward the optimum). report() scores yield vs the
+// calibrate band centre (ScoreKind::BandCenter) and backpropagates along the last
+// path. NB assumes next()→report() alternation (the sweep run loop, and the tests,
+// do exactly that).
+class MctsSampler : public Sampler {
+public:
+    MctsSampler(std::vector<SweepAxis> axes, double center, double half_width)
+        : axes_(std::move(axes)), center_(center), half_width_(half_width > 0.0 ? half_width : 1.0) {
+        Node root;
+        root.region.reserve(axes_.size());
+        for (const auto& ax : axes_) root.region.push_back({ax.lo, ax.hi});
+        nodes_.push_back(std::move(root));
+    }
+
+    std::optional<ParamSet> next() override {
+        last_path_.clear();
+        int node = 0;
+        int depth = 0;
+        for (;;) {
+            last_path_.push_back(node);
+            const std::size_t nchildren = nodes_[node].children.size();
+            if (depth < kMaxDepth && nchildren < allowed_children(nodes_[node].n) &&
+                splittable(nodes_[node].region)) {
+                const int child = add_child(node);  // expand
+                last_path_.push_back(child);
+                return center_point(nodes_[child].region);
+            }
+            if (nodes_[node].children.empty()) {  // leaf at max depth / unsplittable
+                return center_point(nodes_[node].region);
+            }
+            node = best_child(node);  // select
+            ++depth;
+        }
+    }
+
+    void report(const ParamSet&, const ns::physics::TallyResult& tally) override {
+        const double score = -std::abs(tally.yield_kt - center_) / half_width_;
+        for (int idx : last_path_) {
+            nodes_[idx].n += 1.0;
+            nodes_[idx].w += score;
+        }
+    }
+
+    ScoreKind score_kind() const override { return ScoreKind::BandCenter; }
+    bool supports_categorical() const override { return false; }
+
+private:
+    struct Node {
+        std::vector<std::pair<double, double>> region;  // [lo, hi] per axis
+        double n = 0.0;                                 // visits
+        double w = 0.0;                                 // value sum (mean = w/n)
+        std::vector<int> children;
+        int split_axis = -1;
+    };
+
+    static constexpr int kMaxDepth = 24;
+    static constexpr double kCPuct = 1.2;
+    static constexpr double kPwK = 1.0;
+    static constexpr double kPwAlpha = 0.5;
+
+    // Progressive widening: 1 + floor(k·n^alpha), capped at 2 (binary k-d split).
+    std::size_t allowed_children(double n) const {
+        std::size_t c = static_cast<std::size_t>(1.0 + kPwK * std::pow(n, kPwAlpha));
+        return c > 2 ? std::size_t{2} : c;
+    }
+
+    static bool splittable(const std::vector<std::pair<double, double>>& region) {
+        for (const auto& r : region)
+            if (r.second > r.first) return true;
+        return false;
+    }
+
+    static int longest_axis(const std::vector<std::pair<double, double>>& region) {
+        int best = 0;
+        double span = -1.0;
+        for (std::size_t i = 0; i < region.size(); ++i) {
+            const double s = region[i].second - region[i].first;
+            if (s > span) {
+                span = s;
+                best = static_cast<int>(i);
+            }
+        }
+        return best;
+    }
+
+    int add_child(int node) {
+        if (nodes_[node].split_axis < 0) nodes_[node].split_axis = longest_axis(nodes_[node].region);
+        const int ax = nodes_[node].split_axis;
+        const double lo = nodes_[node].region[static_cast<std::size_t>(ax)].first;
+        const double hi = nodes_[node].region[static_cast<std::size_t>(ax)].second;
+        const double mid = 0.5 * (lo + hi);
+        const bool lower_first = nodes_[node].children.empty();
+        Node child;
+        child.region = nodes_[node].region;  // copy before any reallocation
+        child.region[static_cast<std::size_t>(ax)] = lower_first ? std::make_pair(lo, mid)
+                                                                 : std::make_pair(mid, hi);
+        const int idx = static_cast<int>(nodes_.size());
+        nodes_.push_back(std::move(child));      // may reallocate nodes_
+        nodes_[node].children.push_back(idx);    // fresh index lookup after the push
+        return idx;
+    }
+
+    int best_child(int node) const {
+        int best = nodes_[node].children.front();
+        double best_score = -1e300;
+        for (int c : nodes_[node].children) {
+            const Node& ch = nodes_[static_cast<std::size_t>(c)];
+            const double q = ch.n > 0.0 ? ch.w / ch.n : 0.0;
+            const double u = kCPuct * std::sqrt(nodes_[node].n) / (1.0 + ch.n);
+            if (q + u > best_score) {
+                best_score = q + u;
+                best = c;
+            }
+        }
+        return best;
+    }
+
+    ParamSet center_point(const std::vector<std::pair<double, double>>& region) const {
+        ParamSet ps;
+        ps.reserve(axes_.size());
+        for (std::size_t i = 0; i < axes_.size(); ++i)
+            ps.push_back({axes_[i].param, 0.5 * (region[i].first + region[i].second)});
+        return ps;
+    }
+
+    std::vector<SweepAxis> axes_;
+    double center_;
+    double half_width_;
+    std::vector<Node> nodes_;
+    std::vector<int> last_path_;
+};
+
 }  // namespace
 
 std::unique_ptr<Sampler> make_sampler(const SweepManifest& m) {
@@ -156,7 +293,17 @@ std::unique_ptr<Sampler> make_sampler(const SweepManifest& m) {
     } else if (m.sampler == "lhs") {
         s = std::make_unique<PlannedSampler>(lhs_points(m));
     } else if (m.sampler == "mcts") {
-        throw SweepError("sampler \"mcts\" (PUCT) is M5-T4 — not yet available");
+        // BandCenter needs a band centre to target -> mcts requires a calibrate
+        // objective with target_yield_kt. (Pedagogical axes are already loader-
+        // rejected for any non-grid sampler, so mcts never sees one.)
+        if (!m.objective.target_lo.has_value() || !m.objective.target_hi.has_value()) {
+            throw SweepError(
+                "sampler \"mcts\" requires a calibrate objective with target_yield_kt "
+                "(its BandCenter scoring needs a band centre to target)");
+        }
+        const double lo = *m.objective.target_lo;
+        const double hi = *m.objective.target_hi;
+        s = std::make_unique<MctsSampler>(m.space, 0.5 * (lo + hi), 0.5 * (hi - lo));
     } else {
         throw SweepError("unknown sampler \"" + m.sampler + "\" (06 §2: grid | lhs | random | mcts)");
     }

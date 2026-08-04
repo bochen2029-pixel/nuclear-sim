@@ -41,7 +41,7 @@ TEST_CASE("gates.toml loads G0a/G0b at the C-900 config with constant-resolved c
     REQUIRE(cfg.generated_from == "spec/08-validation.md");
     REQUIRE(cfg.gates.size() >= 2);
 
-    const auto& g0a = ns::nukebench::find_gate(cfg, "G0a");
+    const auto g0a = ns::nukebench::find_gate(cfg, "G0a");  // copy: dodge gcc -Wdangling-reference
     REQUIRE(g0a.scenario == "data/scenarios/godiva.toml");
     REQUIRE(g0a.seeds == std::vector<std::int64_t>{1, 2, 3, 4, 5});  // normative seed set
     REQUIRE(g0a.eigen.batch == 1000000);  // C-900
@@ -109,7 +109,7 @@ TEST_CASE("run_gate produces one attempt per normative seed with evaluated crite
         return;
     }
     const auto cfg = ns::nukebench::load_gates(gates_toml(), spec08());
-    const auto& g0a = ns::nukebench::find_gate(cfg, "G0a");
+    const auto g0a = ns::nukebench::find_gate(cfg, "G0a");  // copy: dodge gcc -Wdangling-reference
     const auto rep = ns::nukebench::run_gate(g0a, repo(), "ref", 2000);
 
     REQUIRE(rep.gate == "G0a");

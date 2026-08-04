@@ -6,6 +6,7 @@
 
 #include "app/nukefarm/queue.h"
 #include "app/nukefarm/runner.h"
+#include "app/nukefarm/worker.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
@@ -538,6 +539,76 @@ TEST_CASE("an induced reclaim does not double-count in the store", "[nukefarm]")
     auto row = store.get_run(uid);
     REQUIRE(row.has_value());
     REQUIRE(row->tally_json == "tallyB");  // B's result stands, A's late write ignored
+
+    std::filesystem::remove_all(dir);
+}
+
+// --- M5-T3-d: the distributed worker + the stale-lease policy (ADR-020) ---
+
+TEST_CASE("stale_threshold_s uses the fallback below 10 completed and 2x median above",
+          "[nukefarm]") {
+    ns::store::SweepStore few(":memory:");
+    for (int i = 0; i < 9; ++i) few.record_run({"u" + std::to_string(i), "", "", 3.0});
+    REQUIRE(stale_threshold_s(few, 99.0) == 99.0);  // < 10 completed -> the wall-clock fallback
+
+    ns::store::SweepStore ten(":memory:");
+    for (int i = 1; i <= 10; ++i)
+        ten.record_run({"v" + std::to_string(i), "", "", static_cast<double>(i)});
+    // last 10 wall_s = 1..10 -> median (5+6)/2 = 5.5 -> 2x = 11.
+    REQUIRE(stale_threshold_s(ten, 99.0) == 11.0);
+}
+
+TEST_CASE("submit enqueues the sampler points by unit_id", "[nukefarm]") {
+    SweepManifest m = SweepManifest::parse(kRunnerGrid);  // a 5x5 grid -> 25 distinct units
+    const auto dir = fresh_queue_dir("nukesim_queue_test_submit");
+    WorkQueue q(dir);
+    ns::store::SweepStore store(":memory:");
+
+    REQUIRE(submit(m, q, store) == 25);
+    REQUIRE(q.pending_count() == 25);
+    REQUIRE(submit(m, q, store) == 0);  // idempotent: the units are already enqueued
+
+    std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("run_worker drains the queue into the store", "[nukefarm]") {
+    SweepManifest m = SweepManifest::parse(kRunnerGrid);
+    const auto dir = fresh_queue_dir("nukesim_queue_test_worker");
+    WorkQueue q(dir);
+    ns::store::SweepStore store(":memory:");
+    submit(m, q, store);
+    REQUIRE(q.pending_count() == 25);
+
+    const auto clock = []() { return 1000.0; };
+    WorkerResult r = run_worker(q, store, stub_eval, clock, 600.0);
+    REQUIRE(r.processed == 25);
+    REQUIRE(r.reclaimed == 0);
+    REQUIRE(store.count() == 25);
+    REQUIRE(q.done_count() == 25);
+    REQUIRE(q.pending_count() == 0);
+
+    std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("run_worker reclaims a stale lease and runs the unit", "[nukefarm]") {
+    const auto dir = fresh_queue_dir("nukesim_queue_test_worker_reclaim");
+    WorkQueue q(dir);
+    ns::store::SweepStore store(":memory:");
+    q.enqueue("stale-unit", R"({"compression.ratio":2.2})");
+
+    // A crashed worker claimed it at t=100 and never completed.
+    REQUIRE(q.claim(100.0).has_value());
+    REQUIRE(q.claimed_count() == 1);
+
+    // A fresh worker at t=200 with a 50 s threshold: the stale lease (age 100) is
+    // reclaimed, then claimed + evaluated + recorded + completed.
+    const auto clock = []() { return 200.0; };
+    WorkerResult r = run_worker(q, store, stub_eval, clock, 50.0);
+    REQUIRE(r.reclaimed == 1);
+    REQUIRE(r.processed == 1);
+    REQUIRE(store.count() == 1);
+    REQUIRE(store.is_done("stale-unit"));
+    REQUIRE(q.done_count() == 1);
 
     std::filesystem::remove_all(dir);
 }

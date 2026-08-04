@@ -26,6 +26,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 // sqlite3 is an opaque handle here; <sqlite3.h> is an implementation detail (.cpp).
 struct sqlite3;
@@ -95,6 +96,11 @@ public:
     std::int64_t count() const;
     /// Number of rows in `runs` whose status == `status`.
     std::int64_t count_with_status(const std::string& status) const;
+
+    /// The `wall_s` of the most-recently-recorded `done` runs, newest first, up to
+    /// `limit`. A sweep driver uses this to estimate the per-unit runtime (06 §2 /
+    /// ADR-020 stale-lease policy).
+    std::vector<double> recent_wall_s(std::int64_t limit) const;
 
     /// Sweep cursor (03 §7 `cursor(state_json)`; checkpoint section 8) — the single
     /// resumable sweep-progress blob. `set_cursor` replaces it (atomically);

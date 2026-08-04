@@ -24,7 +24,7 @@ nukefarm status --sweep <name>
 nukefarm resume --sweep <name>
 ```
 
-- Work queue: filesystem-based: `queue/pending/<unit_id>.toml` → `queue/claimed/` → `queue/done/` with lease files. Stale lease > 2× median runtime of the last 10 completed units in this sweep (fallback: 3× scenario `t_max_s` when fewer than 10) ⇒ requeue. **Dedup/idempotency key = `unit_id`** (03 §6) — a requeued or double-claimed unit produces the same artifact path; second finisher's write is a no-op (D6 double-count fix).
+- Work queue: filesystem-based: `queue/pending/<unit_id>.toml` → `queue/claimed/` → `queue/done/` with lease files. Stale lease > 2× median **wall-clock** runtime of the last 10 completed units in this sweep (fallback when fewer than 10: a wall-clock default `stale_lease_fallback_s`, default 600 s ≈ 10 min, overridable — **not** `t_max_s`, which is simulation time; ADR-020) ⇒ requeue. **Dedup/idempotency key = `unit_id`** (03 §6) — a requeued or double-claimed unit produces the same artifact path; second finisher's write is a no-op (D6 double-count fix).
 - Samplers: **in-tree C++ plugin registry** (no extern "C" — C++ types cross the boundary, so the ABI pretense is dropped; E7). Interface:
   ```cpp
   class Sampler { public: virtual ~Sampler() = default;

@@ -395,6 +395,14 @@ add_executable(studio_bridge src/app/studio_bridge/main.cpp)
 target_link_libraries(studio_bridge PRIVATE nukesim_core)
 nukesim_strict(studio_bridge)
 
+# gate_probe (M1-T4a-2a): measure a benchmark scenario's k_eff off data/xs/fast4.json
+# and report the real pcm deviation (G0a/G0b). Non-test binary (like gpu_perf); the
+# formal gate runner is nukebench (M1-T5). ctest count unchanged.
+add_executable(gate_probe tools/xs/gate_probe.cpp)
+target_link_libraries(gate_probe PRIVATE nukesim_core)
+target_include_directories(gate_probe PRIVATE ${CMAKE_SOURCE_DIR}/src)
+nukesim_strict(gate_probe)
+
 add_executable(test_ref tests/unit/test_ref.cpp)
 target_link_libraries(test_ref PRIVATE nukesim_core Catch2::Catch2WithMain)
 target_include_directories(test_ref PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)

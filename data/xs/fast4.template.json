@@ -1,0 +1,26 @@
+{
+  "_template": true,
+  "_note": "FILL-IN TEMPLATE — NOT loadable data. Every physical value is null; the real numbers come ONLY from the documented ENDF/B-VIII.0 collapse (tools/xs/), never by hand. The loader consumes data/xs/fast4.json (name 'fast4'), not this file. See data/xs/PROVENANCE-fast4.md.",
+  "_isotopes_a_set": ["U234", "U235", "U238", "Pu239", "Pu240", "Pu241", "Ga69", "Ga71"],
+  "_isotopes_b_set": ["Al27", "B10", "Be9", "C12", "H1", "N14", "O16", "Po210"],
+  "_per_isotope_shape": {
+    "_note": "4 entries per group array; groups 0-based high->low over bounds [20,3,1,0.1,1e-3] MeV. All barns. sigma_t is loader-computed and MUST NOT appear here.",
+    "nu":        [null, null, null, null],
+    "chi":       [null, null, null, null],
+    "sigma_f":   [null, null, null, null],
+    "sigma_c":   [null, null, null, null],
+    "sigma_s":   [null, null, null, null],
+    "sigma_n2n": [null, null, null, null],
+    "mu_bar":    [null, null, null, null],
+    "beta":      null,
+    "transfer":  [[null, null, null, null], [0.0, null, null, null], [0.0, 0.0, null, null], [0.0, 0.0, 0.0, 1.0]],
+    "cite":      "ENDF/B-VIII.0 (MAT <n>, <eval date>); collapsed to 4 groups with <weighting> — tools/xs/",
+    "status":    "PUBLIC"
+  },
+  "schema_version": 2,
+  "name": "fast4",
+  "group_bounds_MeV": [20.0, 3.0, 1.0, 0.1, 0.001],
+  "isotopes": {
+    "_note": "Each of the 8 a-set isotope keys maps to an object of the _per_isotope_shape above, with nulls replaced by collapsed values. transfer is lower-triangular-populated (no upscatter): row g has zeros for columns < g, real values for columns >= g, and the row sums to 1."
+  }
+}

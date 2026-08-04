@@ -390,7 +390,10 @@ nukesim_strict(nukefarm)
 # nukebench (M1-T5): the formal gate runner. M1-T5-a = the nukesim_nukebench lib — the
 # gates.toml (03 §10) loader with the constant-drift + spec_sha256 integrity guards.
 # M1-T5-b adds the run/gate/diff CLI + gate_report.json (03 §11).
-add_library(nukesim_nukebench STATIC src/app/nukebench/gates.cpp)
+add_library(nukesim_nukebench STATIC
+    src/app/nukebench/gates.cpp
+    src/app/nukebench/gate_report.cpp
+    src/app/nukebench/cli.cpp)
 target_link_libraries(nukesim_nukebench PUBLIC nukesim_core)
 target_include_directories(nukesim_nukebench PUBLIC ${CMAKE_SOURCE_DIR}/src)
 nukesim_strict(nukesim_nukebench)
@@ -400,6 +403,11 @@ target_link_libraries(test_nukebench PRIVATE nukesim_nukebench Catch2::Catch2Wit
 target_compile_definitions(test_nukebench PRIVATE NUKESIM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 nukesim_strict(test_nukebench)
 catch_discover_tests(test_nukebench TEST_PREFIX "nukebench.")
+
+# The nukebench CLI exe (M1-T5-b): the gate runner. Non-test binary (like nukefarm).
+add_executable(nukebench src/app/nukebench/main.cpp)
+target_link_libraries(nukebench PRIVATE nukesim_nukebench)
+nukesim_strict(nukebench)
 
 # gates.toml is GENERATED (tools/gen_gates) and committed; this fails if it drifts (03 §10).
 add_test(NAME nukebench.gates_generated_current

@@ -85,7 +85,6 @@ __global__ void k_generation(Bank in, int nsrc, DeviceLayerStack geom, DeviceMat
                 break;  // leaked
             }
             const float str = mat.sigma_tr[L * 4 + grp];
-            const float st = mat.sigma_t[L * 4 + grp];
             const float d = d_distance_to_boundary(geom, pos, dir, L);
             if (str <= 0.0f) {
                 if (d >= kInfF) {
@@ -107,18 +106,22 @@ __global__ void k_generation(Bank in, int nsrc, DeviceLayerStack geom, DeviceMat
             pos = d_advance(pos, dir, flight);
             const int begin = mat.slot_begin[L];
             const int count = mat.slot_count[L];
-            float pick = s.uniform_f() * st;
+            // Collision on the transport-corrected medium (ADR-021), matching the sigma_tr
+            // flight: select prop. to n_i*sigma_tr,i and split on sigma_tr,i. mu_bar=0 =>
+            // sigma_tr=sigma_t, so this is byte-identical to the analog split (the CPU
+            // oracle does the same; G0c parity on a mu!=0 set holds only with this).
+            float pick = s.uniform_f() * str;
             int chosen = begin;
             for (int si = 0; si < count; ++si) {
                 const int slot = begin + si;
-                pick -= mat.nd[slot] * d_group_sigma_t(mat.g[slot * 4 + grp]);
+                pick -= mat.nd[slot] * d_group_sigma_tr(mat.g[slot * 4 + grp]);
                 if (pick <= 0.0f) {
                     chosen = slot;
                     break;
                 }
             }
             const DGroup gd = mat.g[chosen * 4 + grp];
-            const float sti = d_group_sigma_t(gd);
+            const float sti = d_group_sigma_tr(gd);  // collision denominator = sigma_tr,i
             if (sti <= 0.0f) {
                 break;
             }
@@ -141,7 +144,9 @@ __global__ void k_generation(Bank in, int nsrc, DeviceLayerStack geom, DeviceMat
                 }
                 rg = bg;
             }
-            w *= gd.sigma_s / sti;  // implicit capture
+            // implicit capture: survive as the transport-reduced scatter share
+            // sigma_s,tr = sigma_s - (sigma_t - sigma_tr) = sigma_s - mu*sigma_s.
+            w *= (gd.sigma_s - (d_group_sigma_t(gd) - sti)) / sti;
             if (w <= 0.0f) {
                 break;
             }

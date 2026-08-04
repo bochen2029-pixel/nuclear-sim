@@ -618,3 +618,39 @@ TEST_CASE("gpu fixed-source is bit-identical across launch configs", "[gpu]") {
     REQUIRE(a.fission_bank_checksum == b.fission_bank_checksum);  // + fork streams
     REQUIRE(a.fission_bank_size > 0);
 }
+
+TEST_CASE("GPU eigen matches the CPU oracle on the fast4 Godiva assembly (ADR-021 parity)",
+          "[gpu]") {
+    // G0c on REAL data: with the ADR-021 transport correction on BOTH backends, the device
+    // eigen reproduces the CPU oracle on a mu_bar != 0 set. This is the check the SIM-xs
+    // (mu_bar=0) differential tests could never make. Without the device fix the GPU would
+    // still fly on sigma_tr but collide on sigma_t -> the mu_bar=0 answer (~1.12) vs the
+    // CPU's ~1.026, ~9000 pcm apart.
+    const auto repo = spec_examples::repo_root();
+    const auto fast4 = repo / "data" / "xs" / "fast4.json";
+    if (!std::filesystem::exists(fast4)) {
+        WARN("data/xs/fast4.json absent (M1-T4a-2a) — skipping the GPU/CPU fast4 parity check");
+        return;
+    }
+    const auto xs = ns::xs::FewGroupXS::load(fast4);
+    const auto lib = ns::material::MaterialLib::load_dir(repo / "data" / "materials", xs);
+    const int mid = lib.index_of("u_godiva");
+    REQUIRE(mid >= 0);
+    const ns::geom::LayerStack stack({ns::geom::Layer{"core", 8.741, mid, "PUBLIC-DERIVED"}});
+
+    ns::ref::RefTransport transport(stack, lib, xs, 20260802ull);
+    ns::physics::EigenSpec spec;
+    spec.batch = 30000;
+    spec.inactive = 25;
+    spec.active = 60;
+    spec.seed = 20260802ull;
+    const auto cpu = ns::physics::run_eigen(transport, spec);
+
+    ns::gpu::EigenResultGpu gpu;
+    REQUIRE(ns::gpu::gpu_eigen(stack, lib, 20260802ull, 30000, 25, 60, 64, 128, gpu));
+
+    INFO("CPU k = " << cpu.k << ", GPU k = " << gpu.k);
+    REQUIRE(gpu.k > 0.95);  // near critical — a broken device transport correction gives ~1.12
+    REQUIRE(gpu.k < 1.06);
+    REQUIRE(std::abs(gpu.k - cpu.k) < 0.006);  // < 600 pcm: float-vs-double + independent sampling
+}

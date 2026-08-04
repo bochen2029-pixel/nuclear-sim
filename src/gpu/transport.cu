@@ -147,7 +147,6 @@ __global__ void k_step(SoA soa, DeviceLayerStack geom, DeviceMaterials mat, unsi
             terminal = true;
         } else {
             const float sigma_tr = mat.sigma_tr[L * 4 + grp];
-            const float sigma_t = mat.sigma_t[L * 4 + grp];
             const float to_boundary = d_distance_to_boundary(geom, pos, dir, L);
 
             if (sigma_tr <= 0.0f) {
@@ -175,25 +174,28 @@ __global__ void k_step(SoA soa, DeviceLayerStack geom, DeviceMaterials mat, unsi
                     // E1c — collision. Sample the isotope ∝ nᵢ·Σ_t,ᵢ.
                     const int begin = mat.slot_begin[L];
                     const int count = mat.slot_count[L];
-                    float pick = s.uniform_f() * sigma_t;
+                    // Collision on the transport-corrected medium (ADR-021), matching the
+                    // sigma_tr flight: select prop. to n_i*sigma_tr,i, split on sigma_tr,i,
+                    // reduced scatter share. mu_bar=0 => sigma_tr=sigma_t (analog, unchanged).
+                    float pick = s.uniform_f() * sigma_tr;
                     int chosen = begin;
                     for (int si = 0; si < count; ++si) {
                         const int slot = begin + si;
-                        pick -= mat.nd[slot] * d_group_sigma_t(mat.g[slot * 4 + grp]);
+                        pick -= mat.nd[slot] * d_group_sigma_tr(mat.g[slot * 4 + grp]);
                         if (pick <= 0.0f) {
                             chosen = slot;
                             break;
                         }
                     }
                     const DGroup gd = mat.g[chosen * 4 + grp];
-                    const float sigma_t_i = d_group_sigma_t(gd);
-                    if (sigma_t_i <= 0.0f) {
+                    const float sigma_tr_i = d_group_sigma_tr(gd);
+                    if (sigma_tr_i <= 0.0f) {
                         terminal = true;  // transparent isotope
                     } else {
-                        const float fission_share = gd.sigma_f / sigma_t_i;
+                        const float fission_share = gd.sigma_f / sigma_tr_i;
                         soa.score_prod[p] += w * gd.nu * fission_share;  // weight-weighted, expected
 
-                        w *= gd.sigma_s / sigma_t_i;  // implicit capture (never kill at fission)
+                        w *= (gd.sigma_s - (d_group_sigma_t(gd) - sigma_tr_i)) / sigma_tr_i;  // implicit capture
                         if (w <= 0.0f) {
                             terminal = true;
                         } else if (w < kWeightMin && s.uniform_f() > w / kWeightSurv) {

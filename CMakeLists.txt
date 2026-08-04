@@ -245,6 +245,7 @@ add_library(nukesim_core STATIC
     src/core/hash/sha256.cpp
     src/core/hash/crc32.cpp
     src/core/checkpoint/checkpoint.cpp
+    src/core/store/store.cpp
     src/core/xs/xs.cpp
     src/core/material/material.cpp
     src/core/scenario/scenario.cpp
@@ -345,6 +346,14 @@ target_link_libraries(test_checkpoint PRIVATE nukesim_core Catch2::Catch2WithMai
 target_include_directories(test_checkpoint PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
 nukesim_strict(test_checkpoint)
 catch_discover_tests(test_checkpoint TEST_PREFIX "checkpoint.")
+
+# sweep.db results store (M5-T2): the 03 §7 batch results DB (runs + cursor) +
+# unit_id idempotency (rerun = no-op, D6/D8). Core infra (src/core/store), not a
+# frontend (D7); sqlite3 arrives through nukesim_core -> nukesim_deps.
+add_executable(test_store tests/unit/test_store.cpp)
+target_link_libraries(test_store PRIVATE nukesim_core Catch2::Catch2WithMain)
+nukesim_strict(test_store)
+catch_discover_tests(test_store TEST_PREFIX "store.")
 
 add_executable(test_ref tests/unit/test_ref.cpp)
 target_link_libraries(test_ref PRIVATE nukesim_core Catch2::Catch2WithMain)

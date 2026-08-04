@@ -117,6 +117,15 @@ EvaluateResult evaluate(const DemonCoreAssembly& assembly);
 /// viz cfg JSON, evaluate, return the EvaluateResult JSON.
 std::string evaluate_json(const std::string& cfg_json);
 
+/// The idempotent dedup key for a StudioConfig run: `compute_unit_id(cfg canonical
+/// hash ‖ no-overrides ‖ seed)` (03 §6) — EXACTLY the `unit_id` generate_run
+/// records. Exposed so a sweep driver (nukefarm, M5-T3) can look up "already done"
+/// in the artifact store and SKIP a unit without re-running its burst. Note the
+/// canonical hash covers only the MODELLED demon-core knobs (mass, Pu-240,
+/// compression, initiator, generation time) — two cfgs differing only in an
+/// unmodelled knob (tamper/lens) are the same unit by construction.
+std::string studio_unit_id(const StudioConfig& cfg);
+
 /// The full demon-core burst as DATA (simstub.js generateRun, but REAL). The
 /// visualizer's "main course" tap. Physics only — the JS binding reconstructs the
 /// presentation closures (flux(t)/compression(t)) from `samples`/`tally`, so

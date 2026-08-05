@@ -24,18 +24,28 @@ SPEC_08 = REPO / "spec" / "08-validation.md"
 OUT = REPO / "data" / "benchmarks" / "gates.toml"
 
 # 08 §2 G0a/G0b: C-900 eigen; pass iff EVERY normative seed [1..5] has |k-1| <= 500 pcm +
-# benchmark_uncertainty (C-930) AND sigma <= 25 pcm (C-931). (G0c is differential -> M1-T5-b;
-# G1-G5 need later milestones. Adding them here is a pure data edit.)
+# benchmark_uncertainty (C-930) AND sigma <= 25 pcm (C-931).
+# G0c (differential, M1-T5-c-3): the ref eigen vs the gpu eigen on the SAME Godiva assembly must
+# agree -- |k_ref - k_gpu| <= C-932 (100 pcm) AND <= 3*sqrt(sig_ref^2+sig_gpu^2) (08 §2 criterion a),
+# on the fixed 3-seed set. `nukebench diff` runs both backends and compares; the k_equivalence_pcm
+# criterion records the C-932 threshold. (Criteria (b) per-shell + (c) population-series follow when
+# the GPU eigen exposes those series; G1-G5 need later milestones. Adding gates here is a data edit.)
 _C900 = {"batch": 1000000, "inactive": 50, "active": 200}
 _BARE_CRITERIA = [
     {"name": "k_deviation_pcm", "op": "abs_le", "constant_id": "C-930"},
     {"name": "sigma_pcm", "op": "le", "constant_id": "C-931"},
+]
+_DIFF_CRITERIA = [
+    {"name": "k_equivalence_pcm", "op": "abs_le", "constant_id": "C-932"},
 ]
 GATES = [
     {"id": "G0a", "title": "Godiva bare-sphere k_eff", "scenario": "data/scenarios/godiva.toml",
      "seeds": [1, 2, 3, 4, 5], "eigen": _C900, "criteria": _BARE_CRITERIA},
     {"id": "G0b", "title": "Jezebel bare-sphere k_eff", "scenario": "data/scenarios/jezebel.toml",
      "seeds": [1, 2, 3, 4, 5], "eigen": _C900, "criteria": _BARE_CRITERIA},
+    {"id": "G0c", "title": "Godiva ref-vs-gpu k equivalence (cross-backend differential)",
+     "scenario": "data/scenarios/godiva.toml", "seeds": [1, 2, 3], "eigen": _C900,
+     "criteria": _DIFF_CRITERIA},
 ]
 
 

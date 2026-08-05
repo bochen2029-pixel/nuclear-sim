@@ -694,3 +694,39 @@ TEST_CASE("nukebench run_gate gpu backend produces sane measurements matching th
     INFO("gpu mean k = " << gpu_k << ", ref mean k = " << ref_k);
     REQUIRE(std::abs(gpu_k - ref_k) < 0.006);  // < 600 pcm (float-vs-double + independent sampling)
 }
+
+TEST_CASE("nukebench run_diff computes the G0c ref-vs-gpu k-equivalence differential", "[gpu]") {
+    // M1-T5-c-3: run_diff runs G0c on ref + gpu and reports the per-seed |k_ref - k_gpu| differential
+    // vs C-932 (100 pcm) AND <= 3 sigma (08 sec 2 G0c criterion a). Reduced batch -> the diff
+    // MECHANICS (both backends, k_b populated, delta = |k - k_b|, backend "ref|gpu"), not C-900
+    // precision. fast4 must exist.
+    const auto repo = spec_examples::repo_root();
+    if (!std::filesystem::exists(repo / "data" / "xs" / "fast4.json")) {
+        WARN("data/xs/fast4.json absent — skipping run_diff");
+        return;
+    }
+    const auto cfg = ns::nukebench::load_gates(repo / "data" / "benchmarks" / "gates.toml",
+                                               repo / "spec" / "08-validation.md");
+    const auto g0c = ns::nukebench::find_gate(cfg, "G0c");  // copy: dodge gcc -Wdangling-reference
+    REQUIRE(g0c.seeds.size() == 3);  // the fixed 3-seed differential set (08 sec 2)
+
+    const auto rep = ns::nukebench::run_diff(g0c, repo, "ref", "gpu", 3000);
+    REQUIRE(rep.gate == "G0c");
+    REQUIRE(rep.backend == "ref|gpu");
+    REQUIRE(rep.attempts.size() == 3);
+    for (const auto& a : rep.attempts) {
+        REQUIRE(a.k > 0.95);    // k_ref, near-critical bare fast metal
+        REQUIRE(a.k_b > 0.95);  // k_gpu populated
+        REQUIRE(a.k < 1.10);
+        REQUIRE(a.k_b < 1.10);
+        // the reported deviation IS the |k_ref - k_gpu| differential (pcm)
+        REQUIRE(std::abs(a.k_deviation_pcm - std::abs(a.k - a.k_b) * 1e5) < 1e-6);
+        REQUIRE(a.criteria.size() == 2);  // <= C-932 AND <= 3 sigma
+        REQUIRE((a.verdict == "pass" || a.verdict == "fail"));
+    }
+    REQUIRE((rep.verdict == "pass" || rep.verdict == "fail"));
+    // JSON round-trip preserves k_b (the diff-only measurement)
+    const auto rt = ns::nukebench::parse_report_json(ns::nukebench::to_json(rep));
+    REQUIRE(rt.attempts.size() == 3);
+    REQUIRE(std::abs(rt.attempts[0].k_b - rep.attempts[0].k_b) < 1e-9);
+}

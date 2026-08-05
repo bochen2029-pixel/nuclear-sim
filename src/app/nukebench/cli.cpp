@@ -80,4 +80,31 @@ GateOutcome cli_gate(const std::string& gate_id, const std::filesystem::path& re
     return out;
 }
 
+GateOutcome cli_diff(const std::string& gate_id, const std::filesystem::path& repo,
+                     const std::filesystem::path& report_path, std::int64_t batch_override,
+                     bool dirty, const std::string& git, const std::string& device) {
+    const auto gates_toml = repo / "data" / "benchmarks" / "gates.toml";
+    const auto spec08 = repo / "spec" / "08-validation.md";
+    const GatesConfig cfg = load_gates(gates_toml, spec08);  // spec_sha256 + drift guards
+    const Gate& gate = find_gate(cfg, gate_id);
+
+    const std::string started = iso8601_utc_now();
+    GateReport rep = run_diff(gate, repo, "ref", "gpu", batch_override);  // gpu needs a CUDA build
+    rep.finished = iso8601_utc_now();
+    rep.started = started;
+    rep.gates_toml_sha256 = ns::hash::sha256_hex(norm_lf(read_file(gates_toml)));
+    rep.spec_sha256 = cfg.spec_sha256;
+    rep.code_version = "0.1.0";
+    rep.git = git;
+    rep.device = device;
+    rep.dirty = dirty;
+
+    const std::string verdict = write_report_append(report_path, rep);
+    GateOutcome out;
+    out.verdict = verdict;
+    out.report_path = report_path;
+    out.exit_code = (verdict == "pass") ? 0 : 4;
+    return out;
+}
+
 }  // namespace ns::nukebench

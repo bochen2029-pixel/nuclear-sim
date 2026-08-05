@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "gate": "G0a",
+  "verdict": "fail",
+  "gates_toml_sha256": "5576d46d9dc88063275028086cf5464b695f3747d117e7f0f24c944e7e2c78fd",
+  "spec_sha256": "8dc025c0588905a61c3503d3f7a6e1b81ba94e7eec95a4ba6a0046edd04f77aa",
+  "code_version": "0.1.0",
+  "git": "2ced34f",
+  "dirty": false,
+  "backend": "ref",
+  "device": "Intel Core i9-9900K @ 3.60GHz (CPU ref, win-x64)",
+  "started": "2026-08-05T14:41:19Z",
+  "finished": "2026-08-05T15:52:18Z",
+  "attempts": [
+    {
+      "attempt": 1,
+      "seed": 1,
+      "verdict": "fail",
+      "measurements": {
+        "k": 1.0256172191620185,
+        "sigma_pcm": 5.576455829548913,
+        "k_deviation_pcm": 2561.721916201853
+      },
+      "criteria": [
+        {
+          "name": "k_deviation_pcm",
+          "value": 2561.721916201853,
+          "op": "abs_le",
+          "threshold": 500.0,
+          "pass": false
+        },
+        {
+          "name": "sigma_pcm",
+          "value": 5.576455829548913,
+          "op": "le",
+          "threshold": 25.0,
+          "pass": true
+        }
+      ],
+      "run_dir": ""
+    },
+    {
+      "attempt": 2,
+      "seed": 2,
+      "verdict": "fail",
+      "measurements": {
+        "k": 1.0256338662928388,
+        "sigma_pcm": 6.15637328869923,
+        "k_deviation_pcm": 2563.3866292838816
+      },
+      "criteria": [
+        {
+          "name": "k_deviation_pcm",
+          "value": 2563.3866292838816,
+          "op": "abs_le",
+          "threshold": 500.0,
+          "pass": false
+        },
+        {
+          "name": "sigma_pcm",
+          "value": 6.15637328869923,
+          "op": "le",
+          "threshold": 25.0,
+          "pass": true
+        }
+      ],
+      "run_dir": ""
+    },
+    {
+      "attempt": 3,
+      "seed": 3,
+      "verdict": "fail",
+      "measurements": {
+        "k": 1.0256413689692565,
+        "sigma_pcm": 4.953646969887542,
+        "k_deviation_pcm": 2564.1368969256505
+      },
+      "criteria": [
+        {
+          "name": "k_deviation_pcm",
+          "value": 2564.1368969256505,
+          "op": "abs_le",
+          "threshold": 500.0,
+          "pass": false
+        },
+        {
+          "name": "sigma_pcm",
+          "value": 4.953646969887542,
+          "op": "le",
+          "threshold": 25.0,
+          "pass": true
+        }
+      ],
+      "run_dir": ""
+    },
+    {
+      "attempt": 4,
+      "seed": 4,
+      "verdict": "fail",
+      "measurements": {
+        "k": 1.0255629031421707,
+        "sigma_pcm": 4.654132070658297,
+        "k_deviation_pcm": 2556.290314217069
+      },
+      "criteria": [
+        {
+          "name": "k_deviation_pcm",
+          "value": 2556.290314217069,
+          "op": "abs_le",
+          "threshold": 500.0,
+          "pass": false
+        },
+        {
+          "name": "sigma_pcm",
+          "value": 4.654132070658297,
+          "op": "le",
+          "threshold": 25.0,
+          "pass": true
+        }
+      ],
+      "run_dir": ""
+    },
+    {
+      "attempt": 5,
+      "seed": 5,
+      "verdict": "fail",
+      "measurements": {
+        "k": 1.0255486780805048,
+        "sigma_pcm": 5.685047689252198,
+        "k_deviation_pcm": 2554.867808050476
+      },
+      "criteria": [
+        {
+          "name": "k_deviation_pcm",
+          "value": 2554.867808050476,
+          "op": "abs_le",
+          "threshold": 500.0,
+          "pass": false
+        },
+        {
+          "name": "sigma_pcm",
+          "value": 5.685047689252198,
+          "op": "le",
+          "threshold": 25.0,
+          "pass": true
+        }
+      ],
+      "run_dir": ""
+    }
+  ]
+}

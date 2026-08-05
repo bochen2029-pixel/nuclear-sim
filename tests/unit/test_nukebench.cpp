@@ -169,3 +169,26 @@ TEST_CASE("cli_gate writes the report and returns a pass/fail exit code", "[nuke
     REQUIRE(!rep.spec_sha256.empty());
     fs::remove(report);
 }
+
+TEST_CASE("cli_gate records git/device/timestamp provenance (03 sec 11)", "[nukebench]") {
+    // A committed gate report is void without honest provenance (QC-07): the code hash it was
+    // produced from, the device, and when. This is the M1-T5-c-1 completion of the fields the
+    // M1-T5-b runner left empty.
+    if (!std::filesystem::exists(repo() / "data" / "xs" / "fast4.json")) {
+        WARN("data/xs/fast4.json absent — skipping cli_gate provenance");
+        return;
+    }
+    const auto report = fs::temp_directory_path() / "nukebench_cli_g0a_prov.json";
+    fs::remove(report);
+    ns::nukebench::cli_gate("G0a", repo(), report, "ref", 2000, false, "abc1234", "CPU ref (test)");
+    const auto rep = ns::nukebench::parse_report_json(slurp(report));
+    REQUIRE(rep.git == "abc1234");             // threaded through from the CLI
+    REQUIRE(rep.device == "CPU ref (test)");
+    REQUIRE(rep.backend == "ref");
+    REQUIRE(rep.code_version == "0.1.0");
+    REQUIRE(rep.started.size() == 20);         // ISO-8601 "YYYY-MM-DDTHH:MM:SSZ"
+    REQUIRE(rep.finished.size() == 20);
+    REQUIRE(rep.started.back() == 'Z');        // UTC
+    REQUIRE(rep.finished >= rep.started);       // finished after started (ISO-8601 sorts lexically)
+    fs::remove(report);
+}

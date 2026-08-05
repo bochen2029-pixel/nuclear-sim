@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
 
     auto* gate = app.add_subcommand("gate", "Run a gate's procedure over its normative seeds "
                                             "-> gate_report.json (03 sec 11)");
-    std::string gate_id, report, backend = "ref", repo_str;
+    std::string gate_id, report, backend = "ref", repo_str, git_hash, device;
     std::int64_t batch = 0, seed = 0;
     bool dirty = false;
     gate->add_option("--gate", gate_id, "gate id, e.g. G0a")->required();
@@ -29,6 +29,8 @@ int main(int argc, char** argv) {
     auto* seed_opt = gate->add_option("--seed", seed, "REJECTED with --gate (08 sec 2)");
     gate->add_flag("--dirty", dirty, "mark the tree dirty (verdict capped at conditional)");
     gate->add_option("--repo", repo_str, "repo root (default: cwd)");
+    gate->add_option("--git", git_hash, "short commit hash of the code (provenance, 03 sec 11)");
+    gate->add_option("--device", device, "device string (provenance, e.g. \"CPU ref\")");
 
     CLI11_PARSE(app, argc, argv);
 
@@ -43,7 +45,8 @@ int main(int argc, char** argv) {
             const std::filesystem::path report_path =
                 report.empty() ? ns::nukebench::default_report_path(repo, gate_id)
                                : std::filesystem::path(report);
-            const auto out = ns::nukebench::cli_gate(gate_id, repo, report_path, backend, batch, dirty);
+            const auto out = ns::nukebench::cli_gate(gate_id, repo, report_path, backend, batch,
+                                                     dirty, git_hash, device);
             std::printf("gate %s: %s  (report: %s)\n", gate_id.c_str(), out.verdict.c_str(),
                         out.report_path.string().c_str());
             return out.exit_code;  // 0 pass, 4 gate-fail

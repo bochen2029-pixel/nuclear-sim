@@ -7,6 +7,9 @@
 #include "core/xs/xs.h"
 #include "physics/eigen/eigen.h"
 #include "ref/ref_transport.h"
+#ifdef NUKESIM_WITH_CUDA
+#include "gpu/eigen.h"  // host-callable gpu_eigen (M1-T5-c-2); CUDA-guarded
+#endif
 
 #include <nlohmann/json.hpp>
 
@@ -37,8 +40,8 @@ double measured_for(const std::string& name, const Attempt& a) {
 
 GateReport run_gate(const Gate& gate, const std::filesystem::path& repo,
                     const std::string& backend, std::int64_t eigen_batch_override) {
-    if (backend != "ref") {
-        throw GatesError("run_gate: backend '" + backend + "' not supported (ref only in M1-T5-b)");
+    if (backend != "ref" && backend != "gpu") {
+        throw GatesError("run_gate: backend '" + backend + "' not supported (expected ref|gpu)");
     }
     // Assembly (mirrors the M1-T4a-2a gate_probe): the gate's scenario gives the material +
     // radius; the gate's own seeds + [gate.eigen] config drive the run (not the scenario's).
@@ -62,20 +65,40 @@ GateReport run_gate(const Gate& gate, const std::filesystem::path& repo,
     bool all_pass = true;
     int n = 0;
     for (const std::int64_t seed : gate.seeds) {
-        ns::ref::RefTransport transport(stack, lib, xs, static_cast<std::uint64_t>(seed));
-        ns::physics::EigenSpec spec;
-        spec.batch = batch;
-        spec.inactive = gate.eigen.inactive;
-        spec.active = gate.eigen.active;
-        spec.seed = static_cast<std::uint64_t>(seed);
-        const auto res = ns::physics::run_eigen(transport, spec);
+        double k = 0.0, sigma_pcm = 0.0;
+        if (backend == "ref") {
+            ns::ref::RefTransport transport(stack, lib, xs, static_cast<std::uint64_t>(seed));
+            ns::physics::EigenSpec spec;
+            spec.batch = batch;
+            spec.inactive = gate.eigen.inactive;
+            spec.active = gate.eigen.active;
+            spec.seed = static_cast<std::uint64_t>(seed);
+            const auto res = ns::physics::run_eigen(transport, spec);
+            k = res.k;
+            sigma_pcm = res.sigma_pcm;
+        } else {  // "gpu" (validated above)
+#ifdef NUKESIM_WITH_CUDA
+            // The GPU eigen's result is invariant to launch geometry (gpu/eigen.h); 256x128 is a
+            // proven config that handles the C-900 batch. GPU-vs-ref parity is ADR-021.
+            ns::gpu::EigenResultGpu out;
+            if (!ns::gpu::gpu_eigen(stack, lib, static_cast<std::uint64_t>(seed), batch,
+                                    gate.eigen.inactive, gate.eigen.active, 256, 128, out)) {
+                throw GatesError("gate " + gate.id + ": gpu_eigen failed at seed "
+                                 + std::to_string(seed));
+            }
+            k = out.k;
+            sigma_pcm = out.k_sigma * 1e5;  // k_sigma = standard error of k -> pcm
+#else
+            throw GatesError("run_gate: gpu backend requires a CUDA build (NUKESIM_WITH_CUDA is OFF)");
+#endif
+        }
 
         Attempt a;
         a.attempt = ++n;
         a.seed = seed;
-        a.k = res.k;
-        a.sigma_pcm = res.sigma_pcm;
-        a.k_deviation_pcm = (res.k - 1.0) * 1e5;
+        a.k = k;
+        a.sigma_pcm = sigma_pcm;
+        a.k_deviation_pcm = (k - 1.0) * 1e5;
 
         bool seed_pass = true;
         for (const auto& c : gate.criteria) {

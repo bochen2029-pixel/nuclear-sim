@@ -335,7 +335,7 @@ range = [0.0, 8.0]
     }
 }
 
-TEST_CASE("mcts is rejected as not yet available", "[nukefarm]") {
+TEST_CASE("mcts builds from a calibrate manifest and returns a valid first point", "[nukefarm]") {
     const char* doc = R"(
 name = "x"
 base_scenario = "s.toml"

@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "gate": "G0c",
+  "verdict": "pass",
+  "gates_toml_sha256": "6fe7ffee9dae834b117ae87c26009f9a14b12db2f94a091258d52f3e30bdd2d7",
+  "spec_sha256": "8dc025c0588905a61c3503d3f7a6e1b81ba94e7eec95a4ba6a0046edd04f77aa",
+  "code_version": "0.1.0",
+  "git": "d61e0f2",
+  "dirty": false,
+  "backend": "ref|gpu",
+  "device": "ref i9-9900K + RTX 4070 Ti SUPER (sm_89)",
+  "started": "2026-08-05T19:38:12Z",
+  "finished": "2026-08-05T20:20:21Z",
+  "attempts": [
+    {
+      "attempt": 1,
+      "seed": 1,
+      "verdict": "pass",
+      "measurements": {
+        "k": 1.0256172191620185,
+        "sigma_pcm": 7.8297528903630775,
+        "k_deviation_pcm": 8.10449218429099,
+        "k_b": 1.0255361742401756
+      },
+      "criteria": [
+        {
+          "name": "k_equivalence_pcm",
+          "value": 8.10449218429099,
+          "op": "abs_le",
+          "threshold": 100.0,
+          "pass": true
+        },
+        {
+          "name": "k_equivalence_within_3sigma",
+          "value": 8.10449218429099,
+          "op": "le",
+          "threshold": 23.48925867108923,
+          "pass": true
+        }
+      ],
+      "run_dir": ""
+    },
+    {
+      "attempt": 2,
+      "seed": 2,
+      "verdict": "pass",
+      "measurements": {
+        "k": 1.0256338662928388,
+        "sigma_pcm": 8.30385243069134,
+        "k_deviation_pcm": 3.8865149697420165,
+        "k_b": 1.0255950011431414
+      },
+      "criteria": [
+        {
+          "name": "k_equivalence_pcm",
+          "value": 3.8865149697420165,
+          "op": "abs_le",
+          "threshold": 100.0,
+          "pass": true
+        },
+        {
+          "name": "k_equivalence_within_3sigma",
+          "value": 3.8865149697420165,
+          "op": "le",
+          "threshold": 24.91155729207402,
+          "pass": true
+        }
+      ],
+      "run_dir": ""
+    },
+    {
+      "attempt": 3,
+      "seed": 3,
+      "verdict": "pass",
+      "measurements": {
+        "k": 1.0256413689692565,
+        "sigma_pcm": 7.813391235717239,
+        "k_deviation_pcm": 6.983545566341398,
+        "k_b": 1.02571120442492
+      },
+      "criteria": [
+        {
+          "name": "k_equivalence_pcm",
+          "value": 6.983545566341398,
+          "op": "abs_le",
+          "threshold": 100.0,
+          "pass": true
+        },
+        {
+          "name": "k_equivalence_within_3sigma",
+          "value": 6.983545566341398,
+          "op": "le",
+          "threshold": 23.440173707151715,
+          "pass": true
+        }
+      ],
+      "run_dir": ""
+    }
+  ]
+}

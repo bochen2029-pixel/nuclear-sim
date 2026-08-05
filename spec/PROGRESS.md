@@ -26,7 +26,7 @@
 |---|---|---|---|
 | G0a | **fail** — OUTSIDE band (honest, C-900 committed) | Godiva **+2560 pcm** (C-900 1e6×250, 5-seed mean k=1.02560; σ≤6 pcm < C-931 25 ⇒ σ-criterion PASSES, only k-dev fails — the 4-group residual, not statistics); **`artifacts/gate_reports/G0a/gate_report.json`** (QC-07); ADR-022 | 2026-08-05 |
 | G0b | **fail** — OUTSIDE band (honest, C-900 committed) | Jezebel **+1601 pcm** (C-900 1e6×250, 5-seed mean k=1.01601; σ≤7 pcm < 25); **`artifacts/gate_reports/G0b/gate_report.json`** (QC-07); ADR-022 | 2026-08-05 |
-| G0c | not_run | — | — |
+| G0c | **PASS** (C-900, committed) | Godiva ref-vs-gpu k-equivalence: mean **\|Δk\| = 6.3 pcm** (seeds 8.1 / 3.9 / 7.0; ≤ C-932 100 pcm AND ≤ 3σ ≈24 pcm) — the **FIRST passing gate**; the cross-backend proof of ADR-021 (GPU float32 ≡ CPU double eigen on the μ̄≠0 fast4 Godiva). **`artifacts/gate_reports/G0c/gate_report.json`** (QC-07) | 2026-08-05 |
 | G1a | not_run | — | — |
 | G1a-tight (report-only) | not_run | — | — |
 | G1b | not_run | — | — |

@@ -31,4 +31,11 @@ GateOutcome cli_gate(const std::string& gate_id, const std::filesystem::path& re
                      std::int64_t batch_override, bool dirty, const std::string& git = "",
                      const std::string& device = "");
 
+/// Run the **G0c** cross-backend differential for gate `gate_id` (ref vs gpu) and write the 03 §11
+/// report (append-only) to `report_path`. Needs a CUDA build (the gpu backend; else run_gate throws
+/// -> GatesError -> main exit 3). Same provenance + exit-code contract as cli_gate (0 pass / 4 fail).
+GateOutcome cli_diff(const std::string& gate_id, const std::filesystem::path& repo,
+                     const std::filesystem::path& report_path, std::int64_t batch_override,
+                     bool dirty, const std::string& git = "", const std::string& device = "");
+
 }  // namespace ns::nukebench

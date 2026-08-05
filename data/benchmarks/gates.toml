@@ -45,3 +45,18 @@ op = "le"
 value = 25
 constant_id = "C-931"
 
+[[gate]]
+id = "G0c"
+title = "Godiva ref-vs-gpu k equivalence (cross-backend differential)"
+scenario = "data/scenarios/godiva.toml"
+seeds = [1, 2, 3]
+[gate.eigen]
+batch = 1000000
+inactive = 50
+active = 200
+[[gate.criterion]]
+name = "k_equivalence_pcm"
+op = "abs_le"
+value = 100
+constant_id = "C-932"
+

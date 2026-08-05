@@ -119,6 +119,60 @@ GateReport run_gate(const Gate& gate, const std::filesystem::path& repo,
     return rep;
 }
 
+GateReport run_diff(const Gate& gate, const std::filesystem::path& repo,
+                    const std::string& backend_a, const std::string& backend_b,
+                    std::int64_t eigen_batch_override) {
+    // Run the SAME gate on both backends (reusing run_gate), then compare per seed (08 §2 G0c a).
+    const GateReport ra = run_gate(gate, repo, backend_a, eigen_batch_override);
+    const GateReport rb = run_gate(gate, repo, backend_b, eigen_batch_override);
+    if (ra.attempts.size() != rb.attempts.size()) {
+        throw GatesError("run_diff: backend attempt counts differ for gate " + gate.id);
+    }
+    // The equivalence bound C-932 (pcm), from the gate's criterion (the loader drift-guarded it).
+    double bound_pcm = 0.0;
+    for (const auto& c : gate.criteria) {
+        if (c.name == "k_equivalence_pcm") bound_pcm = c.value;
+    }
+    if (bound_pcm <= 0.0) {
+        throw GatesError("gate " + gate.id +
+                         ": run_diff needs a k_equivalence_pcm criterion (C-932)");
+    }
+
+    GateReport rep;
+    rep.gate = gate.id;
+    rep.backend = backend_a + "|" + backend_b;
+    bool all_pass = true;
+    for (std::size_t i = 0; i < ra.attempts.size(); ++i) {
+        const auto& a = ra.attempts[i];
+        const auto& b = rb.attempts[i];
+        const double delta_pcm = std::abs(a.k - b.k) * 1e5;
+        const double comb_sigma =
+            std::sqrt(a.sigma_pcm * a.sigma_pcm + b.sigma_pcm * b.sigma_pcm);
+
+        Attempt d;
+        d.attempt = static_cast<int>(i + 1);
+        d.seed = a.seed;
+        d.k = a.k;                  // backend_a's k
+        d.k_b = b.k;                // backend_b's k
+        d.sigma_pcm = comb_sigma;
+        d.k_deviation_pcm = delta_pcm;
+
+        // 08 §2 G0c (a): |k_a − k_b| ≤ C-932 (absolute equivalence bound) AND ≤ 3·combined σ.
+        CriterionResult abs_c{"k_equivalence_pcm", "abs_le", delta_pcm, bound_pcm,
+                              delta_pcm <= bound_pcm};
+        CriterionResult sig_c{"k_equivalence_within_3sigma", "le", delta_pcm, 3.0 * comb_sigma,
+                              delta_pcm <= 3.0 * comb_sigma};
+        const bool seed_pass = abs_c.pass && sig_c.pass;
+        d.criteria.push_back(abs_c);
+        d.criteria.push_back(sig_c);
+        d.verdict = seed_pass ? "pass" : "fail";
+        all_pass = all_pass && seed_pass;
+        rep.attempts.push_back(std::move(d));
+    }
+    rep.verdict = all_pass ? "pass" : "fail";  // the caller downgrades to conditional if dirty
+    return rep;
+}
+
 std::string to_json(const GateReport& r) {
     json j;
     j["schema_version"] = r.schema_version;
@@ -141,6 +195,7 @@ std::string to_json(const GateReport& r) {
         ja["verdict"] = a.verdict;
         ja["measurements"] = {{"k", a.k}, {"sigma_pcm", a.sigma_pcm},
                               {"k_deviation_pcm", a.k_deviation_pcm}};
+        if (a.k_b != 0.0) ja["measurements"]["k_b"] = a.k_b;  // G0c diff: the second backend's k
         ja["criteria"] = json::array();
         for (const auto& c : a.criteria) {
             ja["criteria"].push_back({{"name", c.name}, {"value", c.value}, {"op", c.op},
@@ -177,6 +232,7 @@ GateReport parse_report_json(const std::string& text) {
         a.k = m.value("k", 0.0);
         a.sigma_pcm = m.value("sigma_pcm", 0.0);
         a.k_deviation_pcm = m.value("k_deviation_pcm", 0.0);
+        a.k_b = m.value("k_b", 0.0);  // G0c diff (absent in single-backend reports -> 0)
         for (const auto& jc : ja.value("criteria", json::array())) {
             CriterionResult c;
             c.name = jc.value("name", "");

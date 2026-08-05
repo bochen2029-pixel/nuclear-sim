@@ -29,7 +29,9 @@ struct Attempt {
     std::string verdict;             // "pass" | "fail"
     double k = 0.0;
     double sigma_pcm = 0.0;
-    double k_deviation_pcm = 0.0;    // (k - 1) * 1e5
+    double k_deviation_pcm = 0.0;    // (k - 1) * 1e5  (for a diff report: |k_a - k_b| in pcm)
+    double k_b = 0.0;                // G0c diff only: the SECOND backend's k (k = k_a, k_b = k_b);
+                                     // 0 for a single-backend report (then not emitted)
     std::vector<CriterionResult> criteria;
     std::string run_dir;             // may be empty (bundle untracked; report stands alone)
 };
@@ -61,6 +63,15 @@ GateReport parse_report_json(const std::string& json);
 /// provenance fields (git/dirty/timestamps) to the caller.
 GateReport run_gate(const Gate& gate, const std::filesystem::path& repo,
                     const std::string& backend, std::int64_t eigen_batch_override = 0);
+
+/// Run `gate` on TWO backends and evaluate the G0c cross-backend differential (08 §2 criterion a):
+/// per seed, |k_a - k_b| ≤ C-932 (100 pcm) AND ≤ 3·√(σ_a²+σ_b²). Reuses `run_gate` for each backend
+/// (so `backend_b = "gpu"` needs a CUDA build — else it throws). The report's `backend` is "a|b";
+/// per attempt `k = k_a`, `k_b = k_b`, `k_deviation_pcm = |k_a − k_b|·1e5`, `sigma_pcm` = the combined
+/// σ. Criteria b (per-shell) / c (population-series) are deferred (the GPU eigen doesn't expose them).
+GateReport run_diff(const Gate& gate, const std::filesystem::path& repo,
+                    const std::string& backend_a, const std::string& backend_b,
+                    std::int64_t eigen_batch_override = 0);
 
 /// Write `report` to `path`, appending its attempts to any existing report there (attempt
 /// numbers continue; the overall verdict is recomputed over ALL attempts). Append-only is the

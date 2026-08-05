@@ -123,6 +123,32 @@ a **single continuous clock**, spatially + temporally resolved (`samples[].sites
 `population_series`, `fields.f16` `fission_rate`, one SimClock) so this vision is expressible without
 any physics rewrite.
 
+### 3.2 Reconciliation DONE — branch `viz/reconcile-true3d` (2026-08-05, a reviewable hand-off)
+
+Both (a) and (b) above are done, in an **isolated git worktree** (zero contact with the -e session's
+live uncommitted `viz/` WIP). Branch **`viz/reconcile-true3d`** (`705dcb9`): `viz/js/pitscope.js`
+(513 L) + `viz/js/scenario.js` (67 L). All four ADR-023 clauses met in one file:
+- **② true 3D:** atom-proto's `InstancedMesh` sphere-nuclei that heat/swell/**split into instanced
+  fragments** + `LineSegments` neutron streaks (no `THREE.Points`).
+- **③ zoom = focus, not a mode (the new work):** the old `toggle()` `dev.root.visible = !active` is
+  **gone**. The device stays visible; entering **dollies the camera in along the sightline** to a
+  close default framing on the pit; the instant the glide lands, **OrbitControls regains full
+  control** (zoom out to the whole device, zoom in further, orbit/pan); exit dollies back out. A
+  camera-facing cutaway clip (`09 §2`) reveals the core **without** hiding the device — one scene.
+- **①/④ one clock + real sites:** consumes `run.samples[].sites[]` on the same `runT`; the site
+  contract (pos cm / group / isotope / layer) is **confirmed identical** for `studio-adapter` (real)
+  and `simstub` (synthetic), O(N).
+
+**Adoption recipe (for the -e track — a drop-in, no `main.js` change required):** the reconciled
+`pitscope.js` keeps the exact `createPitScope({THREE,scene,camera,controls,dev,getRun,getCfg})`
+contract the -e `main.js` already calls. (1) drop in `viz/js/pitscope.js` + ensure
+`viz/js/scenario.js` present; (2) optional bump `./pitscope.js?v=2`→`?v=3`; (3) optional restore
+labels post-exit (`updateLabels`: `|| micro)` → `|| (micro && micro.active))`); (4) if `main.js`
+already drives the device clip on open, pass `cutawayDevice:false`. **Verified:** `node --check`-clean,
+true-3D present, mode-switch gone, contract matches. **Visual render-verify is the -e adoption step**
+(the host wiring is the -e's uncommitted `main.js`, so it can't run standalone here). `main` is
+unchanged; this is a reviewable branch, not a merge.
+
 ---
 
 ## 4. The contract map (verified end-to-end 2026-08-05)

@@ -22,10 +22,13 @@ std::filesystem::path default_report_path(const std::filesystem::path& repo,
 /// Run gate `gate_id` (from gates.toml under `repo`) over its normative seeds and write the
 /// 03 §11 report to `report_path` (append-only). `backend` ∈ {"ref"}; `batch_override` > 0
 /// runs a reduced batch (quick looks / tests); `dirty` caps a passing verdict at conditional.
-/// Throws ns::nukebench::GatesError on a validation failure (unknown gate, spec_sha256
-/// mismatch) — main maps that to exit 3. exit_code is 0 iff the final verdict is "pass".
+/// `git` (short commit hash of the code that produced the run) + `device` are recorded as
+/// provenance; `started`/`finished` (ISO-8601 UTC) are stamped around the run. Throws
+/// ns::nukebench::GatesError on a validation failure (unknown gate, spec_sha256 mismatch) —
+/// main maps that to exit 3. exit_code is 0 iff the final verdict is "pass".
 GateOutcome cli_gate(const std::string& gate_id, const std::filesystem::path& repo,
                      const std::filesystem::path& report_path, const std::string& backend,
-                     std::int64_t batch_override, bool dirty);
+                     std::int64_t batch_override, bool dirty, const std::string& git = "",
+                     const std::string& device = "");
 
 }  // namespace ns::nukebench

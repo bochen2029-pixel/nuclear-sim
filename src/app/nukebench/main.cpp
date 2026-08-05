@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
     bool dirty = false;
     gate->add_option("--gate", gate_id, "gate id, e.g. G0a")->required();
     gate->add_option("--report", report, "report path (default artifacts/gate_reports/<gate>/)");
-    gate->add_option("--backend", backend, "ref (default)");
+    gate->add_option("--backend", backend, "ref|gpu (default ref; gpu needs a CUDA build)");
     gate->add_option("--batch", batch, "reduced eigen batch for a quick look (default: gate C-900)");
     auto* seed_opt = gate->add_option("--seed", seed, "REJECTED with --gate (08 sec 2)");
     gate->add_flag("--dirty", dirty, "mark the tree dirty (verdict capped at conditional)");

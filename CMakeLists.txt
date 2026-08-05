@@ -494,8 +494,17 @@ if(NUKESIM_WITH_CUDA)
         $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
     nukesim_strict(nukesim_gpu)
 
+    # M1-T5-c-2: the nukebench gate runner gains a CUDA-guarded gpu backend (run_gate
+    # dispatches ref|gpu). Link nukesim_gpu into the nukebench lib + define the guard,
+    # ONLY inside this CUDA block -- on a CPU-only build the gpu path #ifdefs out and
+    # `nukebench gate --backend gpu` throws a clear "not built with CUDA" error, and the
+    # nukebench lib never pulls in CUDA. CI (CUDA OFF) is unaffected.
+    target_link_libraries(nukesim_nukebench PRIVATE nukesim_gpu)
+    target_compile_definitions(nukesim_nukebench PRIVATE NUKESIM_WITH_CUDA=1)
+
     add_executable(test_gpu tests/unit/test_gpu.cpp)
-    target_link_libraries(test_gpu PRIVATE nukesim_gpu Catch2::Catch2WithMain)
+    # links nukesim_nukebench too so the gpu-backend gate test can call run_gate (M1-T5-c-2)
+    target_link_libraries(test_gpu PRIVATE nukesim_gpu nukesim_nukebench Catch2::Catch2WithMain)
     target_include_directories(test_gpu PRIVATE ${CMAKE_SOURCE_DIR}/tests/unit)
     # spec_examples.h (used to build toy loader inputs) references it even in the
     # inline helpers this TU does not call, so it must be defined to compile.

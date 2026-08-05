@@ -35,6 +35,9 @@
 #include "physics/eigen/eigen.h"
 #include "ref/ref_transport.h"
 
+#include "app/nukebench/gate_report.h"  // M1-T5-c-2: exercise run_gate's gpu backend
+#include "app/nukebench/gates.h"
+
 #include "rng_kat.inl"
 #include "spec_examples.h"
 
@@ -653,4 +656,41 @@ TEST_CASE("GPU eigen matches the CPU oracle on the fast4 Godiva assembly (ADR-02
     REQUIRE(gpu.k > 0.95);  // near critical — a broken device transport correction gives ~1.12
     REQUIRE(gpu.k < 1.06);
     REQUIRE(std::abs(gpu.k - cpu.k) < 0.006);  // < 600 pcm: float-vs-double + independent sampling
+}
+
+TEST_CASE("nukebench run_gate gpu backend produces sane measurements matching the ref oracle",
+          "[gpu]") {
+    // M1-T5-c-2: run_gate --backend gpu dispatches to gpu_eigen and reports k / sigma_pcm
+    // (= k_sigma x 1e5). It must agree with the ref oracle (ADR-021 parity) on the same gate.
+    // Reduced batch -> the runner MECHANICS (per-seed attempts, k_sigma->pcm, the backend field),
+    // not C-900 precision. fast4 must exist.
+    const auto repo = spec_examples::repo_root();
+    if (!std::filesystem::exists(repo / "data" / "xs" / "fast4.json")) {
+        WARN("data/xs/fast4.json absent — skipping the gpu run_gate check");
+        return;
+    }
+    const auto cfg = ns::nukebench::load_gates(repo / "data" / "benchmarks" / "gates.toml",
+                                               repo / "spec" / "08-validation.md");
+    const auto g0a = ns::nukebench::find_gate(cfg, "G0a");  // copy: dodge gcc -Wdangling-reference
+
+    const auto gpu = ns::nukebench::run_gate(g0a, repo, "gpu", 3000);
+    REQUIRE(gpu.backend == "gpu");
+    REQUIRE(gpu.attempts.size() == g0a.seeds.size());
+    double gpu_k_sum = 0.0;
+    for (const auto& a : gpu.attempts) {
+        REQUIRE(a.k > 0.95);   // near-critical bare fast metal; a broken device transport gives ~1.12
+        REQUIRE(a.k < 1.10);
+        REQUIRE(a.sigma_pcm > 0.0);  // k_sigma x 1e5 populated
+        REQUIRE(std::abs(a.k_deviation_pcm - (a.k - 1.0) * 1e5) < 1e-6);  // pcm = (k-1)*1e5
+        gpu_k_sum += a.k;
+    }
+    const double gpu_k = gpu_k_sum / static_cast<double>(gpu.attempts.size());
+
+    // Parity: the SAME gate on the ref oracle (same reduced batch) must agree within ~600 pcm.
+    const auto ref = ns::nukebench::run_gate(g0a, repo, "ref", 3000);
+    double ref_k_sum = 0.0;
+    for (const auto& a : ref.attempts) ref_k_sum += a.k;
+    const double ref_k = ref_k_sum / static_cast<double>(ref.attempts.size());
+    INFO("gpu mean k = " << gpu_k << ", ref mean k = " << ref_k);
+    REQUIRE(std::abs(gpu_k - ref_k) < 0.006);  // < 600 pcm (float-vs-double + independent sampling)
 }

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<!--
+  CORE VIEW — cinematic demon-core chain-reaction visualizer (SYNTHETIC DATA)
+  ---------------------------------------------------------------------------
+  A self-contained, AAA-leaning 3D view of the volumetric fission cascade
+  (ADR-023: true-3D volumetric particles, one holistic spacetime, zoom = camera
+  focus, representative sampling that tracks the physics). Built as a NEW module
+  that does NOT touch the parallel GadgetLab (viz/js/main.js, pitscope.js, ...).
+
+  Physics driver is SYNTHETIC but spec-shaped (representative nuclei standing for
+  ~1.5e25 real atoms, population curve, generations, leakage) — the same seam the
+  real nscore fusion API (studio-adapter.js -> studio_server -> couple.h
+  GenerationSample stream) will later feed. Every number is illustrative; no real
+  weapon data (NOTICE.md, 00-overview.md §2-§3).
+
+  RUN:  cd C:\NUCLEAR\viz  &&  python -m http.server 8099
+        open http://localhost:8099/core-view.html
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEMON CORE — chain-reaction view</title>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<style>
+  :root {
+    --accent: #57e6ff;
+    --hot: #ffb44a;
+    --panel: rgba(8, 11, 16, 0.62);
+    --edge: rgba(120, 200, 255, 0.14);
+    --text: #cfe3f2;
+    --dim: #6d8299;
+    --mono: "SFMono-Regular", ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #04060a; overflow: hidden; color: var(--text);
+    font-family: var(--mono); -webkit-font-smoothing: antialiased; }
+  canvas#view { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+
+  /* cinematic letterbox + vignette overlays (pure CSS, over the canvas) */
+  .bar { position: fixed; left: 0; right: 0; height: 42px; background: #000; z-index: 5;
+    pointer-events: none; opacity: 0.9; }
+  .bar.top { top: 0; box-shadow: 0 10px 40px 6px rgba(0,0,0,0.55); }
+  .bar.bot { bottom: 0; box-shadow: 0 -10px 40px 6px rgba(0,0,0,0.55); }
+  #grain { position: fixed; inset: 0; z-index: 4; pointer-events: none; opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+
+  /* HUD */
+  #hud { position: fixed; z-index: 6; inset: 0; pointer-events: none; }
+  .brand { position: absolute; top: 56px; left: 34px; }
+  .brand .t { font-size: 22px; letter-spacing: 5px; font-weight: 600; color: #eaf6ff;
+    text-shadow: 0 0 22px rgba(87,230,255,0.35); }
+  .brand .t b { color: var(--accent); font-weight: 700; }
+  .brand .s { font-size: 10.5px; letter-spacing: 2.5px; color: var(--dim); margin-top: 5px; }
+
+  #readouts { position: absolute; top: 56px; right: 34px; width: 232px;
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 10px;
+    padding: 14px 16px; backdrop-filter: blur(9px); box-shadow: 0 18px 60px rgba(0,0,0,0.5); }
+  #readouts h3 { font-size: 10px; letter-spacing: 3px; color: var(--dim); font-weight: 600;
+    margin-bottom: 11px; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; margin: 7px 0; }
+  .row label { font-size: 11px; letter-spacing: 1px; color: var(--dim); }
+  .row b { font-size: 15px; font-weight: 600; color: #eaf6ff; font-variant-numeric: tabular-nums; }
+  .row b.hot { color: var(--hot); }
+  .row b.acc { color: var(--accent); }
+  .kbar { height: 5px; border-radius: 3px; margin-top: 3px; overflow: hidden;
+    background: rgba(255,255,255,0.07); position: relative; }
+  .kbar > div { height: 100%; width: 0%; border-radius: 3px;
+    background: linear-gradient(90deg, #2f6f8f, var(--accent)); transition: width 0.12s linear; }
+  .kbar .crit { position: absolute; top: -2px; bottom: -2px; left: 50%; width: 1.5px;
+    background: var(--hot); opacity: 0.7; }
+
+  #phase { position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
+    text-align: center; }
+  #phaseLabel { font-size: 12px; letter-spacing: 4px; color: var(--accent);
+    text-shadow: 0 0 18px rgba(87,230,255,0.4); text-transform: uppercase; }
+  #clock { font-size: 10px; letter-spacing: 2px; color: var(--dim); margin-top: 5px; }
+
+  #controls { position: absolute; bottom: 54px; left: 34px; pointer-events: auto;
+    display: flex; gap: 10px; align-items: center; }
+  button { pointer-events: auto; font-family: var(--mono); cursor: pointer;
+    background: var(--panel); color: var(--text); border: 1px solid var(--edge);
+    border-radius: 8px; padding: 9px 15px; font-size: 11px; letter-spacing: 2px;
+    backdrop-filter: blur(9px); transition: all 0.15s; }
+  button:hover { border-color: var(--accent); color: #eaf6ff; box-shadow: 0 0 18px rgba(87,230,255,0.25); }
+  button.primary { background: linear-gradient(180deg, rgba(87,230,255,0.22), rgba(87,230,255,0.08));
+    border-color: rgba(87,230,255,0.5); color: #eaf6ff; }
+  button.primary:hover { box-shadow: 0 0 26px rgba(87,230,255,0.4); }
+  .hint { position: absolute; bottom: 20px; right: 34px; font-size: 10px; letter-spacing: 1.5px;
+    color: var(--dim); pointer-events: none; }
+  .hint b { color: #9fb8cc; }
+  .legend { position: absolute; bottom: 96px; left: 34px; display: flex; gap: 14px; font-size: 10px;
+    letter-spacing: 1px; color: var(--dim); }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px;
+    vertical-align: middle; box-shadow: 0 0 8px currentColor; }
+  .disc { position: absolute; top: 52px; left: 50%; transform: translateX(-50%); font-size: 9px;
+    letter-spacing: 2px; color: rgba(109,130,153,0.7); }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div class="bar top"></div>
+<div class="bar bot"></div>
+<div id="grain"></div>
+
+<div id="hud">
+  <div class="disc">SCHEMATIC · SYNTHETIC DATA · REPRESENTATIVE SAMPLING · NO REAL WEAPON DATA</div>
+  <div class="brand">
+    <div class="t">DEMON<b>CORE</b></div>
+    <div class="s">VOLUMETRIC CHAIN-REACTION VIEW · ADR-023</div>
+  </div>
+
+  <div id="readouts">
+    <h3>REACTION STATE</h3>
+    <div class="row"><label>k&#8203;<sub>eff</sub></label><b id="rK" class="acc">1.000</b></div>
+    <div class="kbar"><div id="rKfill"></div><div class="crit"></div></div>
+    <div class="row"><label>neutrons</label><b id="rN">0</b></div>
+    <div class="row"><label>generation</label><b id="rGen">0</b></div>
+    <div class="row"><label>fissions</label><b id="rFiss" class="hot">0</b></div>
+    <div class="row"><label>log&#8321;&#8320; N</label><b id="rLogN">0.00</b></div>
+    <div class="row"><label>yield (rel.)</label><b id="rYield" class="hot">0.0</b></div>
+  </div>
+
+  <div class="legend">
+    <span><i style="color:#7f96b8"></i>Pu-239</span>
+    <span><i style="color:#b07fb8"></i>Pu-240</span>
+    <span><i style="color:#8fb8a0"></i>Ga</span>
+    <span><i style="color:#57e6ff"></i>neutron</span>
+    <span><i style="color:#ffd48a"></i>fission</span>
+  </div>
+
+  <div id="controls">
+    <button id="ignite" class="primary">⟡ IGNITE</button>
+    <button id="reset">⟲ RESET</button>
+    <button id="slowmo">◐ SLOW-MO: AUTO</button>
+  </div>
+
+  <div id="phase">
+    <div id="phaseLabel">CRITICAL ASSEMBLY — IDLE</div>
+    <div id="clock">t = 0.00 · 1.00×</div>
+  </div>
+
+  <div class="hint">drag <b>orbit</b> · scroll <b>zoom</b> · the burst auto-dilates time</div>
+</div>
+
+<script type="module" src="js/core-view.js?v=1"></script>
+</body>
+</html>

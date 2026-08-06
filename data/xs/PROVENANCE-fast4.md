@@ -118,10 +118,11 @@ unverified uncertainty → 0 (`08 §1`), i.e. **±500 pcm**. Deviation progressi
 |---|---|---|
 | 4-group analytic weight (M1-T4a-2a, ADR-022) | +2562 | +1581 |
 | 5-group + thermal, analytic weight (M1-T4a-3, ADR-024) | +2560 | +1601 |
-| **5-group + self-consistent weight (M1-T4a-5, ADR-025)** | **−276 (WITHIN ±500)** | **+1344 (outside)** |
+| **5-group + self-consistent weight (M1-T4a-5, ADR-025)** | **−270 (WITHIN ±500, G0a PASS)** | **+1315 (outside)** |
 
-(ADR-025 row: `gate_probe` on the shipped seeded set, 120k×seed 1; the committed C-900
-`gate_report.json` regeneration + the gate-ledger flip are the immediate follow-up.)
+(ADR-025 row: committed **C-900** `gate_report.json` (1e6×250, 5-seed mean; backend gpu,
+git d0dfdd6, dirty=false — ref-equivalent by the committed G0c differential). G0a is the 2nd
+passing gate; the de-risk `gate_probe` 120k pass was −276 / +1344.)
 
 **Honest result:** self-consistent weighting brings **Godiva into the band** (the soft analytic
 weight under-estimated μ̄/leakage; the correct hard flux fixes it — see ADR-025) and **improves

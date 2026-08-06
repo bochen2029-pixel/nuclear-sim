@@ -2,36 +2,36 @@
   "schema_version": 1,
   "gate": "G0b",
   "verdict": "fail",
-  "gates_toml_sha256": "5576d46d9dc88063275028086cf5464b695f3747d117e7f0f24c944e7e2c78fd",
+  "gates_toml_sha256": "6fe7ffee9dae834b117ae87c26009f9a14b12db2f94a091258d52f3e30bdd2d7",
   "spec_sha256": "8dc025c0588905a61c3503d3f7a6e1b81ba94e7eec95a4ba6a0046edd04f77aa",
   "code_version": "0.1.0",
-  "git": "2ced34f",
+  "git": "d0dfdd6",
   "dirty": false,
-  "backend": "ref",
-  "device": "Intel Core i9-9900K @ 3.60GHz (CPU ref, win-x64)",
-  "started": "2026-08-05T14:41:20Z",
-  "finished": "2026-08-05T15:19:06Z",
+  "backend": "gpu",
+  "device": "RTX 4070 Ti SUPER (gpu; G0c-validated vs ref)",
+  "started": "2026-08-06T15:42:19Z",
+  "finished": "2026-08-06T15:42:54Z",
   "attempts": [
     {
       "attempt": 1,
       "seed": 1,
       "verdict": "fail",
       "measurements": {
-        "k": 1.0160527302326041,
-        "sigma_pcm": 6.610752981718627,
-        "k_deviation_pcm": 1605.2730232604117
+        "k": 1.013049121295502,
+        "sigma_pcm": 7.302962539987231,
+        "k_deviation_pcm": 1304.9121295501952
       },
       "criteria": [
         {
           "name": "k_deviation_pcm",
-          "value": 1605.2730232604117,
+          "value": 1304.9121295501952,
           "op": "abs_le",
           "threshold": 500.0,
           "pass": false
         },
         {
           "name": "sigma_pcm",
-          "value": 6.610752981718627,
+          "value": 7.302962539987231,
           "op": "le",
           "threshold": 25.0,
           "pass": true
@@ -44,21 +44,21 @@
       "seed": 2,
       "verdict": "fail",
       "measurements": {
-        "k": 1.0159709403983506,
-        "sigma_pcm": 6.86489410915805,
-        "k_deviation_pcm": 1597.0940398350563
+        "k": 1.013135917135608,
+        "sigma_pcm": 7.252074583440715,
+        "k_deviation_pcm": 1313.5917135608022
       },
       "criteria": [
         {
           "name": "k_deviation_pcm",
-          "value": 1597.0940398350563,
+          "value": 1313.5917135608022,
           "op": "abs_le",
           "threshold": 500.0,
           "pass": false
         },
         {
           "name": "sigma_pcm",
-          "value": 6.86489410915805,
+          "value": 7.252074583440715,
           "op": "le",
           "threshold": 25.0,
           "pass": true
@@ -71,21 +71,21 @@
       "seed": 3,
       "verdict": "fail",
       "measurements": {
-        "k": 1.0159353990949496,
-        "sigma_pcm": 6.433013165201022,
-        "k_deviation_pcm": 1593.5399094949564
+        "k": 1.013255664370803,
+        "sigma_pcm": 7.273764388516402,
+        "k_deviation_pcm": 1325.5664370803056
       },
       "criteria": [
         {
           "name": "k_deviation_pcm",
-          "value": 1593.5399094949564,
+          "value": 1325.5664370803056,
           "op": "abs_le",
           "threshold": 500.0,
           "pass": false
         },
         {
           "name": "sigma_pcm",
-          "value": 6.433013165201022,
+          "value": 7.273764388516402,
           "op": "le",
           "threshold": 25.0,
           "pass": true
@@ -98,21 +98,21 @@
       "seed": 4,
       "verdict": "fail",
       "measurements": {
-        "k": 1.0160834311720763,
-        "sigma_pcm": 6.706774716803613,
-        "k_deviation_pcm": 1608.3431172076334
+        "k": 1.0131710186218874,
+        "sigma_pcm": 7.064408137622264,
+        "k_deviation_pcm": 1317.1018621887408
       },
       "criteria": [
         {
           "name": "k_deviation_pcm",
-          "value": 1608.3431172076334,
+          "value": 1317.1018621887408,
           "op": "abs_le",
           "threshold": 500.0,
           "pass": false
         },
         {
           "name": "sigma_pcm",
-          "value": 6.706774716803613,
+          "value": 7.064408137622264,
           "op": "le",
           "threshold": 25.0,
           "pass": true
@@ -125,21 +125,21 @@
       "seed": 5,
       "verdict": "fail",
       "measurements": {
-        "k": 1.0160033694102597,
-        "sigma_pcm": 5.743924933683358,
-        "k_deviation_pcm": 1600.3369410259704
+        "k": 1.0131466920326455,
+        "sigma_pcm": 7.121058815130136,
+        "k_deviation_pcm": 1314.6692032645512
       },
       "criteria": [
         {
           "name": "k_deviation_pcm",
-          "value": 1600.3369410259704,
+          "value": 1314.6692032645512,
           "op": "abs_le",
           "threshold": 500.0,
           "pass": false
         },
         {
           "name": "sigma_pcm",
-          "value": 5.743924933683358,
+          "value": 7.121058815130136,
           "op": "le",
           "threshold": 25.0,
           "pass": true

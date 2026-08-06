@@ -394,6 +394,7 @@ add_library(nukesim_nukebench STATIC
     src/app/nukebench/gates.cpp
     src/app/nukebench/gate_report.cpp
     src/app/nukebench/scan.cpp
+    src/app/nukebench/diff_criteria.cpp
     src/app/nukebench/cli.cpp)
 target_link_libraries(nukesim_nukebench PUBLIC nukesim_core)
 target_include_directories(nukesim_nukebench PUBLIC ${CMAKE_SOURCE_DIR}/src)

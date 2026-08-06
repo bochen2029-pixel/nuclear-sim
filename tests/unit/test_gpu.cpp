@@ -560,6 +560,11 @@ TEST_CASE("gpu eigen power iteration is deterministic and gives a sane k", "[gpu
     REQUIRE(a.k == b.k);
     REQUIRE(a.source_checksum == b.source_checksum);
     REQUIRE(a.entropy_final == b.entropy_final);
+    // The G0c (b)/(c) outputs are host-side, index-ordered -> also bit-identical (M1-T5-c-5).
+    REQUIRE(a.k_history == b.k_history);            // per-active-gen k sequence (c)
+    REQUIRE(a.per_shell_source == b.per_shell_source);  // radial fission histogram (b)
+    REQUIRE(a.k_history.size() == 40u);            // == active generations
+    REQUIRE(a.per_shell_source.size() == 8u);      // kShells radial shells
 
     // Sane eigenvalue and a converged, non-degenerate source.
     REQUIRE(a.k > 0.5);
@@ -721,7 +726,21 @@ TEST_CASE("nukebench run_diff computes the G0c ref-vs-gpu k-equivalence differen
         REQUIRE(a.k_b < 1.10);
         // the reported deviation IS the |k_ref - k_gpu| differential (pcm)
         REQUIRE(std::abs(a.k_deviation_pcm - std::abs(a.k - a.k_b) * 1e5) < 1e-6);
-        REQUIRE(a.criteria.size() == 2);  // <= C-932 AND <= 3 sigma
+        // M1-T5-c-5: 4 criteria now — (a) <=C-932, (a) <=3sigma, (b) per-shell, (c) population.
+        REQUIRE(a.criteria.size() == 4);
+        bool has_shell = false, has_pop = false;
+        for (const auto& c : a.criteria) {
+            if (c.name == "per_shell_equivalence_ratio") {
+                has_shell = true;
+                REQUIRE(c.threshold == 1.0);       // ratio form: pass iff worst |delta|/bound <= 1
+            }
+            if (c.name == "population_series_equivalence_ratio") {
+                has_pop = true;
+                REQUIRE(c.threshold == 1.0);
+            }
+        }
+        REQUIRE(has_shell);
+        REQUIRE(has_pop);
         REQUIRE((a.verdict == "pass" || a.verdict == "fail"));
     }
     REQUIRE((rep.verdict == "pass" || rep.verdict == "fail"));

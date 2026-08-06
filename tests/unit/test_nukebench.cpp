@@ -5,6 +5,7 @@
 #include "api/run_provenance.h"
 #include "api/studio.h"
 #include "app/nukebench/cli.h"
+#include "app/nukebench/diff_criteria.h"
 #include "app/nukebench/gate_report.h"
 #include "app/nukebench/gates.h"
 #include "app/nukebench/scan.h"
@@ -315,4 +316,53 @@ TEST_CASE("linspace_1_to_2 spans [1.0, 2.0] inclusive", "[nukebench]") {
     REQUIRE(ls.front() == 1.0);
     REQUIRE(ls.back() == 2.0);
     REQUIRE(std::abs(ls[5] - 1.5) < 1e-12);
+}
+
+// --- M1-T5-c-5: the G0c differential criteria (b)/(c) — pure comparison functions ---
+
+TEST_CASE("population_series is the cumulative log10 of the k sequence", "[nukebench]") {
+    const auto p = ns::nukebench::population_series({10.0, 10.0, 10.0});
+    REQUIRE(p.size() == 3);
+    REQUIRE(std::abs(p[0] - 1.0) < 1e-12);  // log10 N(1) = log10(10) = 1
+    REQUIRE(std::abs(p[1] - 2.0) < 1e-12);  // cumulative
+    REQUIRE(std::abs(p[2] - 3.0) < 1e-12);
+    REQUIRE(ns::nukebench::population_series({}).empty());
+}
+
+TEST_CASE("population_series_equivalence (G0c c): identical passes; drift past 3*n*sigma fails",
+          "[nukebench]") {
+    const std::vector<double> k = {1.02, 1.03, 1.01, 1.02, 1.025};
+    const auto same = ns::nukebench::population_series_equivalence(k, k, 1e-4, 1.02);
+    REQUIRE(same.pass);
+    REQUIRE(same.worst_ratio == 0.0);
+    REQUIRE(same.n == 5);
+
+    // A systematically higher gpu k drifts log10 N; with a tiny sigma the bound is too small -> fail.
+    std::vector<double> k_hi = k;
+    for (double& x : k_hi) x += 2e-3;
+    REQUIRE_FALSE(ns::nukebench::population_series_equivalence(k, k_hi, 1e-5, 1.02).pass);
+    // The SAME drift with a large enough sigma passes (the bound scales with sigma_k).
+    REQUIRE(ns::nukebench::population_series_equivalence(k, k_hi, 1e-1, 1.02).pass);
+
+    // Guards: empty -> trivially equal; sigma<=0 on real data cannot pass.
+    REQUIRE(ns::nukebench::population_series_equivalence({}, {}, 1e-4, 1.0).pass);
+    REQUIRE_FALSE(ns::nukebench::population_series_equivalence(k, k, 0.0, 1.0).pass);
+}
+
+TEST_CASE("per_shell_equivalence (G0c b): 2%-relative and 3-sigma bounds", "[nukebench]") {
+    const std::vector<double> f = {100.0, 200.0, 50.0};
+    REQUIRE(ns::nukebench::per_shell_equivalence(f, f).pass);
+    REQUIRE(ns::nukebench::per_shell_equivalence(f, {101.0, 203.0, 50.5}).pass);        // all <= 2%
+    REQUIRE_FALSE(ns::nukebench::per_shell_equivalence(f, {100.0, 210.0, 50.0}).pass);  // shell 1: 5% > 2%
+    // A 3-sigma bound wider than 2% lets the same delta pass: 3*sqrt(10^2+10^2) ~= 42 > 0.02*200 = 4.
+    const std::vector<double> sig = {10.0, 10.0, 10.0};
+    REQUIRE(ns::nukebench::per_shell_equivalence(f, {100.0, 210.0, 50.0}, sig, sig).pass);
+}
+
+TEST_CASE("radial_shell_histogram bins by radius with the outer edge clamped", "[nukebench]") {
+    // r_max=2, 2 shells -> [0,1) and [1,2]; 2.0 and 3.0 clamp into the outer shell.
+    const auto h = ns::nukebench::radial_shell_histogram({0.5, 0.9, 1.5, 2.0, 3.0}, 2.0, 2);
+    REQUIRE(h.size() == 2);
+    REQUIRE(h[0] == 2.0);  // 0.5, 0.9
+    REQUIRE(h[1] == 3.0);  // 1.5, 2.0 (clamp), 3.0 (clamp)
 }

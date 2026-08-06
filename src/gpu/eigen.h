@@ -12,6 +12,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 #include "core/geometry/geometry.h"
 #include "core/material/material.h"
@@ -26,6 +27,14 @@ struct EigenResultGpu {
     /// Position-weighted checksum of the final fission bank — bit-identical across
     /// launch configs (determinism).
     unsigned long long source_checksum = 0;
+    /// Per-active-generation k, in generation order (G0c criterion c — the
+    /// population series log10 N(n) = cumsum log10 k). Bit-identical across launch
+    /// configs (collected host-side in gen order). Length == active generations.
+    std::vector<double> k_history;
+    /// Final fission source binned into equal-width radial shells over [0, radius]
+    /// (G0c criterion b — per-shell fission-source equivalence vs the CPU oracle).
+    /// Counts; bit-identical across launch configs (host-side integer binning).
+    std::vector<double> per_shell_source;
     /// Peak device memory attributed to this run (M4-T4), via cudaMemGetInfo.
     /// Observational only — launches nothing, cannot affect k or determinism.
     std::int64_t peak_vram_bytes = 0;

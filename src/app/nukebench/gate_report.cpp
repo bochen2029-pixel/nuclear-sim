@@ -1,5 +1,6 @@
 #include "app/nukebench/gate_report.h"
 
+#include "app/nukebench/diff_criteria.h"  // G0c (b)/(c) comparisons (M1-T5-c-5)
 #include "core/diagnostics.h"
 #include "core/geometry/geometry.h"
 #include "core/material/material.h"
@@ -13,9 +14,14 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <fstream>
 #include <sstream>
+#include <string>
+#include <vector>
 
 namespace ns::nukebench {
 
@@ -35,6 +41,110 @@ double measured_for(const std::string& name, const Attempt& a) {
     if (name == "k_deviation_pcm") return a.k_deviation_pcm;
     if (name == "sigma_pcm") return a.sigma_pcm;
     return std::nan("");  // criterion the runner doesn't measure -> never passes
+}
+
+// --- G0c (b)/(c) detailed per-seed eigen (M1-T5-c-5) ---
+
+// Radial-shell granularity for criterion (b). MUST match gpu_eigen's kShells (src/gpu/eigen.cu):
+// both bin over [0, r_outer] into this many equal-width shells so ref and gpu shells align.
+constexpr int kDiffRadialShells = 8;
+
+// What criteria (a)/(b)/(c) need from one seed on one backend.
+struct SeedDetail {
+    double k = 0.0;
+    double sigma_pcm = 0.0;
+    std::vector<double> active_k;    // per-gen k over the active window [inactive, inactive+active)
+    std::vector<double> per_shell;   // final fission source binned into kDiffRadialShells shells
+};
+
+// The (b) comparison is of the NORMALIZED radial fission-source distribution (fractions), so it
+// tests the spatial SHAPE, not the two backends' slightly-different total final-bank counts.
+std::vector<double> shell_fractions(const std::vector<double>& counts) {
+    double tot = 0.0;
+    for (const double c : counts) tot += c;
+    std::vector<double> f(counts.size(), 0.0);
+    if (tot > 0.0) {
+        for (std::size_t i = 0; i < counts.size(); ++i) f[i] = counts[i] / tot;
+    }
+    return f;
+}
+
+// Poisson 1-sigma of each shell FRACTION: sqrt(count) / total (the count has Poisson sigma sqrt(N)).
+std::vector<double> shell_fraction_sigma(const std::vector<double>& counts) {
+    double tot = 0.0;
+    for (const double c : counts) tot += c;
+    std::vector<double> s(counts.size(), 0.0);
+    if (tot > 0.0) {
+        for (std::size_t i = 0; i < counts.size(); ++i) s[i] = std::sqrt(std::max(0.0, counts[i])) / tot;
+    }
+    return s;
+}
+
+// Sample standard deviation of a k sequence — the per-GENERATION spread of k (criterion c's sigma_k,
+// NOT the standard error of the mean; see diff_criteria.h).
+double stddev(const std::vector<double>& v) {
+    if (v.size() < 2) return 0.0;
+    double mean = 0.0;
+    for (const double x : v) mean += x;
+    mean /= static_cast<double>(v.size());
+    double ss = 0.0;
+    for (const double x : v) ss += (x - mean) * (x - mean);
+    return std::sqrt(ss / static_cast<double>(v.size() - 1));
+}
+
+// Run one seed's eigen on `backend` and extract the (b)/(c) series. `r_max` = the sphere radius.
+SeedDetail run_seed_detail(const std::string& backend, const ns::geom::LayerStack& stack,
+                           const ns::material::MaterialLib& lib, const ns::xs::FewGroupXS& xs,
+                           const Gate& gate, std::int64_t seed, std::int64_t batch, double r_max) {
+    SeedDetail out;
+    if (backend == "ref") {
+        ns::ref::RefTransport transport(stack, lib, xs, static_cast<std::uint64_t>(seed));
+        ns::physics::EigenSpec spec;
+        spec.batch = batch;
+        spec.inactive = gate.eigen.inactive;
+        spec.active = gate.eigen.active;
+        spec.seed = static_cast<std::uint64_t>(seed);
+        const ns::physics::EigenResult er = ns::physics::run_eigen(transport, spec);
+        out.k = er.k;
+        out.sigma_pcm = er.sigma_pcm;
+        // The last `active` k's = the settled window [inactive, inactive+active) — the SAME window
+        // the gpu collects (gen >= inactive), so the two population series compare gen-for-gen.
+        const std::size_t act = static_cast<std::size_t>(gate.eigen.active);
+        out.active_k =
+            er.k_history.size() >= act
+                ? std::vector<double>(er.k_history.end() - static_cast<std::ptrdiff_t>(act),
+                                      er.k_history.end())
+                : er.k_history;
+        std::vector<double> radii;
+        radii.reserve(er.source.sites.size());
+        for (const auto& s : er.source.sites) {
+            radii.push_back(std::sqrt(s.pos.x * s.pos.x + s.pos.y * s.pos.y + s.pos.z * s.pos.z));
+        }
+        out.per_shell = radial_shell_histogram(radii, r_max, kDiffRadialShells);
+        return out;
+    }
+    if (backend == "gpu") {
+#ifdef NUKESIM_WITH_CUDA
+        ns::gpu::EigenResultGpu g;
+        if (!ns::gpu::gpu_eigen(stack, lib, static_cast<std::uint64_t>(seed), batch,
+                                gate.eigen.inactive, gate.eigen.active, 256, 128, g)) {
+            throw GatesError("gate " + gate.id + ": gpu_eigen failed at seed " +
+                             std::to_string(seed));
+        }
+        out.k = g.k;
+        out.sigma_pcm = g.k_sigma * 1e5;    // k_sigma = SE of k -> pcm
+        out.active_k = g.k_history;          // already the active window, in gen order
+        out.per_shell = g.per_shell_source;  // kShells shells over [0, radius]
+        return out;
+#else
+        (void)stack;
+        (void)lib;
+        (void)xs;
+        (void)r_max;
+        throw GatesError("run_diff: gpu backend requires a CUDA build (NUKESIM_WITH_CUDA is OFF)");
+#endif
+    }
+    throw GatesError("run_diff: backend '" + backend + "' not supported (expected ref|gpu)");
 }
 }  // namespace
 
@@ -122,12 +232,6 @@ GateReport run_gate(const Gate& gate, const std::filesystem::path& repo,
 GateReport run_diff(const Gate& gate, const std::filesystem::path& repo,
                     const std::string& backend_a, const std::string& backend_b,
                     std::int64_t eigen_batch_override) {
-    // Run the SAME gate on both backends (reusing run_gate), then compare per seed (08 §2 G0c a).
-    const GateReport ra = run_gate(gate, repo, backend_a, eigen_batch_override);
-    const GateReport rb = run_gate(gate, repo, backend_b, eigen_batch_override);
-    if (ra.attempts.size() != rb.attempts.size()) {
-        throw GatesError("run_diff: backend attempt counts differ for gate " + gate.id);
-    }
     // The equivalence bound C-932 (pcm), from the gate's criterion (the loader drift-guarded it).
     double bound_pcm = 0.0;
     for (const auto& c : gate.criteria) {
@@ -138,33 +242,73 @@ GateReport run_diff(const Gate& gate, const std::filesystem::path& repo,
                          ": run_diff needs a k_equivalence_pcm criterion (C-932)");
     }
 
+    // Assembly (as in run_gate): the gate's scenario -> material + radius, on fast4. Built ONCE;
+    // each seed runs the ref AND gpu eigen on it, keeping the per-generation + per-shell detail
+    // criteria (b)/(c) need (which run_gate's summary discards).
+    const auto scenario = ns::scenario::Scenario::load(repo / gate.scenario, repo);
+    if (scenario.layers.empty()) throw GatesError("gate " + gate.id + ": scenario has no layers");
+    const auto& layer = scenario.layers.front();
+    const auto xs = ns::xs::FewGroupXS::load(repo / "data" / "xs" / "fast4.json");
+    std::vector<ns::LoadWarning> warnings;
+    const auto lib = ns::material::MaterialLib::load_dir(repo / "data" / "materials", xs, &warnings);
+    const int mid = lib.index_of(layer.material);
+    if (mid < 0) throw GatesError("gate " + gate.id + ": material '" + layer.material + "' not found");
+    const ns::geom::LayerStack stack(
+        {ns::geom::Layer{layer.id, layer.r_outer_cm, mid, layer.status}});
+    const double r_max = stack.outermost_radius();
+    const std::int64_t batch = eigen_batch_override > 0 ? eigen_batch_override : gate.eigen.batch;
+
     GateReport rep;
     rep.gate = gate.id;
     rep.backend = backend_a + "|" + backend_b;
     bool all_pass = true;
-    for (std::size_t i = 0; i < ra.attempts.size(); ++i) {
-        const auto& a = ra.attempts[i];
-        const auto& b = rb.attempts[i];
-        const double delta_pcm = std::abs(a.k - b.k) * 1e5;
-        const double comb_sigma =
-            std::sqrt(a.sigma_pcm * a.sigma_pcm + b.sigma_pcm * b.sigma_pcm);
+    int n = 0;
+    for (const std::int64_t seed : gate.seeds) {
+        const SeedDetail A = run_seed_detail(backend_a, stack, lib, xs, gate, seed, batch, r_max);
+        const SeedDetail B = run_seed_detail(backend_b, stack, lib, xs, gate, seed, batch, r_max);
+
+        const double delta_pcm = std::abs(A.k - B.k) * 1e5;
+        const double comb_sigma = std::sqrt(A.sigma_pcm * A.sigma_pcm + B.sigma_pcm * B.sigma_pcm);
 
         Attempt d;
-        d.attempt = static_cast<int>(i + 1);
-        d.seed = a.seed;
-        d.k = a.k;                  // backend_a's k
-        d.k_b = b.k;                // backend_b's k
+        d.attempt = ++n;
+        d.seed = seed;
+        d.k = A.k;                  // backend_a's k
+        d.k_b = B.k;                // backend_b's k
         d.sigma_pcm = comb_sigma;
         d.k_deviation_pcm = delta_pcm;
 
-        // 08 §2 G0c (a): |k_a − k_b| ≤ C-932 (absolute equivalence bound) AND ≤ 3·combined σ.
+        // (a) k-equivalence: |k_a − k_b| ≤ C-932 AND ≤ 3·combined σ (08 §2 a).
         CriterionResult abs_c{"k_equivalence_pcm", "abs_le", delta_pcm, bound_pcm,
                               delta_pcm <= bound_pcm};
         CriterionResult sig_c{"k_equivalence_within_3sigma", "le", delta_pcm, 3.0 * comb_sigma,
                               delta_pcm <= 3.0 * comb_sigma};
-        const bool seed_pass = abs_c.pass && sig_c.pass;
+
+        // (b) per-shell fission-source equivalence: max(3·√(σ²), 2%·f_ref) per shell (08 §2 b),
+        // on the NORMALIZED radial distribution (fractions) with Poisson per-shell σ. worst_ratio
+        // ≤ 1 iff every shell passes.
+        const DiffCheck shell =
+            per_shell_equivalence(shell_fractions(A.per_shell), shell_fractions(B.per_shell),
+                                  shell_fraction_sigma(A.per_shell), shell_fraction_sigma(B.per_shell));
+        CriterionResult shell_c{"per_shell_equivalence_ratio", "le", shell.worst_ratio, 1.0,
+                                shell.pass && shell.n > 0};
+
+        // (c) population series: |log10 N_a(n) − log10 N_b(n)| ≤ 3·n·σ_k/(k·ln10) ∀n (08 §2 c).
+        // σ_k = the combined PER-GENERATION spread of k (std of the active-gen k's), so the linear
+        // envelope bounds the independent-RNG random walk yet catches a systematic bias (see
+        // diff_criteria.h). The SE of the mean would fail a genuinely-equivalent pair, batch-independently.
+        const double sg_a = stddev(A.active_k), sg_b = stddev(B.active_k);
+        const double sigma_k = std::sqrt(sg_a * sg_a + sg_b * sg_b);
+        const double k_mean = 0.5 * (A.k + B.k);
+        const DiffCheck pop = population_series_equivalence(A.active_k, B.active_k, sigma_k, k_mean);
+        CriterionResult pop_c{"population_series_equivalence_ratio", "le", pop.worst_ratio, 1.0,
+                              pop.pass && pop.n > 0};
+
+        const bool seed_pass = abs_c.pass && sig_c.pass && shell_c.pass && pop_c.pass;
         d.criteria.push_back(abs_c);
         d.criteria.push_back(sig_c);
+        d.criteria.push_back(shell_c);
+        d.criteria.push_back(pop_c);
         d.verdict = seed_pass ? "pass" : "fail";
         all_pass = all_pass && seed_pass;
         rep.attempts.push_back(std::move(d));

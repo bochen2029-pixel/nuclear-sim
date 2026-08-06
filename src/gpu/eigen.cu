@@ -392,6 +392,7 @@ bool gpu_eigen(const ns::geom::LayerStack& stack, const ns::material::MaterialLi
             k_sum += k_this;
             k_sumsq += k_this * k_this;
             ++k_count;
+            out.k_history.push_back(k_this);  // G0c (c): active-gen k, in order (bit-identical)
         }
 
         // Swap banks; the new source is `total` neutrons.
@@ -410,6 +411,38 @@ bool gpu_eigen(const ns::geom::LayerStack& stack, const ns::material::MaterialLi
                         cudaMemcpyDeviceToHost) == cudaSuccess;
         for (std::size_t i = 0; ok && i < s.size(); ++i) {
             checksum += s[i] * (static_cast<unsigned long long>(i) + 1ull);
+        }
+    }
+
+    // G0c (b): bin the final fission bank into equal-width radial shells over [0, radius].
+    // Host-side integer counts (like entropy_8cubed) -> bit-identical across launch configs, no
+    // device atomics. run_diff bins the ref sites into the same shell count to compare (08 §2 b).
+    if (ok) {
+        constexpr int kShells = 8;
+        std::vector<float> px(static_cast<std::size_t>(nsrc));
+        std::vector<float> py(static_cast<std::size_t>(nsrc));
+        std::vector<float> pz(static_cast<std::size_t>(nsrc));
+        ok = cudaMemcpy(px.data(), cur.x, static_cast<std::size_t>(nsrc) * sizeof(float),
+                        cudaMemcpyDeviceToHost) == cudaSuccess
+          && cudaMemcpy(py.data(), cur.y, static_cast<std::size_t>(nsrc) * sizeof(float),
+                        cudaMemcpyDeviceToHost) == cudaSuccess
+          && cudaMemcpy(pz.data(), cur.z, static_cast<std::size_t>(nsrc) * sizeof(float),
+                        cudaMemcpyDeviceToHost) == cudaSuccess;
+        if (ok && radius > 0.0) {
+            std::vector<long long> shell(static_cast<std::size_t>(kShells), 0);
+            for (int i = 0; i < nsrc; ++i) {
+                const double r = std::sqrt(static_cast<double>(px[i]) * px[i]
+                                           + static_cast<double>(py[i]) * py[i]
+                                           + static_cast<double>(pz[i]) * pz[i]);
+                int b = static_cast<int>(r / radius * kShells);
+                if (b < 0) b = 0;
+                if (b >= kShells) b = kShells - 1;  // clamp r >= radius into the outer shell
+                ++shell[static_cast<std::size_t>(b)];
+            }
+            out.per_shell_source.resize(shell.size());
+            for (std::size_t i = 0; i < shell.size(); ++i) {
+                out.per_shell_source[i] = static_cast<double>(shell[i]);  // explicit i64 -> f64
+            }
         }
     }
 

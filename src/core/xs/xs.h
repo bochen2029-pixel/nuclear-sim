@@ -17,10 +17,11 @@
 
 namespace ns::xs {
 
-/// v2 fixes four groups. 04 §3's Transfer is a 4x4 array, so the group count is
-/// part of the normative API rather than a runtime value; more groups is the
-/// schema-v3 path via ADR (D4, R-1).
-inline constexpr int kGroups = 4;
+/// v3 fixes FIVE groups (ADR-024): the 4 fast groups + one thermal group below 1 keV
+/// (the G1a thermal-sink fix). 04 §3's Transfer is a kGroups x kGroups array, so the
+/// group count is part of the normative API rather than a runtime value; changing it is
+/// a schema bump via ADR (D4, R-1; v2 was 4-group, v3 added the thermal group).
+inline constexpr int kGroups = 5;
 /// Same value as an unsigned type. 04 §3's groups() returns int, but every
 /// container size compared against it is a size_t, and gcc's -Wsign-compare
 /// (fatal under 02 §4's -Werror) does not accept the mix.

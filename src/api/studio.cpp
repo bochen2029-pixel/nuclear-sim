@@ -41,16 +41,17 @@ double radius_for_mass(double mass_kg, double density_g_cm3) {
     return std::cbrt(3.0 * volume / (4.0 * std::numbers::pi));
 }
 
-// One SIM isotope's 4-group xs (schema v2). Fast-group fission/scatter, identity
-// transfer, chi in group 0. status SIM — clearly a stand-in, not cited data.
+// One SIM isotope's 5-group xs (schema v3, ADR-024). Fast-group fission/scatter,
+// 5x5 identity transfer (the thermal group is inert in this stand-in), chi in group 0.
+// status SIM — clearly a stand-in, not cited data.
 json sim_isotope(double nu, double sigma_f, double sigma_c, double sigma_s) {
-    const auto four = [](double v) { return json::array({v, v, v, v}); };
-    const json identity = json::array({json::array({1.0, 0.0, 0.0, 0.0}),
-                                       json::array({0.0, 1.0, 0.0, 0.0}),
-                                       json::array({0.0, 0.0, 1.0, 0.0}),
-                                       json::array({0.0, 0.0, 0.0, 1.0})});
+    const auto four = [](double v) { return json::array({v, v, v, v, v}); };
+    const json identity = json::array({json::array({1.0, 0.0, 0.0, 0.0, 0.0}),
+                                       json::array({0.0, 1.0, 0.0, 0.0, 0.0}),
+                                       json::array({0.0, 0.0, 1.0, 0.0, 0.0}),
+                                       json::array({0.0, 0.0, 0.0, 1.0, 0.0}), json::array({0.0, 0.0, 0.0, 0.0, 1.0})});
     return {{"nu", four(nu)},
-            {"chi", json::array({1.0, 0.0, 0.0, 0.0})},
+            {"chi", json::array({1.0, 0.0, 0.0, 0.0, 0.0})},
             {"sigma_f", four(sigma_f)},
             {"sigma_c", four(sigma_c)},
             {"sigma_s", four(sigma_s)},
@@ -99,9 +100,9 @@ DemonCoreAssembly::DemonCoreAssembly(const StudioConfig& cfg) {
 
     // SIM xs: Pu-239 fissile (RealSphere-like); Pu-240 a net poison (lower fast
     // fission, higher capture) so more Pu-240 lowers k — the demon-core gauge.
-    const json xs = {{"schema_version", 2},
+    const json xs = {{"schema_version", 3},
                      {"name", "pu_sim"},
-                     {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3})},
+                     {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3, 1e-10})},
                      {"isotopes",
                       {{"Pu239", sim_isotope(2.9, 1.4, 0.15, 4.0)},
                        {"Pu240", sim_isotope(2.5, 0.5, 0.80, 4.0)}}}};

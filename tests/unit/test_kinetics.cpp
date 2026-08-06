@@ -42,13 +42,13 @@ public:
         fs::create_directories(root_ / "xs");
         fs::create_directories(root_ / "materials");
 
-        const auto four = [](double v) { return json::array({v, v, v, v}); };
-        const json identity = json::array({json::array({1.0, 0.0, 0.0, 0.0}),
-                                           json::array({0.0, 1.0, 0.0, 0.0}),
-                                           json::array({0.0, 0.0, 1.0, 0.0}),
-                                           json::array({0.0, 0.0, 0.0, 1.0})});
+        const auto four = [](double v) { return json::array({v, v, v, v, v}); };
+        const json identity = json::array({json::array({1.0, 0.0, 0.0, 0.0, 0.0}),
+                                           json::array({0.0, 1.0, 0.0, 0.0, 0.0}),
+                                           json::array({0.0, 0.0, 1.0, 0.0, 0.0}),
+                                           json::array({0.0, 0.0, 0.0, 1.0, 0.0}), json::array({0.0, 0.0, 0.0, 0.0, 1.0})});
         const json pu = {{"nu", four(2.9)},  // constant across groups → ν̄_Pu = 2.9 exactly
-                         {"chi", json::array({1.0, 0.0, 0.0, 0.0})},
+                         {"chi", json::array({1.0, 0.0, 0.0, 0.0, 0.0})},
                          {"sigma_f", four(1.4)},
                          {"sigma_c", four(0.15)},
                          {"sigma_s", four(4.0)},
@@ -59,7 +59,7 @@ public:
                          {"cite", "synthetic test medium — not physical data"},
                          {"status", "SIM"}};
         const json u8 = {{"nu", four(2.5)},  // constant across groups → ν̄_U = 2.5 exactly
-                         {"chi", json::array({1.0, 0.0, 0.0, 0.0})},
+                         {"chi", json::array({1.0, 0.0, 0.0, 0.0, 0.0})},
                          {"sigma_f", four(0.5)},
                          {"sigma_c", four(0.4)},
                          {"sigma_s", four(5.0)},
@@ -69,9 +69,9 @@ public:
                          {"transfer", identity},
                          {"cite", "synthetic test medium — not physical data"},
                          {"status", "SIM"}};
-        const json xs = {{"schema_version", 2},
+        const json xs = {{"schema_version", 3},
                          {"name", "mix"},
-                         {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3})},
+                         {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3, 1e-10})},
                          {"isotopes", {{"Pu239", pu}, {"U238", u8}}}};
         spec_examples::write_file(root_ / "xs" / "mix.json", xs.dump(2));
 

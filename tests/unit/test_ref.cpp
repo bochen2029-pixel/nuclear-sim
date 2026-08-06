@@ -41,10 +41,10 @@ public:
         fs::create_directories(root_ / "xs");
         fs::create_directories(root_ / "materials");
 
-        const auto four = [](double v) { return json::array({v, v, v, v}); };
+        const auto four = [](double v) { return json::array({v, v, v, v, v}); };
         json iso = {
             {"nu", four(nu)},
-            {"chi", json::array({1.0, 0.0, 0.0, 0.0})},
+            {"chi", json::array({1.0, 0.0, 0.0, 0.0, 0.0})},
             {"sigma_f", four(sigma_f_b)},
             {"sigma_c", four(sigma_c_b)},
             {"sigma_s", four(sigma_s_b)},
@@ -55,16 +55,16 @@ public:
             {"beta", 0.0020},
             // Group-preserving transfer: every scatter stays in group 0, which
             // is what makes the one-group analytic k_inf the right oracle.
-            {"transfer", json::array({json::array({1.0, 0.0, 0.0, 0.0}),
-                                      json::array({0.0, 1.0, 0.0, 0.0}),
-                                      json::array({0.0, 0.0, 1.0, 0.0}),
-                                      json::array({0.0, 0.0, 0.0, 1.0})})},
+            {"transfer", json::array({json::array({1.0, 0.0, 0.0, 0.0, 0.0}),
+                                      json::array({0.0, 1.0, 0.0, 0.0, 0.0}),
+                                      json::array({0.0, 0.0, 1.0, 0.0, 0.0}),
+                                      json::array({0.0, 0.0, 0.0, 1.0, 0.0}), json::array({0.0, 0.0, 0.0, 0.0, 1.0})})},
             {"cite", "synthetic test medium — not physical data"},
             {"status", "SIM"},
         };
-        json xs = {{"schema_version", 2},
+        json xs = {{"schema_version", 3},
                    {"name", "test"},
-                   {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3})},
+                   {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3, 1e-10})},
                    {"isotopes", {{"Pu239", iso}}}};
         spec_examples::write_file(root_ / "xs" / "test.json", xs.dump(2));
 

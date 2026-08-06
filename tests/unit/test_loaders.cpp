@@ -117,13 +117,13 @@ TEST_CASE("the spec's own xs example parses", "[loaders]") {
     const auto set = ns::xs::FewGroupXS::load(fx.xs_path());
 
     REQUIRE(set.name() == "fast4");
-    REQUIRE(set.groups() == 4);
-    REQUIRE(set.bounds_MeV().size() == 5);
+    REQUIRE(set.groups() == 5);
+    REQUIRE(set.bounds_MeV().size() == 6);
     REQUIRE(set.has_isotope("Pu239"));
 
     const auto& pu = set.isotope("Pu239");
     REQUIRE(pu.beta == 0.0020);          // REQUIRED by ADR-013
-    REQUIRE(pu.g.size() == 4);
+    REQUIRE(pu.g.size() == 5);
     REQUIRE(pu.status == "PUBLIC");
     REQUIRE_FALSE(pu.transfer_is_null);
 
@@ -157,23 +157,24 @@ TEST_CASE("xs loader rejects every schema-v2 violation class", "[loaders]") {
                            "numerically undetectable");
     }
     SECTION("non-descending group bounds") {
-        expect_xs_rejected(fx, [](json& d) { d["group_bounds_MeV"] = json::array({20.0, 3.0, 3.0, 0.1, 1e-3}); },
+        expect_xs_rejected(fx, [](json& d) { d["group_bounds_MeV"] = json::array({20.0, 3.0, 3.0, 0.1, 1e-3, 1e-10}); },
                            "strictly descending");
     }
     SECTION("wrong number of group bounds") {
         expect_xs_rejected(fx, [](json& d) { d["group_bounds_MeV"] = json::array({20.0, 3.0, 1.0}); },
-                           "schema-v3 path");
+                           "n_groups+1");
     }
     SECTION("upscatter") {
         expect_xs_rejected(fx, [](json& d) {
             d["isotopes"]["Pu239"]["transfer"] = json::array({
-                json::array({0.70, 0.20, 0.08, 0.02}), json::array({0.10, 0.60, 0.20, 0.10}),
-                json::array({0.0, 0.0, 0.80, 0.20}), json::array({0.0, 0.0, 0.0, 1.0})});
+                json::array({0.70, 0.20, 0.08, 0.02, 0.0}), json::array({0.10, 0.60, 0.20, 0.10, 0.0}),
+                json::array({0.0, 0.0, 0.80, 0.20, 0.0}), json::array({0.0, 0.0, 0.0, 0.90, 0.10}),
+                json::array({0.0, 0.0, 0.0, 0.0, 1.0})});
         }, "upscatter");
     }
     SECTION("transfer row that does not sum to 1") {
         expect_xs_rejected(fx, [](json& d) {
-            d["isotopes"]["Pu239"]["transfer"][0] = json::array({0.70, 0.20, 0.08, 0.10});
+            d["isotopes"]["Pu239"]["transfer"][0] = json::array({0.70, 0.20, 0.08, 0.10, 0.0});
         }, "must sum to 1.0");
     }
     SECTION("null transfer outside a SIM set") {
@@ -240,7 +241,7 @@ TEST_CASE("the spec's own material example parses and yields number densities", 
     REQUIRE(total > 1e22);
     REQUIRE(total < 1e23);
 
-    REQUIRE(mat.macro.sigma_f.size() == 4);
+    REQUIRE(mat.macro.sigma_f.size() == 5);
     REQUIRE(mat.macro.sigma_f[0] > 0.0);
     REQUIRE(mat.macro.nu_sigma_f[0] > mat.macro.sigma_f[0]);  // nu-bar ~ 2.9 > 1
     REQUIRE(mat.macro.sigma_tr[0] < mat.macro.sigma_t[0]);

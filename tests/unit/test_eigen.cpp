@@ -35,24 +35,24 @@ public:
         fs::create_directories(root_ / "xs");
         fs::create_directories(root_ / "materials");
 
-        const auto four = [](double v) { return json::array({v, v, v, v}); };
+        const auto four = [](double v) { return json::array({v, v, v, v, v}); };
         json iso = {{"nu", four(2.9)},
-                    {"chi", json::array({1.0, 0.0, 0.0, 0.0})},
+                    {"chi", json::array({1.0, 0.0, 0.0, 0.0, 0.0})},
                     {"sigma_f", four(1.4)},
                     {"sigma_c", four(0.15)},
                     {"sigma_s", four(4.0)},
                     {"sigma_n2n", four(0.0)},
                     {"mu_bar", four(0.0)},
                     {"beta", 0.0020},
-                    {"transfer", json::array({json::array({1.0, 0.0, 0.0, 0.0}),
-                                              json::array({0.0, 1.0, 0.0, 0.0}),
-                                              json::array({0.0, 0.0, 1.0, 0.0}),
-                                              json::array({0.0, 0.0, 0.0, 1.0})})},
+                    {"transfer", json::array({json::array({1.0, 0.0, 0.0, 0.0, 0.0}),
+                                              json::array({0.0, 1.0, 0.0, 0.0, 0.0}),
+                                              json::array({0.0, 0.0, 1.0, 0.0, 0.0}),
+                                              json::array({0.0, 0.0, 0.0, 1.0, 0.0}), json::array({0.0, 0.0, 0.0, 0.0, 1.0})})},
                     {"cite", "synthetic test medium — not physical data"},
                     {"status", "SIM"}};
-        json xs = {{"schema_version", 2},
+        json xs = {{"schema_version", 3},
                    {"name", "test"},
-                   {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3})},
+                   {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3, 1e-10})},
                    {"isotopes", {{"Pu239", iso}}}};
         spec_examples::write_file(root_ / "xs" / "test.json", xs.dump(2));
 

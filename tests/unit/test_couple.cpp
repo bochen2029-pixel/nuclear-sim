@@ -119,13 +119,13 @@ public:
         fs::remove_all(root_);
         fs::create_directories(root_ / "xs");
         fs::create_directories(root_ / "materials");
-        const auto four = [](double v) { return json::array({v, v, v, v}); };
-        const json identity = json::array({json::array({1.0, 0.0, 0.0, 0.0}),
-                                           json::array({0.0, 1.0, 0.0, 0.0}),
-                                           json::array({0.0, 0.0, 1.0, 0.0}),
-                                           json::array({0.0, 0.0, 0.0, 1.0})});
+        const auto four = [](double v) { return json::array({v, v, v, v, v}); };
+        const json identity = json::array({json::array({1.0, 0.0, 0.0, 0.0, 0.0}),
+                                           json::array({0.0, 1.0, 0.0, 0.0, 0.0}),
+                                           json::array({0.0, 0.0, 1.0, 0.0, 0.0}),
+                                           json::array({0.0, 0.0, 0.0, 1.0, 0.0}), json::array({0.0, 0.0, 0.0, 0.0, 1.0})});
         const json pu = {{"nu", four(2.9)},
-                         {"chi", json::array({1.0, 0.0, 0.0, 0.0})},
+                         {"chi", json::array({1.0, 0.0, 0.0, 0.0, 0.0})},
                          {"sigma_f", four(1.4)},
                          {"sigma_c", four(0.15)},
                          {"sigma_s", four(4.0)},
@@ -135,9 +135,9 @@ public:
                          {"transfer", identity},
                          {"cite", "synthetic test medium — not physical data"},
                          {"status", "SIM"}};
-        const json xs = {{"schema_version", 2},
+        const json xs = {{"schema_version", 3},
                          {"name", "pu"},
-                         {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3})},
+                         {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3, 1e-10})},
                          {"isotopes", {{"Pu239", pu}}}};
         spec_examples::write_file(root_ / "xs" / "pu.json", xs.dump(2));
         const json mat = {{"schema_version", 1},

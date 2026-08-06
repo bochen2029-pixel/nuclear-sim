@@ -27,24 +27,24 @@ note   = "public range ~2–2.5x; value is the canonical working point"
 
 Rules: `status = "PENDING"` entries MAY omit `value`, MUST carry `resolved_by = "<task-id>"`, and MUST raise if read at runtime (the generated header emits a deleted function, so reading one is a compile error). If `lo`/`hi` present, the generator emits `_lo`/`_hi` companions **and a `static_assert(lo ≤ value ≤ hi)` in the header** — stronger than the unit test this originally specified, because it cannot be forgotten for a newly added constant and it fails at compile time. Multi-entry registries (e.g. RNG streams) use `[[registry]]` arrays, not a single constant. Derived constants (e.g. C-041) carry `derived = "= C-918/(C-040*C-917)"` and the generator computes them. Human-readable ranges/notes stay in the appendix; the strict file is what the generator reads. `tools/verify/constants_roundtrip` asserts bijection between appendix rows and strict-file entries (id/value/unit/status/cite); runs under ctest.
 
-## 2. `data/xs/<set>.json` — few-group cross sections (schema v2)
+## 2. `data/xs/<set>.json` — few-group cross sections (schema v3)
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "name": "fast4",
-  "group_bounds_MeV": [20.0, 3.0, 1.0, 0.1, 1e-3],
+  "group_bounds_MeV": [20.0, 3.0, 1.0, 0.1, 1e-3, 1e-9],
   "isotopes": {
     "Pu239": {
-      "nu":        [2.98, 2.92, 2.89, 2.89],
-      "chi":       [0.55, 0.30, 0.12, 0.03],
-      "sigma_f":   [1.95, 1.80, 1.80, 2.10],
-      "sigma_c":   [0.12, 0.10, 0.10, 0.15],
-      "sigma_s":   [4.10, 4.00, 3.90, 3.80],
-      "sigma_n2n": [0.00, 0.00, 0.00, 0.00],
-      "mu_bar":    [0.28, 0.24, 0.20, 0.15],
+      "nu":        [2.98, 2.92, 2.89, 2.89, 2.88],
+      "chi":       [0.55, 0.30, 0.12, 0.03, 0.00],
+      "sigma_f":   [1.95, 1.80, 1.80, 2.10, 400.0],
+      "sigma_c":   [0.12, 0.10, 0.10, 0.15, 190.0],
+      "sigma_s":   [4.10, 4.00, 3.90, 3.80, 10.00],
+      "sigma_n2n": [0.00, 0.00, 0.00, 0.00, 0.00],
+      "mu_bar":    [0.28, 0.24, 0.20, 0.15, 0.00],
       "beta":      0.0020,
-      "transfer":  [[0.70,0.20,0.08,0.02],[0.0,0.70,0.20,0.10],[0.0,0.0,0.80,0.20],[0.0,0.0,0.0,1.0]],
+      "transfer":  [[0.70,0.20,0.08,0.017,0.003],[0.0,0.70,0.20,0.098,0.002],[0.0,0.0,0.80,0.195,0.005],[0.0,0.0,0.0,0.90,0.10],[0.0,0.0,0.0,0.0,1.0]],
       "cite":      "ENDF-B-VIII-NNDC",
       "status":    "PUBLIC"
     }
@@ -53,12 +53,12 @@ Rules: `status = "PENDING"` entries MAY omit `value`, MUST carry `resolved_by = 
 ```
 
 **Semantics (normative):**
-- Groups are **0-based, highest→lowest energy**; `group_bounds_MeV` has `n_groups+1` strictly descending entries; group `g` spans `(bounds[g+1], bounds[g]]` MeV. v1 default is 4 groups with the lowest bound at **1e-3 MeV** — thermal is treated as unresolved-by-design (recorded limitation; adding thermal/epithermal groups is the v3 path, R-1).
+- Groups are **0-based, highest→lowest energy**; `group_bounds_MeV` has `n_groups+1` strictly descending entries; group `g` spans `(bounds[g+1], bounds[g]]` MeV. **v3 (ADR-024) fixes 5 groups: the 4 fast groups `[20, 3, 1, 0.1, 1e-3] MeV` (unchanged from v2) plus one thermal group below 1 keV down to the ~thermal data-grid floor.** The fast groups collapse under the hard fast weight (byte-identical to v2 → the bare-metal gates stay gate-safe); the thermal group under a 293.6 K Maxwellian + 1/E moderated weight (`tools/xs/weighting.py`). (v1/v2 were 4 groups with the lowest bound at 1e-3 MeV and thermal unresolved-by-design; v3 adds the thermalization-to-capture sink — the G1a canonical-supercritical fix.)
 - `sigma_f` = fission; `sigma_c` = **radiative capture only** (the v0 name `sigma_a` is REJECTED with a migration diagnostic — it was ambiguous with capture+fission); `sigma_s` = total scattering; `sigma_n2n` = (n,2n), optional, default 0.
 - **`sigma_t = sigma_f + sigma_c + sigma_s + sigma_n2n` is computed by the loader; it MUST NOT appear in the file.**
 - `nu` is **TOTAL** ν̄ (prompt + delayed) — ADR-013. The eigenvalue computed from it is `k_eff`, the benchmark-comparable quantity. `beta` (scalar, **REQUIRED**) is the isotope's delayed-neutron fraction (C-022…C-022e); `k_prompt = k_eff·(1−β_eff)` is derived downstream and consumed only by E3a kinetics. A set whose `nu` is prompt-only is a **loader error** — there is no way to detect it numerically, so the convention is enforced by requiring `beta` and by the M1-T4a data card stating which evaluation the `nu` came from.
 - `mu_bar` = mean lab-frame scattering cosine per group (**REQUIRED**; transport-corrected P0, `01 §2`). Transport-corrected total `sigma_tr = sigma_t − mu_bar·sigma_s` is used for flight sampling.
-- `transfer[from][to]` = probability that scattering in group `from` places the neutron in group `to`; each row sums to 1.0 ± 1e-6; **upscatter (`to < from`) MUST be zero in v2** (loader rejects). `transfer` is REQUIRED when `n_groups > 1`; `null` is permitted only in `status = "SIM"` test sets, and gate runs reject null-transfer sets.
+- `transfer[from][to]` = probability that scattering in group `from` places the neutron in group `to`; each row sums to 1.0 ± 1e-6; **upscatter (`to < from`) MUST be zero in v2 and v3** (loader rejects; ADR-024: the v3 thermal group is an absorption-biased sink — true thermal upscatter is the v4 path). `transfer` is REQUIRED when `n_groups > 1`; `null` is permitted only in `status = "SIM"` test sets, and gate runs reject null-transfer sets.
 - All cross sections in barns. Every value carries `cite`/`status`.
 
 Values above are illustrative placeholders — M1-T4a replaces them with cited values and records provenance + collapse method in `data/benchmarks/`.

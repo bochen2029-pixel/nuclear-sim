@@ -49,15 +49,15 @@ public:
         fs::remove_all(root_);
         fs::create_directories(root_);
 
-        const auto four = [](double v) { return json::array({v, v, v, v}); };
-        json iso = {{"nu", four(2.9)}, {"chi", json::array({1.0, 0.0, 0.0, 0.0})},
+        const auto four = [](double v) { return json::array({v, v, v, v, v}); };
+        json iso = {{"nu", four(2.9)}, {"chi", json::array({1.0, 0.0, 0.0, 0.0, 0.0})},
                     {"sigma_f", four(1.0)}, {"sigma_c", four(0.1)}, {"sigma_s", four(4.0)},
                     {"sigma_n2n", four(0.0)}, {"mu_bar", four(0.0)}, {"beta", 0.0020},
                     {"transfer", nullptr},
                     {"cite", "placeholder — the cited dataset is M1-T4a-2"},
                     {"status", "SIM"}};
-        json xs = {{"schema_version", 2}, {"name", "probe"},
-                   {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3})},
+        json xs = {{"schema_version", 3}, {"name", "probe"},
+                   {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3, 1e-10})},
                    {"isotopes", json::object()}};
         for (const char* n : {"U234", "U235", "U238", "Pu239", "Pu240", "Pu241", "Ga69", "Ga71"}) {
             xs["isotopes"][n] = iso;

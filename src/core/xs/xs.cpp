@@ -84,12 +84,13 @@ void load_transfer(const json& iso, const std::filesystem::path& path, const std
                     "transfer entries are probabilities and must be non-negative");
 
             // Groups are ordered highest -> lowest energy, so `to < from` is
-            // upscatter. v2 forbids it outright: a fast-spectrum few-group set
-            // that upscatters is either mis-collapsed or mis-ordered, and both
-            // produce a plausible-looking k.
+            // upscatter. v2 AND v3 forbid it outright (ADR-024: the v3 thermal group is
+            // an absorption-biased SINK, not a thermalize-and-return group; true thermal
+            // upscatter is the v4 path). A set that upscatters here is either mis-collapsed
+            // or mis-ordered, and both produce a plausible-looking k.
             if (to < from) {
                 require(p == 0.0, path, row_field + "[" + std::to_string(to) + "]",
-                        "upscatter (to < from) MUST be zero in schema v2; got "
+                        "upscatter (to < from) MUST be zero in schema v2/v3 (ADR-024); got "
                             + std::to_string(p));
             }
             out.transfer[from][to] = p;
@@ -196,10 +197,13 @@ FewGroupXS FewGroupXS::load(const std::filesystem::path& path) {
     require(doc.at("schema_version").is_number_integer(), path, "schema_version",
             "must be an integer");
     const int version = doc.at("schema_version").get<int>();
-    require(version == 2, path, "schema_version",
-            "must be 2; loaders MUST reject unknown versions (03 §preamble). Got "
+    require(version == 3, path, "schema_version",
+            "must be 3 (ADR-024: v3 is the 5-group set — the 4 fast groups + one thermal "
+            "group); loaders MUST reject unknown versions (03 §preamble). Got "
                 + std::to_string(version)
-                + (version == 1 ? " — v1 used sigma_a; see 03 §2 for the v2 migration" : ""));
+                + (version == 2 ? " — v2 was the 4-group set; regenerate the collapse at "
+                                  "kGroups=5 (tools/xs, ADR-024)"
+                   : version == 1 ? " — v1 used sigma_a; see 03 §2 for the migration" : ""));
 
     FewGroupXS out;
     require(doc.contains("name") && doc.at("name").is_string(), path, "name",
@@ -211,8 +215,9 @@ FewGroupXS FewGroupXS::load(const std::filesystem::path& path) {
     require(bounds.is_array(), path, "group_bounds_MeV", "must be an array");
     require(bounds.size() == kGroupsN + 1, path, "group_bounds_MeV",
             "must have n_groups+1 = " + std::to_string(kGroups + 1)
-                + " entries. Schema v2 fixes 4 groups (04 §3's Transfer is 4x4); more groups "
-                  "is the schema-v3 path via ADR (D4, R-1). Got "
+                + " entries. Schema v3 fixes 5 groups — the 4 fast groups + one thermal group "
+                  "(04 §3's Transfer is kGroups x kGroups); the group count is a schema bump via "
+                  "ADR (D4, R-1; ADR-024). Got "
                 + std::to_string(bounds.size()));
 
     for (std::size_t i = 0; i < bounds.size(); ++i) {

@@ -1,7 +1,8 @@
 # `fast4` — provenance manifest (per isotope)
 
 **Dataset:** `data/xs/fast4.json` — few-group (4-group) fast neutron cross sections,
-schema v2 (`03 §2`). **Authored by M1-T4a-2a** (owner-authorized Path B, 2026-08-04).
+schema v2 (`03 §2`). **Authored by M1-T4a-2a** (a-set, 8 isotopes; owner-authorized Path B,
+2026-08-04); **extended to the full 16 isotopes by M1-T4a-2b** (b-set, 2026-08-06).
 
 > Records WHERE every number comes from and HOW it was produced. Every value is from the
 > documented collapse (`tools/xs/build_fast4.py` + `weighting.py`); NONE is tuned to a
@@ -39,22 +40,48 @@ schema v2 (`03 §2`). **Authored by M1-T4a-2a** (owner-authorized Path B, 2026-0
 | Ga-69  | 3125 | 293.6 K | Jezebel (Ga alloy) |
 | Ga-71  | 3131 | 293.6 K | Jezebel (Ga alloy) |
 
-*(MATs verified against the IAEA ENDF/B-VIII.0 filenames. b-set — Al-27, B-10, Be-9, C-12,
-H-1, N-14, O-16, Po-210 — is M1-T4a-2b; not needed for G0a/G0b.)*
+## Isotopes (b-set: M1-T4a-2b → full-device transport, step 5)
+
+Structural / tamper-pusher / high-explosive / initiator isotopes. Same source (ENDF/B-VIII.0
+pre-reconstructed HDF5, 293.6 K) + same pipeline. **NOT used by G0a/G0b** (bare U/Pu spheres).
+
+| Isotope | ENDF/B-VIII.0 file | Role |
+|---|---|---|
+| Al-27  | Al27.h5  | pusher / structural |
+| B-10   | B10.h5   | neutron absorber (its role is (n,α)) |
+| Be-9   | Be9.h5   | initiator (Po-Be source), reflector |
+| C-12   | C12.h5   | high explosive (Comp B), moderator |
+| H-1    | H1.h5    | high explosive (Comp B), the strong moderator |
+| N-14   | N14.h5   | high explosive (Comp B) |
+| O-16   | O16.h5   | high explosive (Comp B) |
+| Po-210 | Po210.h5 | initiator alpha source |
+
+**Pipeline enhancement the b-set required (M1-T4a-2b), and its a-set impact:** the a-set collapse
+was written for actinides and mishandled two channels the light/absorber b-set exposes — it counted
+only (n,γ) as absorption (dropping B-10's dominant (n,α)) and treated ALL elastic as within-group
+(dropping H-1's moderation). Both were fixed in `build_fast4.py`. The fixes are **gate-safe by
+construction**: the multi-channel absorption changes the a-set only where the charged-particle
+channels are non-zero (Ga's (n,p)/(n,α), a real correction — but Ga is NOT in Godiva/Jezebel; U-235
+shifts one 6th-decimal, U-238/Pu-239/Pu-240 are byte-identical), and the finite-A elastic downscatter
+is applied only for A<30 so the heavy a-set elastic is byte-identical to the committed set. Net:
+**Jezebel (G0b) byte-identical; Godiva (G0a) <<1 pcm; G0c (a differential) unaffected.** *Known
+limitation / follow-up:* the A<30 isotropic-CM elastic-downscatter approximation is accurate for the
+light b-set but the exact treatment is the anisotropic kernel from the ENDF elastic p(μ); it matters
+for the (peripheral) HE region in full-device transport, not for the current gates.
 
 ## Per-field method
 
 | Field | ENDF source | Collapse |
 |---|---|---|
 | `sigma_f`   | MT=18 fission                 | σ_g = ∫_g σ(E)φ(E)dE / ∫_g φ(E)dE (trapezoid on the nuclide's own grid) |
-| `sigma_c`   | MT=102 radiative capture only | flux-weighted group average |
+| `sigma_c`   | disappearance: MT=102 (n,γ) + MT=103-107 (n,p)/(n,d)/(n,t)/(n,³He)/**(n,α)** | flux-weighted group average of the SUM. For the a-set actinides the charged-particle channels are ~0 (sigma_c unchanged to <1e-6 b); for the b-set they DOMINATE — B-10's absorber role is entirely (n,α) (~0.22 b @1 MeV), not (n,γ) (~6e-5 b) (M1-T4a-2b) |
 | `sigma_s`   | MT=2 elastic + MT=4/51-91 inelastic | flux-weighted group average (elastic + inelastic) |
 | `sigma_n2n` | MT=16 (n,2n)                  | flux-weighted group average |
 | `nu`        | MT=452 TOTAL ν̄               | fission-rate weighted: ν̄_g = ∫ν σ_f φ / ∫σ_f φ |
 | `chi`       | MT=18 prompt fission spectrum (ContinuousTabular), incident-averaged | fraction emitted into group g; Σχ_g = 1 |
 | `beta`      | delayed (MT=455) / total ν̄   | scalar, fission-rate weighted over the fast range |
 | `mu_bar`    | MT=2 elastic angular (Tabular) | ⟨μ_el·σ_el·φ⟩ / ⟨(σ_el+σ_inel)·φ⟩ — the transport-correction cosine (elastic anisotropy, diluted by ~isotropic inelastic) |
-| `transfer`  | elastic kinematics + MT=51-90 (LevelInelastic) + MT=91 (CorrelatedAngleEnergy/KalbachMann) | elastic ~within-group (heavy-A); inelastic downscatter from the ENDF secondary spectra; rows sum to 1; no upscatter |
+| `transfer`  | elastic kinematics + MT=51-90 (LevelInelastic) + MT=91 (CorrelatedAngleEnergy/KalbachMann) | **light nuclei (A<30): finite-A elastic downscatter** (isotropic-CM, E′ uniform in [αE, E], α=((A-1)/(A+1))²) — H-1 moderates; **heavy nuclei (A≥30): elastic within-group** (forward-peaked, negligible energy loss — and byte-identical to the committed a-set). Inelastic downscatter from the ENDF secondary spectra. Rows sum to 1; no upscatter (M1-T4a-2b) |
 
 `sigma_t` is loader-computed (`σ_t = σ_f + σ_c + σ_s + σ_n2n`, `03 §2`) — NOT in the file.
 `transfer` is a real matrix (gate runs reject null-transfer).

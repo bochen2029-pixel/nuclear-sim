@@ -30,6 +30,9 @@ BOUNDS_MEV = [20.0, 3.0, 1.0, 0.1, 1.0e-3]
 BOUNDS_EV = [b * 1.0e6 for b in BOUNDS_MEV]
 NG = 4
 TEMP = "294K"  # 293.6 K room temperature (the assemblies are at room temperature)
+# Below this mass number, fast elastic scattering is treated as isotropic-CM downscatter
+# ([alpha*E, E]); at/above it, forward-peaking dominates and elastic stays within-group (M1-T4a-2b).
+kElasticDownscatterA = 30
 
 # fast4 a-set nuclide -> openmc HDF5 filename.
 ASET = ["U234", "U235", "U238", "Pu239", "Pu240", "Pu241", "Ga69", "Ga71"]
@@ -77,6 +80,23 @@ def inelastic_xs(iso):
     def total(E):
         E = np.atleast_1d(np.asarray(E, float))
         return sum(np.asarray(iso[mt].xs[TEMP](E), float) for mt in levels)
+
+    return total
+
+
+def disappearance_xs(iso):
+    """Total neutron-DISAPPEARANCE (absorption-minus-fission) xs -> sigma_c: radiative capture
+    (n,gamma) MT=102 PLUS the charged-particle-out channels (n,p) 103, (n,d) 104, (n,t) 105,
+    (n,3He) 106, (n,alpha) 107. For the a-set actinides these charged-particle channels are ~0
+    (sigma_c is unchanged to <1e-6 b, so the a-set + G0a/G0b are essentially untouched); for the
+    b-set they are the DOMINANT absorber and MUST be counted -- e.g. B-10, whose absorber role is
+    entirely (n,alpha) (~0.22 b @1 MeV, ~2 b @100 keV), NOT (n,gamma) (~6e-5 b). Fission (its own
+    channel) and (n,2n) (a multiplication channel) are deliberately excluded (M1-T4a-2b)."""
+    fns = [xs_of(iso, mt) for mt in (102, 103, 104, 105, 106, 107)]
+
+    def total(E):
+        E = np.atleast_1d(np.asarray(E, float))
+        return sum(np.asarray(f(E), float) for f in fns)
 
     return total
 
@@ -174,7 +194,7 @@ def collapse_isotope(iso):
 
     el = xs_of(iso, 2)
     inel = inelastic_xs(iso)
-    cap = xs_of(iso, 102)
+    cap = disappearance_xs(iso)  # (n,g) + (n,p)/(n,a)/... -- the b-set's (n,a) absorbers (M1-T4a-2b)
     n2n = xs_of(iso, 16)
     fis = xs_of(iso, 18)
     mub_el = elastic_mubar_fn(iso)
@@ -359,9 +379,12 @@ def fission_chi(iso):
 
 def scatter_transfer(iso):
     """transfer[from][to]: group-to-group scatter probability (rows sum to 1, no upscatter).
-    Elastic (MT2) is ~within-group at this coarse fast structure (heavy-A kinematics confine
-    E' to a sub-group loss); inelastic discrete (MT51-90, LevelInelastic) + continuum (MT91)
-    carry the downscatter. (n,2n) is excluded -- it is the separate sigma_n2n channel.)"""
+    Elastic (MT2) downscatters by FINITE-A kinematics: an s-wave (isotropic-CM) collision sends the
+    outgoing energy uniformly into [alpha*E, E], alpha = ((A-1)/(A+1))^2. Heavy A -> alpha ~ 1 -> it
+    is ~within-group (the a-set actinides, unchanged to rounding); light A moderates -- H-1 (alpha=0)
+    is pure downscatter, which the old heavy-A within-group shortcut dropped (M1-T4a-2b). Inelastic
+    discrete (MT51-90, LevelInelastic) + continuum (MT91) also downscatter. (n,2n) is excluded -- it
+    is the separate sigma_n2n channel."""
     inel = [mt for mt in list(range(51, 91)) + [91] if mt in iso.reactions]
     inel_edist = {}
     for mt in inel:
@@ -372,12 +395,32 @@ def scatter_transfer(iso):
                     inel_edist[mt] = e
                 break
 
+    A = iso.mass_number
+    alpha = ((A - 1.0) / (A + 1.0)) ** 2  # min fraction of E retained in one elastic collision
+    # The isotropic-CM downscatter [alpha*E, E] is accurate only where fast elastic is ~isotropic,
+    # i.e. LIGHT nuclei (A < kElasticDownscatterA). Heavy nuclei are forward-peaked (mu_bar -> 1), so
+    # elastic loses almost no energy and the within-group treatment is the better approximation --
+    # applying isotropic downscatter there would OVERESTIMATE it. Keeping the split also leaves the
+    # heavy a-set (U/Pu/Ga) elastic byte-identical to the committed set, so G0a/G0b/G0c are untouched.
+    # The exact anisotropic elastic-downscatter kernel (from the ENDF p(mu)) is a documented follow-up.
+    light = A < kElasticDownscatterA
+    span = None
     T = np.zeros((NG, NG))
     for g in range(NG):
         ghi, glo = BOUNDS_EV[g], BOUNDS_EV[g + 1]
-        # elastic within-group rate: integrate on the resonance-resolving grid.
         Ef = group_nodes(iso, glo, ghi)
-        T[g, g] += float(_trapz(np.asarray(xs_of(iso, 2)(Ef), float) * phi_ev(Ef), Ef))
+        el_rate = np.asarray(xs_of(iso, 2)(Ef), float) * phi_ev(Ef)
+        if not light:
+            # heavy: forward-peaked elastic stays within-group (reproduces the a-set exactly).
+            T[g, g] += float(_trapz(el_rate, Ef))
+        else:
+            # light: elastic downscatter, outgoing E' ~ uniform in [alpha*E, E] (isotropic CM).
+            span = Ef * (1.0 - alpha)
+            for gp in range(g, NG):
+                b2, a2 = BOUNDS_EV[gp], BOUNDS_EV[gp + 1]  # group gp spans (a2, b2] eV, hi->lo
+                ov = np.clip(np.minimum(Ef, b2) - np.maximum(alpha * Ef, a2), 0.0, None)
+                frac = np.where(span > 0.0, ov / np.where(span > 0.0, span, 1.0), 0.0)
+                T[g, gp] += float(_trapz(el_rate * frac, Ef))
         # inelastic downscatter: coarse grid is enough (inelastic xs is smooth, no
         # resonances). Same trapz convention as elastic so the ratio is consistent.
         Ec = np.logspace(np.log10(glo), np.log10(ghi), 80)

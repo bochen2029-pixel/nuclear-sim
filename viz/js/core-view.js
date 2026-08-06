@@ -516,3 +516,9 @@ window.__cv = {
 
 updateHud();
 tick();
+
+// hide the loading overlay once the first frame is composited
+requestAnimationFrame(() => requestAnimationFrame(() => {
+  const l = document.getElementById('loading');
+  if (l) { l.classList.add('hidden'); setTimeout(() => l.remove(), 800); }
+}));

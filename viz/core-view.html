@@ -102,6 +102,23 @@
     vertical-align: middle; box-shadow: 0 0 8px currentColor; }
   .disc { position: absolute; top: 52px; left: 50%; transform: translateX(-50%); font-size: 9px;
     letter-spacing: 2px; color: rgba(109,130,153,0.7); }
+
+  /* loading overlay (hidden by core-view.js once the first frame is up) */
+  #loading { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 20px; background: #04060a;
+    transition: opacity 0.7s ease; }
+  #loading.hidden { opacity: 0; pointer-events: none; }
+  #loading .spinner { width: 40px; height: 40px; border: 2px solid rgba(87,230,255,0.12);
+    border-top-color: var(--accent); border-radius: 50%; animation: cvspin 0.9s linear infinite;
+    box-shadow: 0 0 26px rgba(87,230,255,0.2); }
+  @keyframes cvspin { to { transform: rotate(360deg); } }
+  #loading .lt { font-size: 14px; letter-spacing: 6px; color: #eaf6ff; }
+  #loading .lt b { color: var(--accent); }
+  #loading .ls { font-size: 10px; letter-spacing: 2.5px; color: var(--dim); }
+  #loading .lerr { display: none; font-size: 11px; letter-spacing: 1px; color: #ff8a6a; max-width: 380px;
+    text-align: center; line-height: 1.6; }
+  #loading.err .spinner, #loading.err .ls { display: none; }
+  #loading.err .lerr { display: block; }
 </style>
 </head>
 <body>
@@ -150,6 +167,21 @@
   <div class="hint">drag <b>orbit</b> · scroll <b>zoom</b> · the burst auto-dilates time</div>
 </div>
 
+<div id="loading">
+  <div class="spinner"></div>
+  <div class="lt">DEMON<b>CORE</b></div>
+  <div class="ls">initializing renderer · three.js r160</div>
+  <div class="lerr">WebGL could not initialize. This view needs a WebGL2-capable browser with
+    hardware acceleration enabled.</div>
+</div>
+
+<script>
+  // graceful WebGL fallback: if the module hasn't come up in a few seconds, show the error state.
+  window.addEventListener('error', (e) => { if (String(e?.message || '').match(/webgl|context/i)) {
+    document.getElementById('loading')?.classList.add('err'); } });
+  setTimeout(() => { const l = document.getElementById('loading');
+    if (l && !l.classList.contains('hidden')) l.classList.add('err'); }, 9000);
+</script>
 <script type="module" src="js/core-view.js?v=1"></script>
 </body>
 </html>

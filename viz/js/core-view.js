@@ -49,6 +49,16 @@ scene.fog = new THREE.FogExp2(0x04060a, 0.026);
   const rad = g.createRadialGradient(256, 232, 30, 256, 256, 400);
   rad.addColorStop(0, '#141f2e'); rad.addColorStop(0.45, '#0a121d'); rad.addColorStop(1, '#03050a');
   g.fillStyle = rad; g.fillRect(0, 0, 512, 512);
+  // faint nebula wisps → atmospheric depth (the DOF softens them into a dreamy backdrop)
+  for (let i = 0; i < 16; i++) {
+    const x = Math.random() * 512, y = Math.random() * 512, r = 40 + Math.random() * 150;
+    const bg = g.createRadialGradient(x, y, 0, x, y, r);
+    bg.addColorStop(0, ['#1c3242', '#182a3c', '#213045', '#12222e'][i % 4]);
+    bg.addColorStop(1, 'rgba(0,0,0,0)');
+    g.globalAlpha = 0.10 + Math.random() * 0.12; g.fillStyle = bg;
+    g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+  }
+  g.globalAlpha = 1;
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
   scene.background = tex;
 }
@@ -241,9 +251,9 @@ const DofShader = {
       float coc = smoothstep(0.09, 0.62, length(vec2(c.x * uRes.x / uRes.y, c.y)) * 1.6) * uAmount;
       float ar = uRes.y / uRes.x;
       vec3 col = texture2D(tDiffuse, vUv).rgb; float w = 1.0;
-      for (int i = 1; i <= 22; i++){
+      for (int i = 1; i <= 30; i++){
         float a = float(i) * 2.3999632;                       // golden-angle disc
-        float rad = sqrt(float(i) / 22.0) * coc;
+        float rad = sqrt(float(i) / 30.0) * coc;
         vec2 off = vec2(cos(a) * ar, sin(a)) * rad;
         col += texture2D(tDiffuse, vUv + off).rgb; w += 1.0;
       }

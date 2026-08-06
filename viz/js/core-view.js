@@ -105,7 +105,7 @@ ground.rotation.x = -Math.PI / 2; ground.position.y = -PIT_R * 2.1; ground.recei
 scene.add(ground);
 
 // ------------------------------------------------------------------ nuclei (instanced, true-3D)
-const nucGeo = new THREE.IcosahedronGeometry(1, 1);
+const nucGeo = new THREE.IcosahedronGeometry(1, 2);   // detail 2 → smoother spheres in the sharp focal plane
 // per-instance emissive glow (fission flash) injected into the standard shader
 nucGeo.setAttribute('aGlow', new THREE.InstancedBufferAttribute(new Float32Array(N_NUCLEI), 1));
 const nucMat = new THREE.MeshStandardMaterial({ metalness: 0.42, roughness: 0.36, envMapIntensity: 1.2 });
@@ -216,7 +216,7 @@ function fission(j, gen) {
 // ------------------------------------------------------------------ burst core (emissive + glow shells)
 const core = new THREE.Mesh(
   new THREE.IcosahedronGeometry(PIT_R * 0.13, 4),
-  new THREE.MeshBasicMaterial({ color: 0xfff1d6, transparent: true, opacity: 0,
+  new THREE.MeshBasicMaterial({ color: 0xffdca8, transparent: true, opacity: 0,
     blending: THREE.AdditiveBlending, depthWrite: false }));
 scene.add(core);
 const glowShells = [];
@@ -432,14 +432,14 @@ function frame(dtReal, doRender = true) {
   // ---- burst core + lights driven by population ----
   const inten = Math.min(1, nAlive / MAXN);   // linear fill fraction → clean growth→peak ramp
   const burst = inten * inten;
-  core.material.opacity = burst * 0.5;
-  core.scale.setScalar(0.35 + burst * 1.6);
+  core.material.opacity = burst * 0.38;
+  core.scale.setScalar(0.35 + burst * 1.5);
   for (let i = 0; i < glowShells.length; i++) {
     glowShells[i].material.opacity = burst * (0.22 - i * 0.05);
     glowShells[i].scale.setScalar(0.6 + burst * (1.4 + i * 0.5));
   }
-  coreLight.intensity = burst * 30;
-  fill.intensity = 14 + burst * 16;
+  coreLight.intensity = burst * 20;
+  fill.intensity = 14 + burst * 14;
   grade.uniforms.uBurst.value = burst;
   godrays.uniforms.uStrength.value = 0.03 + burst * 0.3;   // shafts intensify with the burst
   boundary.material.opacity = 0.04 + burst * 0.05;

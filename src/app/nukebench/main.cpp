@@ -1,17 +1,21 @@
-// nukebench — headless gate runner (06 §1). A thin CLI11 dispatch over the tested handlers in
-// cli.{h,cpp}: `gate` (M1-T5-b) + `diff` (the G0c cross-backend differential, M1-T5-c-3); `run`
-// deferred. Exit codes per 06 §5: 0 ok, 1 general, 2 usage, 3 validation, 4 gate-fail, 5 internal.
+// nukebench — headless CLI (06 §1). A thin CLI11 dispatch over the tested handlers in cli.{h,cpp}:
+// `run` (scenario -> the 03 §6 bundle, M1-T5-c-4), `gate` (M1-T5-b), `diff` (the G0c cross-backend
+// differential, M1-T5-c-3). Exit codes per 06 §5: 0 ok, 1 general, 2 usage, 3 validation, 4
+// gate-fail, 5 internal.
 
 #include "app/nukebench/cli.h"
 #include "app/nukebench/gates.h"  // GatesError
 
 #include <CLI/CLI.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <exception>
 #include <filesystem>
 #include <string>
+#include <utility>
+#include <vector>
 
 int main(int argc, char** argv) {
     CLI::App app{"nukebench - headless gate runner (08 sec 2)"};
@@ -46,9 +50,43 @@ int main(int argc, char** argv) {
     diff->add_option("--git", d_git, "short commit hash of the code (provenance, 03 sec 11)");
     diff->add_option("--device", d_device, "device string (provenance, e.g. \"ref + RTX 4070\")");
 
+    // M1-T5-c-4: `run` — a demon-core scenario cfg -> the 03 sec 6 artifact bundle (run.json +
+    // tally.json). fast4-independent (the src/api studio surface); backend ref only (CPU burst).
+    auto* run = app.add_subcommand("run", "Run a demon-core scenario (cfg JSON) -> the 03 sec 6 "
+                                          "artifact bundle {run.json, tally.json}");
+    std::string r_scenario, r_backend = "ref", r_out = "artifacts", r_git, r_device;
+    std::vector<std::string> r_overrides;
+    bool r_dirty = false;
+    run->add_option("--scenario", r_scenario, "demon-core cfg JSON (flat dotted keys)")->required();
+    run->add_option("--override", r_overrides, "key=value applied to the cfg (repeatable, numeric)");
+    run->add_option("--backend", r_backend, "ref (default; the demon-core burst is CPU transport)");
+    run->add_option("--out", r_out, "artifact root (default: artifacts/)");
+    run->add_option("--git", r_git, "short commit hash of the code (provenance, 03 sec 6)");
+    run->add_option("--device", r_device, "device string (provenance)");
+    run->add_flag("--dirty", r_dirty, "mark the working tree dirty (provenance)");
+
     CLI11_PARSE(app, argc, argv);
 
     try {
+        if (*run) {
+            std::vector<std::pair<std::string, std::string>> ovs;
+            for (const auto& s : r_overrides) {
+                const std::size_t eq = s.find('=');
+                if (eq == std::string::npos || eq == 0) {
+                    std::fprintf(stderr, "nukebench run: --override must be key=value: %s\n", s.c_str());
+                    return 2;  // 06 sec 5 usage
+                }
+                ovs.emplace_back(s.substr(0, eq), s.substr(eq + 1));
+            }
+            const auto out =
+                ns::nukebench::cli_run(r_scenario, ovs, r_out, r_backend, r_git, r_device, r_dirty);
+            if (out.exit_code == 0) {
+                std::printf("run %s: %s  yield=%.4g kt  (bundle: %s)\n", out.unit_id.substr(0, 16).c_str(),
+                            out.detonate ? "detonate" : (out.fizzle ? "fizzle" : "no-detonate"),
+                            out.yield_kt, out.out_dir.string().c_str());
+            }
+            return out.exit_code;  // 0 ok, 3 validation
+        }
         if (*gate) {
             if (seed_opt->count() > 0) {  // --seed with --gate is a usage error (08 sec 2)
                 std::fprintf(stderr, "nukebench gate: --seed is not accepted with --gate (08 sec 2)\n");

@@ -2,17 +2,22 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include "api/run_provenance.h"
+#include "api/studio.h"
 #include "app/nukebench/cli.h"
 #include "app/nukebench/gate_report.h"
 #include "app/nukebench/gates.h"
+#include "physics/tally/tally.h"
 
 #include "spec_examples.h"
 
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -191,4 +196,80 @@ TEST_CASE("cli_gate records git/device/timestamp provenance (03 sec 11)", "[nuke
     REQUIRE(rep.started.back() == 'Z');        // UTC
     REQUIRE(rep.finished >= rep.started);       // finished after started (ISO-8601 sorts lexically)
     fs::remove(report);
+}
+
+// --- M1-T5-c-4: `nukebench run` (scenario cfg -> the 03 §6 bundle) ---
+
+TEST_CASE("cli_run writes the 03 sec 6 bundle {run.json, tally.json} with stamped provenance",
+          "[nukebench]") {
+    // A strongly-compressed heavy pit -> a real prompt-supercritical burst (the meaningful `run`
+    // case): a finite yield and a clean, round-trippable 03 §5 tally. Small eigen batch for speed;
+    // deeply supercritical, so batch noise never flips the deterministic-seed outcome.
+    const std::string cfg =
+        R"({"pit.mass_kg":9.0,"compression.ratio":2.5,"eigen.batch":800,"seed":20260805})";
+    const auto scen = write_tmp("nukebench_run_scen.json", cfg);
+    const auto out_root = fs::temp_directory_path() / "nukebench_run_out";
+    fs::remove_all(out_root);
+
+    const auto r = ns::nukebench::cli_run(scen, {}, out_root, "ref", "abc1234", "CPU ref (test)", false);
+    REQUIRE(r.exit_code == 0);
+    REQUIRE(r.detonate);                                 // EMERGENT from the burst, not a rule
+    REQUIRE(r.yield_kt > 0.0);
+    REQUIRE_FALSE(r.unit_id.empty());
+    REQUIRE(r.out_dir.filename() == r.unit_id);          // artifacts/<unit_id>/ (03 §6)
+    REQUIRE(fs::exists(r.out_dir / "run.json"));
+    REQUIRE(fs::exists(r.out_dir / "tally.json"));
+
+    // run.json round-trips (every 03 §6 required field present) + records the stamped provenance.
+    const auto run = ns::api::parse_run_json(slurp(r.out_dir / "run.json"));
+    REQUIRE(run.unit_id == r.unit_id);
+    REQUIRE(run.backend == "ref");
+    REQUIRE(run.git == "abc1234");
+    REQUIRE(run.device == "CPU ref (test)");
+    REQUIRE(run.code_version == "0.1.0");
+    REQUIRE(run.spec_version == "0.3");
+    REQUIRE(run.started.size() == 20);                   // ISO-8601 "YYYY-MM-DDTHH:MM:SSZ"
+    REQUIRE(run.finished.size() == 20);
+    REQUIRE(run.scenario_overrides.empty());             // baked into the cfg -> unit_id recomputable
+    // the recorded unit_id IS the studio dedup key for the effective cfg (== nukefarm's key).
+    REQUIRE(run.unit_id == ns::api::studio_unit_id(ns::api::StudioConfig::from_json(cfg)));
+
+    // tally.json round-trips as a valid 03 §5 TallyResult — the primary `run` output.
+    const auto tally = ns::physics::parse_tally_json(slurp(r.out_dir / "tally.json"));
+    REQUIRE(std::isfinite(tally.yield_kt));
+    REQUIRE(tally.yield_kt > 0.0);
+    fs::remove_all(out_root);
+}
+
+TEST_CASE("cli_run folds a numeric --override into the effective cfg and the unit_id",
+          "[nukebench]") {
+    const std::string base =
+        R"({"pit.mass_kg":4.0,"compression.ratio":1.0,"eigen.batch":600,"seed":20260805})";
+    const auto scen = write_tmp("nukebench_run_ov.json", base);
+    const auto out_root = fs::temp_directory_path() / "nukebench_run_ov_out";
+    fs::remove_all(out_root);
+
+    const auto a = ns::nukebench::cli_run(scen, {}, out_root, "ref");
+    const auto b = ns::nukebench::cli_run(scen, {{"pit.mass_kg", "5.0"}}, out_root, "ref");
+    REQUIRE(a.exit_code == 0);
+    REQUIRE(b.exit_code == 0);
+    REQUIRE(a.unit_id != b.unit_id);                     // the override changed the effective cfg
+    REQUIRE(fs::exists(a.out_dir / "run.json"));
+    REQUIRE(fs::exists(b.out_dir / "run.json"));
+    // b's unit_id is the studio key of the *merged* cfg (override applied verbatim onto the file).
+    const std::string merged =
+        R"({"pit.mass_kg":5.0,"compression.ratio":1.0,"eigen.batch":600,"seed":20260805})";
+    REQUIRE(b.unit_id == ns::api::studio_unit_id(ns::api::StudioConfig::from_json(merged)));
+    fs::remove_all(out_root);
+}
+
+TEST_CASE("cli_run rejects a bad backend, a missing scenario, and a non-numeric override (exit 3)",
+          "[nukebench]") {
+    // All three are validation failures caught BEFORE any burst runs (fast + no side effects).
+    const auto scen = write_tmp("nukebench_run_bad.json", R"({"pit.mass_kg":4.0})");
+    const auto out_root = fs::temp_directory_path() / "nukebench_run_bad_out";
+
+    REQUIRE(ns::nukebench::cli_run(scen, {}, out_root, "gpu").exit_code == 3);         // unsupported backend
+    REQUIRE(ns::nukebench::cli_run(out_root / "nope.json", {}, out_root, "ref").exit_code == 3);  // no file
+    REQUIRE(ns::nukebench::cli_run(scen, {{"pit.mass_kg", "heavy"}}, out_root, "ref").exit_code == 3);  // NaN override
 }

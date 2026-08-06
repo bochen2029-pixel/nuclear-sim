@@ -1,13 +1,20 @@
 #include "app/nukebench/cli.h"
 
+#include "api/run_provenance.h"
+#include "api/studio.h"
 #include "app/nukebench/gate_report.h"
 #include "app/nukebench/gates.h"
 #include "core/hash/sha256.h"
+#include "physics/tally/tally.h"
+
+#include <nlohmann/json.hpp>
 
 #include <chrono>
+#include <cstdio>
 #include <ctime>
 #include <fstream>
 #include <sstream>
+#include <system_error>
 
 namespace ns::nukebench {
 
@@ -17,6 +24,11 @@ std::string read_file(const std::filesystem::path& p) {
     std::ostringstream ss;
     ss << f.rdbuf();
     return ss.str();
+}
+
+void write_file(const std::filesystem::path& p, const std::string& content) {
+    std::ofstream f(p, std::ios::binary);
+    f << content;
 }
 
 /// UTC wall-clock as ISO-8601 (e.g. "2026-08-05T14:30:00Z"), for the report's started/finished
@@ -104,6 +116,95 @@ GateOutcome cli_diff(const std::string& gate_id, const std::filesystem::path& re
     out.verdict = verdict;
     out.report_path = report_path;
     out.exit_code = (verdict == "pass") ? 0 : 4;
+    return out;
+}
+
+RunOutcome cli_run(const std::filesystem::path& scenario_file,
+                   const std::vector<std::pair<std::string, std::string>>& overrides,
+                   const std::filesystem::path& out_root, const std::string& backend,
+                   const std::string& git, const std::string& device, bool dirty) {
+    RunOutcome out;
+
+    // The demon-core burst is CPU reference transport; the gpu eigen is k-only (no burst).
+    if (backend != "ref") {
+        std::fprintf(stderr,
+                     "nukebench run: --backend %s not supported; the demon-core burst runs on the "
+                     "CPU reference transport (--backend ref)\n",
+                     backend.c_str());
+        out.exit_code = 3;  // 06 §5 validation
+        return out;
+    }
+
+    std::error_code ec;
+    if (!std::filesystem::exists(scenario_file, ec)) {
+        std::fprintf(stderr, "nukebench run: scenario file not found: %s\n",
+                     scenario_file.string().c_str());
+        out.exit_code = 3;
+        return out;
+    }
+
+    // The scenario is a flat dotted-key JSON object (viz/js/scenario.js + studio_bridge shape).
+    nlohmann::json cfg_obj;
+    try {
+        cfg_obj = nlohmann::json::parse(read_file(scenario_file));
+    } catch (const nlohmann::json::exception& e) {
+        std::fprintf(stderr, "nukebench run: scenario is not valid JSON: %s\n", e.what());
+        out.exit_code = 3;
+        return out;
+    }
+    if (!cfg_obj.is_object()) {
+        std::fprintf(stderr, "nukebench run: scenario must be a JSON object of dotted keys\n");
+        out.exit_code = 3;
+        return out;
+    }
+
+    // Merge overrides verbatim; every demon-core knob is numeric, so a non-numeric
+    // value is a validation error (StudioConfig::from_json would silently ignore it).
+    for (const auto& [key, val] : overrides) {
+        nlohmann::json parsed;
+        try {
+            parsed = nlohmann::json::parse(val);
+        } catch (const nlohmann::json::exception&) {
+            parsed = nullptr;
+        }
+        if (!parsed.is_number()) {
+            std::fprintf(stderr, "nukebench run: override value must be numeric: %s=%s\n",
+                         key.c_str(), val.c_str());
+            out.exit_code = 3;
+            return out;
+        }
+        cfg_obj[key] = parsed;
+    }
+
+    // Run the emergent burst. unit_id = studio_unit_id(cfg) — the overrides are folded
+    // into the cfg (hence into the canonical hash and unit_id); scenario_overrides stays
+    // [] so the recorded unit_id remains recomputable from the recorded fields (03 §6).
+    const ns::api::StudioConfig cfg = ns::api::StudioConfig::from_json(cfg_obj.dump());
+    const std::string started = iso8601_utc_now();
+    ns::api::GenerateRunResult res = ns::api::generate_run(cfg);
+    const std::string finished = iso8601_utc_now();
+
+    // Stamp the environment provenance the physics layer leaves for a frontend (cli_gate pattern).
+    res.run.code_version = "0.1.0";
+    res.run.spec_version = "0.3";
+    res.run.git = git;
+    res.run.dirty = dirty;
+    if (!device.empty()) res.run.device = device;
+    res.run.started = started;
+    res.run.finished = finished;
+
+    // Emit the 03 §6 bundle: artifacts/<unit_id>/{run.json, tally.json}.
+    const std::filesystem::path dir = out_root / res.run.unit_id;
+    std::filesystem::create_directories(dir, ec);
+    write_file(dir / "run.json", ns::api::to_json(res.run));
+    write_file(dir / "tally.json", ns::physics::to_json(res.tally));
+
+    out.unit_id = res.run.unit_id;
+    out.out_dir = dir;
+    out.detonate = res.detonate;
+    out.fizzle = !res.supercritical;
+    out.yield_kt = res.yield_kt;
+    out.exit_code = 0;  // a completed run (fizzle or detonate) is a success; `run` is not a gate
     return out;
 }
 

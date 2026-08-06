@@ -5,12 +5,12 @@
   "gates_toml_sha256": "6fe7ffee9dae834b117ae87c26009f9a14b12db2f94a091258d52f3e30bdd2d7",
   "spec_sha256": "8dc025c0588905a61c3503d3f7a6e1b81ba94e7eec95a4ba6a0046edd04f77aa",
   "code_version": "0.1.0",
-  "git": "d61e0f2",
+  "git": "d321f07",
   "dirty": false,
   "backend": "ref|gpu",
-  "device": "ref i9-9900K + RTX 4070 Ti SUPER (sm_89)",
-  "started": "2026-08-05T19:38:12Z",
-  "finished": "2026-08-05T20:20:21Z",
+  "device": "ref i9-9900K + RTX 4070 Ti SUPER",
+  "started": "2026-08-06T02:33:57Z",
+  "finished": "2026-08-06T03:19:24Z",
   "attempts": [
     {
       "attempt": 1,
@@ -35,6 +35,20 @@
           "value": 8.10449218429099,
           "op": "le",
           "threshold": 23.48925867108923,
+          "pass": true
+        },
+        {
+          "name": "per_shell_equivalence_ratio",
+          "value": 0.5659700018319944,
+          "op": "le",
+          "threshold": 1.0,
+          "pass": true
+        },
+        {
+          "name": "population_series_equivalence_ratio",
+          "value": 0.3033904027028617,
+          "op": "le",
+          "threshold": 1.0,
           "pass": true
         }
       ],
@@ -64,6 +78,20 @@
           "op": "le",
           "threshold": 24.91155729207402,
           "pass": true
+        },
+        {
+          "name": "per_shell_equivalence_ratio",
+          "value": 0.4608662629436435,
+          "op": "le",
+          "threshold": 1.0,
+          "pass": true
+        },
+        {
+          "name": "population_series_equivalence_ratio",
+          "value": 0.5378865659356141,
+          "op": "le",
+          "threshold": 1.0,
+          "pass": true
         }
       ],
       "run_dir": ""
@@ -91,6 +119,20 @@
           "value": 6.983545566341398,
           "op": "le",
           "threshold": 23.440173707151715,
+          "pass": true
+        },
+        {
+          "name": "per_shell_equivalence_ratio",
+          "value": 0.5583261418882072,
+          "op": "le",
+          "threshold": 1.0,
+          "pass": true
+        },
+        {
+          "name": "population_series_equivalence_ratio",
+          "value": 0.6371845176286253,
+          "op": "le",
+          "threshold": 1.0,
           "pass": true
         }
       ],

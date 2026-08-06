@@ -26,7 +26,7 @@
 |---|---|---|---|
 | G0a | **fail** — OUTSIDE band (honest, C-900 committed) | Godiva **+2560 pcm** (C-900 1e6×250, 5-seed mean k=1.02560; σ≤6 pcm < C-931 25 ⇒ σ-criterion PASSES, only k-dev fails — the 4-group residual, not statistics); **`artifacts/gate_reports/G0a/gate_report.json`** (QC-07); ADR-022 | 2026-08-05 |
 | G0b | **fail** — OUTSIDE band (honest, C-900 committed) | Jezebel **+1601 pcm** (C-900 1e6×250, 5-seed mean k=1.01601; σ≤7 pcm < 25); **`artifacts/gate_reports/G0b/gate_report.json`** (QC-07); ADR-022 | 2026-08-05 |
-| G0c | **PASS** (criterion a, C-900, committed) | Godiva ref-vs-gpu k-equivalence: mean **\|Δk\| = 6.3 pcm** (seeds 8.1 / 3.9 / 7.0; ≤ C-932 100 pcm AND ≤ 3σ ≈24 pcm) — the **FIRST passing gate**; the cross-backend proof of ADR-021. **`artifacts/gate_reports/G0c/gate_report.json`** (QC-07). **Criteria (b) per-shell + (c) population-series now evaluated too (M1-T5-c-5): both PASS ref-vs-gpu** (batch-3000 smoke: (b) shell-fraction ratio 0.72–0.98, (c) population ratio 0.19–0.56 — all ≤ 1); a committed C-900 (a)+(b)+(c) report is a follow-up | 2026-08-05 |
+| G0c | **PASS** (a+b+c, C-900, committed) | Godiva ref-vs-gpu FULL cross-backend equivalence, all 3 seeds × all 4 criteria (M1-T5-c-5b): **(a) k-equivalence** mean **\|Δk\| = 6.3 pcm** (8.1/3.9/7.0; ≤ C-932 100 pcm AND ≤ 3σ ≈24 pcm) — the **FIRST passing gate**, the cross-backend proof of ADR-021; **(b) per-shell** fission-source ratio 0.46–0.57; **(c) population-series** ratio 0.30–0.64 (all ≤ 1). Committed C-900 report **`artifacts/gate_reports/G0c/gate_report.json`** (QC-07; git d321f07, dirty false; supersedes the c-3b a-only report, preserved in git) | 2026-08-06 |
 | G1a | not_run | — | — |
 | G1a-tight (report-only) | not_run | — | — |
 | G1b | not_run | — | — |

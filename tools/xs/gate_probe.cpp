@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
     const fs::path scenario_path = argv[1];
     fs::path repo = fs::current_path();
     long long batch_override = -1, seed_override = -1;
-    int inactive_override = -1, active_override = -1;
+    int inactive_override = -1, active_override = -1, n_layers = -1;
 
     for (int i = 2; i < argc; ++i) {
         const std::string a = argv[i];
@@ -47,6 +47,7 @@ int main(int argc, char** argv) {
         else if (a == "--active") active_override = std::atoi(next());
         else if (a == "--seed") seed_override = std::atoll(next());
         else if (a == "--repo") repo = next();
+        else if (a == "--layers") n_layers = std::atoi(next());  // limit to the first N shells (G1a probe)
         else { std::fprintf(stderr, "unknown arg: %s\n", a.c_str()); return 2; }
     }
 
@@ -60,14 +61,20 @@ int main(int argc, char** argv) {
             std::fprintf(stderr, "scenario has no layers\n");
             return 1;
         }
-        const auto& layer = scenario.layers.front();
-        const int mid = lib.index_of(layer.material);
-        if (mid < 0) {
-            std::fprintf(stderr, "material '%s' not found in the library\n", layer.material.c_str());
-            return 1;
+        // Build the FULL nested-shell stack (bare-sphere benchmarks have one layer; the canonical
+        // Trinity assembly has pit/tamper/.../HE) -- the multi-layer eigen for G1a static criticality.
+        std::vector<ns::geom::Layer> layers;
+        for (const auto& L : scenario.layers) {
+            if (n_layers > 0 && static_cast<int>(layers.size()) >= n_layers) break;  // G1a probe
+            const int mid = lib.index_of(L.material);
+            if (mid < 0) {
+                std::fprintf(stderr, "material '%s' not found in the library\n", L.material.c_str());
+                return 1;
+            }
+            layers.push_back(ns::geom::Layer{L.id, L.r_outer_cm, mid, L.status});
         }
-        const ns::geom::LayerStack stack(
-            {ns::geom::Layer{layer.id, layer.r_outer_cm, mid, layer.status}});
+        const ns::geom::LayerStack stack(layers);
+        const auto& layer = scenario.layers.front();  // pit (innermost) -- for the printout
         ns::ref::RefTransport transport(stack, lib, xs, static_cast<std::uint64_t>(scenario.seed));
 
         ns::physics::EigenSpec spec;
@@ -77,8 +84,9 @@ int main(int argc, char** argv) {
         spec.seed = seed_override > 0 ? static_cast<std::uint64_t>(seed_override)
                                       : static_cast<std::uint64_t>(scenario.seed);
 
-        std::printf("scenario=%s  material=%s  R=%.4f cm  batch=%lld inactive=%d active=%d seed=%llu\n",
-                    scenario.name.c_str(), layer.material.c_str(), layer.r_outer_cm,
+        std::printf("scenario=%s  layers=%zu  pit=%s r0=%.4f  R_outer=%.4f cm  batch=%lld inactive=%d active=%d seed=%llu\n",
+                    scenario.name.c_str(), scenario.layers.size(), layer.material.c_str(),
+                    layer.r_outer_cm, scenario.layers.back().r_outer_cm,
                     static_cast<long long>(spec.batch), spec.inactive, spec.active,
                     static_cast<unsigned long long>(spec.seed));
         std::fflush(stdout);

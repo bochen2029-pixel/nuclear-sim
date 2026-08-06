@@ -77,12 +77,12 @@ const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.03).texture;
 
 // ------------------------------------------------------------------ lighting
-scene.add(new THREE.AmbientLight(0x223247, 0.55));
-const key = new THREE.DirectionalLight(0xbfd8ff, 1.15);
+scene.add(new THREE.AmbientLight(0x18222f, 0.3));
+const key = new THREE.DirectionalLight(0xffe6cc, 1.75);      // warm dramatic key
 key.position.set(6, 9, 4); key.castShadow = true;
-key.shadow.mapSize.set(1024, 1024); key.shadow.camera.near = 1; key.shadow.camera.far = 40;
-key.shadow.bias = -0.0006; scene.add(key);
-const rim = new THREE.PointLight(0x46c8ff, 40, 30, 1.7); rim.position.set(-7, 3, -6); scene.add(rim);
+key.shadow.mapSize.set(2048, 2048); key.shadow.camera.near = 1; key.shadow.camera.far = 40;
+key.shadow.bias = -0.0006; key.shadow.radius = 3; scene.add(key);
+const rim = new THREE.PointLight(0x4aa8ff, 70, 32, 1.7); rim.position.set(-7, 3, -6); scene.add(rim);   // cool back-rim
 const fill = new THREE.PointLight(0xff8a3a, 14, 24, 1.8); fill.position.set(5, -3, 5); scene.add(fill);
 // the burst core light — intensity is driven by the reaction population
 const coreLight = new THREE.PointLight(0xffd28a, 0, 30, 1.5); scene.add(coreLight);
@@ -98,13 +98,13 @@ scene.add(ground);
 const nucGeo = new THREE.IcosahedronGeometry(1, 1);
 // per-instance emissive glow (fission flash) injected into the standard shader
 nucGeo.setAttribute('aGlow', new THREE.InstancedBufferAttribute(new Float32Array(N_NUCLEI), 1));
-const nucMat = new THREE.MeshStandardMaterial({ metalness: 0.15, roughness: 0.42, envMapIntensity: 0.5 });
+const nucMat = new THREE.MeshStandardMaterial({ metalness: 0.42, roughness: 0.36, envMapIntensity: 1.2 });
 nucMat.onBeforeCompile = (sh) => {
   sh.vertexShader = 'attribute float aGlow;\nvarying float vGlow;\n' +
     sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vGlow = aGlow;');
   sh.fragmentShader = 'varying float vGlow;\n' +
     sh.fragmentShader.replace('#include <emissivemap_fragment>',
-      '#include <emissivemap_fragment>\n  totalEmissiveRadiance += vGlow * vGlow * vec3(3.4, 1.9, 0.6);');
+      '#include <emissivemap_fragment>\n  totalEmissiveRadiance += vGlow * vGlow * vec3(2.4, 1.35, 0.45);');
 };
 const nuclei = new THREE.InstancedMesh(nucGeo, nucMat, N_NUCLEI);
 nuclei.instanceMatrix.setUsage(THREE.StaticDrawUsage);
@@ -227,7 +227,57 @@ scene.add(boundary);
 // ------------------------------------------------------------------ post
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.7, 0.72, 0.88);
+// custom rack-focus DOF: center-sharp, rim melts to bokeh. A pure HDR-safe post-filter
+// (composer targets are half-float) placed BEFORE bloom so out-of-focus highlights bloom
+// into soft glowing discs — the cinematic UE5/MW tell, without BokehPass's HDR clipping.
+const DofShader = {
+  uniforms: { tDiffuse: { value: null }, uRes: { value: new THREE.Vector2() }, uAmount: { value: 0.022 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uAmount;
+    varying vec2 vUv;
+    void main(){
+      vec2 c = vUv - 0.5;
+      float coc = smoothstep(0.09, 0.62, length(vec2(c.x * uRes.x / uRes.y, c.y)) * 1.6) * uAmount;
+      float ar = uRes.y / uRes.x;
+      vec3 col = texture2D(tDiffuse, vUv).rgb; float w = 1.0;
+      for (int i = 1; i <= 22; i++){
+        float a = float(i) * 2.3999632;                       // golden-angle disc
+        float rad = sqrt(float(i) / 22.0) * coc;
+        vec2 off = vec2(cos(a) * ar, sin(a)) * rad;
+        col += texture2D(tDiffuse, vUv + off).rgb; w += 1.0;
+      }
+      gl_FragColor = vec4(col / w, 1.0);
+    }`,
+};
+const dof = new ShaderPass(DofShader);
+dof.uniforms.uRes.value.set(innerWidth, innerHeight);
+composer.addPass(dof);
+// volumetric god-rays: radial crepuscular shafts from the bright core (screen-space
+// light scattering toward center) — the UE5/MW atmospheric signature, driven by the burst.
+const GodRaysShader = {
+  uniforms: { tDiffuse: { value: null }, uStrength: { value: 0.1 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float uStrength;
+    varying vec2 vUv;
+    void main(){
+      vec3 col = texture2D(tDiffuse, vUv).rgb;
+      vec2 dir = (vec2(0.5) - vUv) / 28.0;
+      vec2 uv = vUv; float decay = 1.0; vec3 shaft = vec3(0.0);
+      for (int i = 0; i < 28; i++){
+        uv += dir;
+        vec3 s = texture2D(tDiffuse, uv).rgb;
+        float b = max(0.0, dot(s, vec3(0.333)) - 0.72);   // only bright emissive seeds shafts
+        shaft += s * b * decay;
+        decay *= 0.93;
+      }
+      gl_FragColor = vec4(col + shaft * uStrength, 1.0);
+    }`,
+};
+const godrays = new ShaderPass(GodRaysShader);
+composer.addPass(godrays);
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.52, 0.7, 0.9);
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
 const GradeShader = {
@@ -238,17 +288,29 @@ const GradeShader = {
     varying vec2 vUv;
     void main(){
       vec2 uv = vUv; vec2 c = uv - 0.5; float d = dot(c, c);
-      float ca = (0.0007 + d * 0.0028) * (1.0 + uBurst * 1.0);
+      // radial chromatic aberration (subtle lens)
+      float ca = (0.0006 + d * 0.0024) * (1.0 + uBurst * 0.8);
       vec3 col;
       col.r = texture2D(tDiffuse, uv + c * ca).r;
       col.g = texture2D(tDiffuse, uv).g;
       col.b = texture2D(tDiffuse, uv - c * ca).b;
-      float vig = smoothstep(1.15, 0.28, d * 1.5);
-      col *= mix(0.62, 1.0, vig);
+      // unsharp-mask sharpen (crisp AAA micro-detail)
+      vec2 px = 1.0 / uRes;
+      vec3 bl = texture2D(tDiffuse, uv + vec2(px.x, 0.0)).rgb + texture2D(tDiffuse, uv - vec2(px.x, 0.0)).rgb
+              + texture2D(tDiffuse, uv + vec2(0.0, px.y)).rgb + texture2D(tDiffuse, uv - vec2(0.0, px.y)).rgb;
+      col += (col - bl * 0.25) * 0.20;
+      // cinematic teal-orange grade: teal in the shadows, warm in the highlights
+      float l = dot(col, vec3(0.299, 0.587, 0.114));
+      col += mix(vec3(-0.012, 0.010, 0.030), vec3(0.050, 0.016, -0.030), smoothstep(0.12, 0.85, l));
+      col = clamp(col, 0.0, 1.0);
+      col = mix(vec3(l), col, 1.12);              // +12% saturation
+      // vignette
+      float vig = smoothstep(1.08, 0.20, d * 1.5);
+      col *= mix(0.52, 1.0, vig);
+      // fine film grain
       float g = fract(sin(dot(uv * uRes + uTime, vec2(12.9898, 78.233))) * 43758.5453);
-      col += (g - 0.5) * 0.022;
-      col = pow(col, vec3(0.96));                 // slight lift
-      gl_FragColor = vec4(col, 1.0);
+      col += (g - 0.5) * 0.017;
+      gl_FragColor = vec4(max(col, 0.0), 1.0);
     }`,
 };
 const grade = new ShaderPass(GradeShader);
@@ -358,17 +420,18 @@ function frame(dtReal, doRender = true) {
   if (colorDirty) nuclei.instanceColor.needsUpdate = true;
 
   // ---- burst core + lights driven by population ----
-  const inten = Math.min(1, logN / 6.6);
+  const inten = Math.min(1, nAlive / MAXN);   // linear fill fraction → clean growth→peak ramp
   const burst = inten * inten;
-  core.material.opacity = burst * 0.8;
-  core.scale.setScalar(0.35 + burst * 1.9);
+  core.material.opacity = burst * 0.5;
+  core.scale.setScalar(0.35 + burst * 1.6);
   for (let i = 0; i < glowShells.length; i++) {
     glowShells[i].material.opacity = burst * (0.22 - i * 0.05);
     glowShells[i].scale.setScalar(0.6 + burst * (1.4 + i * 0.5));
   }
-  coreLight.intensity = burst * 55;
-  fill.intensity = 14 + burst * 20;
+  coreLight.intensity = burst * 30;
+  fill.intensity = 14 + burst * 16;
   grade.uniforms.uBurst.value = burst;
+  godrays.uniforms.uStrength.value = 0.03 + burst * 0.3;   // shafts intensify with the burst
   boundary.material.opacity = 0.04 + burst * 0.05;
 
   // camera: gently ease closer as the chain builds (zoom = focus, ADR-023)
@@ -405,7 +468,8 @@ addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
-  bloom.setSize(innerWidth, innerHeight); grade.uniforms.uRes.value.set(innerWidth, innerHeight);
+  bloom.setSize(innerWidth, innerHeight);
+  grade.uniforms.uRes.value.set(innerWidth, innerHeight); dof.uniforms.uRes.value.set(innerWidth, innerHeight);
 });
 
 // debug/introspection + agent-eyes hook (autonomous screenshot loop, per the

@@ -253,9 +253,13 @@ const DofShader = {
       vec3 col = texture2D(tDiffuse, vUv).rgb; float w = 1.0;
       for (int i = 1; i <= 30; i++){
         float a = float(i) * 2.3999632;                       // golden-angle disc
-        float rad = sqrt(float(i) / 30.0) * coc;
-        vec2 off = vec2(cos(a) * ar, sin(a)) * rad;
-        col += texture2D(tDiffuse, vUv + off).rgb; w += 1.0;
+        float t = sqrt(float(i) / 30.0) * coc;
+        vec2 dir = vec2(cos(a) * ar, sin(a));
+        // chromatic bokeh: R/B sample at slightly offset CoC radii → color-fringed highlights
+        col.r += texture2D(tDiffuse, vUv + dir * t * 1.04).r;
+        col.g += texture2D(tDiffuse, vUv + dir * t).g;
+        col.b += texture2D(tDiffuse, vUv + dir * t * 0.96).b;
+        w += 1.0;
       }
       gl_FragColor = vec4(col / w, 1.0);
     }`,

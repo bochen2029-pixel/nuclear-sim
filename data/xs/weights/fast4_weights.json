@@ -1,0 +1,13 @@
+{
+  "_comment": "ADR-025 per-assembly self-consistent weighting. Maps each benchmark isotope to the bare critical assembly whose openmc fundamental-mode flux (data/xs/weights/<assembly>.spectrum.json) weights its fast4 collapse. Isotopes absent from this map keep the analytic fast-metal weight (tools/xs/weighting.py) and are byte-identical to the ADR-024 v3 set. openmc supplies the flux SHAPE only; no cross section is touched, and no weight is ever tuned toward a benchmark k.",
+  "weights": {
+    "U234": "godiva",
+    "U235": "godiva",
+    "U238": "godiva",
+    "Pu239": "jezebel",
+    "Pu240": "jezebel",
+    "Pu241": "jezebel",
+    "Ga69": "jezebel",
+    "Ga71": "jezebel"
+  }
+}

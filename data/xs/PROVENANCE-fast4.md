@@ -1,8 +1,10 @@
 # `fast4` — provenance manifest (per isotope)
 
-**Dataset:** `data/xs/fast4.json` — few-group (4-group) fast neutron cross sections,
-schema v2 (`03 §2`). **Authored by M1-T4a-2a** (a-set, 8 isotopes; owner-authorized Path B,
-2026-08-04); **extended to the full 16 isotopes by M1-T4a-2b** (b-set, 2026-08-06).
+**Dataset:** `data/xs/fast4.json` — few-group fast neutron cross sections, **schema v3
+(5-group: 4 fast + 1 thermal, `03 §2` / ADR-024)**. **Authored by M1-T4a-2a** (a-set, 8
+isotopes; owner-authorized Path B, 2026-08-04); **extended to 16 isotopes by M1-T4a-2b**
+(b-set); **thermal group added by M1-T4a-3** (ADR-024); **collapse weight made
+self-consistent per benchmark assembly by M1-T4a-5** (ADR-025, 2026-08-06).
 
 > Records WHERE every number comes from and HOW it was produced. Every value is from the
 > documented collapse (`tools/xs/build_fast4.py` + `weighting.py`); NONE is tuned to a
@@ -88,23 +90,42 @@ for the (peripheral) HE region in full-device transport, not for the current gat
 
 ## The weighting spectrum (documented — `tools/xs/README.md §Weighting`)
 
-Godiva/Jezebel are bare, unmoderated fast-metal critical assemblies, so φ(E) is a **hard fast
-spectrum** — a Watt fission source (a=0.988 MeV, b=2.249 /MeV) for E ≥ 0.82 MeV joined to a
-1/E slowing-down tail, with NO thermal peak — explicitly NOT a generic 1/E or thermal weight.
-A single documented weight is used (the fixed-weight choice); iterating it toward each
-assembly's self-consistent spectrum is a deferred path to close the residual (ADR-022 path a).
+Godiva/Jezebel are bare, unmoderated fast-metal critical assemblies, so the **analytic** weight
+φ(E) is a **hard fast spectrum** — a Watt fission source (a=0.988 MeV, b=2.249 /MeV) for
+E ≥ 0.82 MeV joined to a 1/E slowing-down tail (+ a 293.6 K Maxwellian in the v3 thermal group),
+explicitly NOT a generic 1/E or thermal weight.
 
-## Validation — measured, not assumed (via `gate_probe`, 200k × 40+150)
+**Self-consistent per-assembly weighting (M1-T4a-5, ADR-025 — ADR-022 path a).** The analytic
+weight above is now the DEFAULT (retained for the 8 structural/light isotopes). For the **8
+benchmark isotopes** it is replaced by **that assembly's own fundamental-mode flux spectrum**,
+computed by openmc continuous-energy k-eigenvalue transport on the exact benchmark geometry
+(`tools/xs/assembly_spectrum.py` → committed `data/xs/weights/{godiva,jezebel}.spectrum.json`,
+seeded; map `fast4_weights.json`): **U-234/235/238 ← Godiva flux** (median 0.94 MeV);
+**Pu-239/240/241 + Ga-69/71 ← Jezebel flux** (median 1.32 MeV — much harder than the analytic
+weight, which the fixed weight could not represent). The thermal group keeps the analytic
+Maxwellian (spliced below the 1 keV fast floor). openmc supplies the flux SHAPE only — no cross
+section is touched, and no weight is tuned toward a benchmark k (openmc's own k = 1.00019 /
+0.99988 ≈ 1.000, confirming geometry, but is never copied). The 8 structural isotopes stay
+byte-identical to the ADR-024 set (verified).
+
+## Validation — measured, not assumed (via `gate_probe`, reference MC eigen)
 
 The reference MC eigen (`ref/`, with the ADR-021 consistent transport correction) on the
 committed benchmark scenarios. Band = 500 pcm + benchmark_uncertainty_pcm; the PUBLIC-DERIVED
-unverified uncertainty → 0 (`08 §1`), i.e. **±500 pcm**.
+unverified uncertainty → 0 (`08 §1`), i.e. **±500 pcm**. Deviation progression across the arc:
 
-- **G0a Godiva:**  k = **1.02562 ± 12 pcm**  →  **+2562 pcm**  (band ±500) — **outside** (high)
-- **G0b Jezebel:** k = **1.01581 ± 24 pcm**  →  **+1581 pcm**  (band ±500) — **outside** (high)
+| set | Godiva | Jezebel |
+|---|---|---|
+| 4-group analytic weight (M1-T4a-2a, ADR-022) | +2562 | +1581 |
+| 5-group + thermal, analytic weight (M1-T4a-3, ADR-024) | +2560 | +1601 |
+| **5-group + self-consistent weight (M1-T4a-5, ADR-025)** | **−276 (WITHIN ±500)** | **+1344 (outside)** |
 
-**Honest result (ADR-022):** both ~1.5–2.5% high — the coarse 4-group residual with a fixed
-weight, NOT an xs defect and NOT fudged. The physics is right (ADR-021 took the same set from
-~15–22% off to this); the fixed 4-group structure is simply too coarse to clear ±500 pcm for
-these fast-metal benchmarks. Deferred paths to close it: self-consistent weighting, or a finer
-group structure — never tuning the cross sections.
+(ADR-025 row: `gate_probe` on the shipped seeded set, 120k×seed 1; the committed C-900
+`gate_report.json` regeneration + the gate-ledger flip are the immediate follow-up.)
+
+**Honest result:** self-consistent weighting brings **Godiva into the band** (the soft analytic
+weight under-estimated μ̄/leakage; the correct hard flux fixes it — see ADR-025) and **improves
+Jezebel** (+1601 → +1344) but does not close it — Jezebel is the genuinely hard gate that neither
+weighting nor finer groups closes alone (memory `fast-group-residual-derisk`, corrected). No cross
+section was tuned; the weight is each assembly's real physical flux, and the result is reported as
+measured (Godiva slightly under, Jezebel still out), not engineered.

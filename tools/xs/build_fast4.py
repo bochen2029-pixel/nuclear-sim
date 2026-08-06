@@ -48,10 +48,48 @@ kElasticDownscatterA = 30
 ASET = ["U234", "U235", "U238", "Pu239", "Pu240", "Pu241", "Ga69", "Ga71"]
 
 
-def phi_ev(E_ev):
-    """Documented fast weight on an eV grid (weighting.weight takes MeV)."""
+def phi_ev_analytic(E_ev):
+    """The documented analytic fast-metal weight on an eV grid (weighting.weight takes MeV).
+    The DEFAULT collapse weight. ADR-025 overrides it per isotope with an assembly's
+    self-consistent openmc flux (make_selfconsistent_phi_ev) for the benchmark isotopes."""
     E_ev = np.atleast_1d(np.asarray(E_ev, dtype=float))
     return np.array([weighting.weight(e / 1.0e6) for e in E_ev])
+
+
+# The CURRENT collapse weight phi(E_ev). collapse_isotope() and its helpers read this module
+# global at CALL time; main() reassigns it per isotope (ADR-025 per-assembly weighting). With
+# no --weights map it stays analytic for every isotope -> byte-identical to the ADR-024 set.
+phi_ev = phi_ev_analytic
+
+
+def make_selfconsistent_phi_ev(spectrum_path):
+    """A self-consistent collapse weight phi(E_ev) from a committed openmc assembly-flux
+    spectrum (ADR-025; tools/xs/assembly_spectrum.py): log-log interpolation of the
+    fundamental-mode flux over the fast range, with the analytic 293.6 K thermal Maxwellian
+    spliced below the 1 keV fast floor (continuous at the join; ADR-024). The bare-metal
+    openmc flux is ~0 below 1 keV and the thermal group is inert for the A>=30 benchmark
+    isotopes, so the splice keeps the thermal weight physical without leaning on ~0-count MC
+    bins. openmc supplies the flux SHAPE only -- it never touches a cross section."""
+    with open(spectrum_path) as fh:
+        d = json.load(fh)
+    edges = np.asarray(d["edges_ev"], float)
+    emid = np.sqrt(edges[:-1] * edges[1:])
+    phi = np.asarray(d["phi_per_ev"], float)
+    m = (phi > 0.0) & (emid > 0.0)
+    logE, logP = np.log(emid[m]), np.log(phi[m])
+    sc_at_floor = float(np.exp(np.interp(np.log(FAST_FLOOR_EV), logE, logP)))
+    an_at_floor = float(phi_ev_analytic(np.array([FAST_FLOOR_EV]))[0])
+    thermal_scale = (sc_at_floor / an_at_floor) if an_at_floor > 0 else 0.0
+
+    def phi_ev_sc(E_ev):
+        E = np.atleast_1d(np.asarray(E_ev, float))
+        out = np.exp(np.interp(np.log(np.clip(E, 1e-300, None)), logE, logP,
+                               left=logP[0], right=logP[-1]))
+        lo = E < FAST_FLOOR_EV  # thermal group: analytic Maxwellian, continuous at the floor
+        if np.any(lo):
+            out[lo] = phi_ev_analytic(E[lo]) * thermal_scale
+        return out
+    return phi_ev_sc
 
 
 def group_nodes(iso, glo, ghi):
@@ -455,7 +493,30 @@ def main():
     ap.add_argument("--hdf5", required=True, help="dir with <Nuclide>.h5 files")
     ap.add_argument("--out", required=True, help="output fast4.json")
     ap.add_argument("--isotopes", default=",".join(ASET))
+    ap.add_argument("--weights", default=None,
+                    help='JSON map {"weights": {isotope: assembly}} for ADR-025 '
+                         "self-consistent per-assembly weighting; isotopes absent from the "
+                         "map keep the analytic fast-metal weight (byte-identical to v3)")
+    ap.add_argument("--weights-dir", default="data/xs/weights",
+                    help="dir holding <assembly>.spectrum.json (tools/xs/assembly_spectrum.py)")
     args = ap.parse_args()
+
+    global phi_ev
+
+    weight_map = {}
+    if args.weights:
+        with open(args.weights) as fh:
+            weight_map = json.load(fh)["weights"]
+    sc_cache = {}
+
+    def weight_for(name):
+        assembly = weight_map.get(name)
+        if assembly is None:
+            return phi_ev_analytic, "analytic"
+        if assembly not in sc_cache:
+            sc_cache[assembly] = make_selfconsistent_phi_ev(
+                os.path.join(args.weights_dir, f"{assembly}.spectrum.json"))
+        return sc_cache[assembly], assembly
 
     isotopes = args.isotopes.split(",")
     out = {
@@ -467,12 +528,20 @@ def main():
     for name in isotopes:
         path = os.path.join(args.hdf5, f"{name}.h5")
         iso = openmc.data.IncidentNeutron.from_hdf5(path)
-        print(f"-- collapsing {name} (A={iso.mass_number}, MTs incl fission={18 in iso.reactions})")
-        out["isotopes"][name] = collapse_isotope(iso)
+        phi_ev, assembly = weight_for(name)  # reassign the module global read by the collapse
+        print(f"-- collapsing {name} (A={iso.mass_number}, weight={assembly})")
+        rec = collapse_isotope(iso)
+        if assembly != "analytic":
+            rec["cite"] = (f"ENDF/B-VIII.0 (MAT {iso.name}); 5-group collapse (v3), "
+                           f"SELF-CONSISTENT {assembly} openmc-flux weight (ADR-025, "
+                           f"data/xs/weights/{assembly}.spectrum.json) + thermal Maxwellian")
+        out["isotopes"][name] = rec
 
     with open(args.out, "w") as fh:
         json.dump(out, fh, indent=2)
-    print(f"wrote {args.out} with {len(out['isotopes'])} isotopes")
+    n_sc = sum(1 for n in isotopes if n in weight_map)
+    print(f"wrote {args.out} with {len(out['isotopes'])} isotopes "
+          f"({n_sc} self-consistent, {len(out['isotopes']) - n_sc} analytic)")
 
 
 if __name__ == "__main__":

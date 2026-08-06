@@ -633,7 +633,7 @@ TEST_CASE("GPU eigen matches the CPU oracle on the fast4 Godiva assembly (ADR-02
     // eigen reproduces the CPU oracle on a mu_bar != 0 set. This is the check the SIM-xs
     // (mu_bar=0) differential tests could never make. Without the device fix the GPU would
     // still fly on sigma_tr but collide on sigma_t -> the mu_bar=0 answer (~1.12) vs the
-    // CPU's ~1.026, ~9000 pcm apart.
+    // CPU's ~0.997 (ADR-025 self-consistent weighting), well over 10000 pcm apart.
     const auto repo = spec_examples::repo_root();
     const auto fast4 = repo / "data" / "xs" / "fast4.json";
     if (!std::filesystem::exists(fast4)) {

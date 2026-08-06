@@ -253,12 +253,13 @@ TEST_CASE("the benchmark data cards carry their source and retrieval date", "[be
 }
 
 TEST_CASE("fast4 gives a sane fast-metal k on Godiva and Jezebel", "[benchmarks]") {
-    // A regression guard on the cited fast4 set + the ADR-021 transport correction. NOT the
-    // precision gate (that is gate_probe / nukebench, M1-T5): the honest 4-group set lands
-    // Godiva ~1.026 / Jezebel ~1.016 (ADR-022, both ~1.5-2.5% high, outside +/-500 pcm). This
-    // asserts only that a bare fast-metal critical assembly comes out NEAR critical -- which a
-    // broken transport correction does not: mu_bar=0 gives k~1.12, and the INCONSISTENT split
-    // (pre-ADR-021, collide on sigma_t while flying on sigma_tr) gives k~0.84. Both fail this.
+    // A regression guard on the cited fast4 set + the ADR-021 transport correction + the ADR-025
+    // self-consistent per-assembly weighting. NOT the precision gate (that is gate_probe /
+    // nukebench, M1-T5): the self-consistent set lands Godiva ~0.997 (now WITHIN +/-500 pcm) /
+    // Jezebel ~1.013 (still ~+1300 -- the genuinely hard gate, ADR-025). This asserts only that a
+    // bare fast-metal critical assembly comes out NEAR critical -- which a broken transport
+    // correction does not: mu_bar=0 gives k~1.12, and the INCONSISTENT split (pre-ADR-021, collide
+    // on sigma_t while flying on sigma_tr) gives k~0.84. Both fail this wide [0.95, 1.06] band.
     const auto fast4 = repo() / "data" / "xs" / "fast4.json";
     if (!fs::exists(fast4)) {
         WARN("data/xs/fast4.json absent (authored by M1-T4a-2a) — skipping the eigen guard");

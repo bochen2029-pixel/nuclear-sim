@@ -25,10 +25,20 @@ import weighting  # noqa: E402  -- phi(E_MeV), the documented fast weight
 # numpy>=2.0 renamed trapz -> trapezoid; support both.
 _trapz = getattr(np, "trapezoid", None) or getattr(np, "trapz")
 
-# 03 §2 fixed structure: bounds high->low in MeV -> eV. 4 groups, 0-based high->low.
-BOUNDS_MEV = [20.0, 3.0, 1.0, 0.1, 1.0e-3]
+# 03 §2 structure. v3 (ADR-024): 5 groups -- the 4 fast groups [20,3,1,0.1,1e-3] MeV
+# UNCHANGED (byte-identical fast constants -> the bare-metal gates are gate-safe) PLUS one
+# thermal group below 1 keV down to the ~thermal data-grid floor. bounds high->low, MeV->eV.
+BOUNDS_MEV = [20.0, 3.0, 1.0, 0.1, 1.0e-3, 1.0e-10]
 BOUNDS_EV = [b * 1.0e6 for b in BOUNDS_MEV]
-NG = 4
+NG = 5
+# Fast averaging floor (v3, ADR-024). The isotope-scalar fission observables -- beta and the
+# chi incident-average -- and the fission/inelastic EMISSION spectra are FAST properties. They
+# must be weighted over the fast range only, NOT the thermal extension: the huge thermal
+# sigma_f*phi would otherwise dominate the fission-rate weight, and spreading the emission grid
+# down to thermal dilutes its fast resolution. Pinning the floor at the old 4-group bottom
+# (1 keV) keeps beta/chi/emission BYTE-IDENTICAL to v2 (gate-safety). Elastic downscatter INTO
+# the thermal group (scatter_transfer, light nuclei) is separate and unaffected by this floor.
+FAST_FLOOR_EV = 1.0e3  # 1 keV = the g3/g4 boundary (the old 4-group bottom)
 TEMP = "294K"  # 293.6 K room temperature (the assemblies are at room temperature)
 # Below this mass number, fast elastic scattering is treated as isotropic-CM downscatter
 # ([alpha*E, E]); at/above it, forward-peaking dominates and elastic stays within-group (M1-T4a-2b).
@@ -219,7 +229,7 @@ def collapse_isotope(iso):
 
     # delayed fraction beta: fission-rate-weighted delayed/total over the whole fast range.
     if fissile:
-        Eall = group_nodes(iso, BOUNDS_EV[-1], BOUNDS_EV[0])
+        Eall = group_nodes(iso, FAST_FLOOR_EV, BOUNDS_EV[0])  # fast-fission delayed fraction (v3 fast floor)
         w = phi_ev(Eall) * np.asarray(fis(Eall), float)
         den = _trapz(w, Eall)
         if den > 0:
@@ -243,7 +253,7 @@ def collapse_isotope(iso):
         "mu_bar": [round(x, 6) for x in mu_bar],
         "beta": round(beta, 6),
         "transfer": [_round_sum1(transfer[g], g) for g in range(NG)],
-        "cite": f"ENDF/B-VIII.0 (MAT {iso.name}); 4-group collapse, fast-metal weight (tools/xs)",
+        "cite": f"ENDF/B-VIII.0 (MAT {iso.name}); 5-group collapse (v3, +thermal group), fast-metal + thermal-Maxwellian weight (tools/xs)",
         "status": "PUBLIC",
     }
 
@@ -267,7 +277,7 @@ def _emission_group_fracs(edist, Ein):
     """Fraction of secondary neutrons emitted into each group for incident energy Ein,
     from an openmc.data energy distribution. Returns a length-NG array summing to ~1."""
     name = type(edist).__name__
-    lo, hi = BOUNDS_EV[-1], BOUNDS_EV[0]
+    lo, hi = FAST_FLOOR_EV, BOUNDS_EV[0]  # fission/inelastic emit only fast -> keep the v2 grid; f[thermal]=0
     Eo = np.logspace(np.log10(lo), np.log10(hi), 4000)
 
     if name == "LevelInelastic":  # deterministic discrete-level outgoing energy
@@ -361,7 +371,7 @@ def fission_chi(iso):
     if edist is None:
         return [0.0] * NG
     # fission-rate-weighted incident energies across the fast range
-    Ein = group_nodes(iso, BOUNDS_EV[-1], BOUNDS_EV[0])
+    Ein = group_nodes(iso, FAST_FLOOR_EV, BOUNDS_EV[0])  # fast-incident chi (v3 fast floor)
     wr = phi_ev(Ein) * np.asarray(xs_of(iso, 18)(Ein), float)
     acc = np.zeros(NG)
     wsum = 0.0
@@ -449,7 +459,7 @@ def main():
 
     isotopes = args.isotopes.split(",")
     out = {
-        "schema_version": 2,
+        "schema_version": 3,
         "name": "fast4",
         "group_bounds_MeV": BOUNDS_MEV,
         "isotopes": {},

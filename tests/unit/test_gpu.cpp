@@ -62,12 +62,12 @@ struct ToyWorld {
         fs::create_directories(root / "materials");
 
         const auto four = [](double a, double b, double c, double d) {
-            return json::array({a, b, c, d});
+            return json::array({a, b, c, d, d});
         };
-        const json identity = json::array({json::array({1.0, 0.0, 0.0, 0.0}),
-                                           json::array({0.0, 1.0, 0.0, 0.0}),
-                                           json::array({0.0, 0.0, 1.0, 0.0}),
-                                           json::array({0.0, 0.0, 0.0, 1.0})});
+        const json identity = json::array({json::array({1.0, 0.0, 0.0, 0.0, 0.0}),
+                                           json::array({0.0, 1.0, 0.0, 0.0, 0.0}),
+                                           json::array({0.0, 0.0, 1.0, 0.0, 0.0}),
+                                           json::array({0.0, 0.0, 0.0, 1.0, 0.0}), json::array({0.0, 0.0, 0.0, 0.0, 1.0})});
         const json u235 = {{"nu", four(2.6, 2.5, 2.45, 2.44)},
                            {"chi", four(1.0, 0.0, 0.0, 0.0)},
                            {"sigma_f", four(1.3, 1.2, 1.1, 1.05)},
@@ -90,9 +90,9 @@ struct ToyWorld {
                            {"transfer", identity},
                            {"cite", "synthetic test medium — not physical data"},
                            {"status", "SIM"}};
-        const json xs_doc = {{"schema_version", 2},
+        const json xs_doc = {{"schema_version", 3},
                              {"name", "toy"},
-                             {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3})},
+                             {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3, 1e-10})},
                              {"isotopes", {{"U235", u235}, {"U238", u238}}}};
         spec_examples::write_file(root / "xs" / "toy.json", xs_doc.dump(2));
 
@@ -147,24 +147,24 @@ struct PureCaptureWorld {
         fs::create_directories(root / "xs");
         fs::create_directories(root / "materials");
 
-        const auto four = [](double v) { return json::array({v, v, v, v}); };
+        const auto four = [](double v) { return json::array({v, v, v, v, v}); };
         const json iso = {{"nu", four(0.0)},
-                          {"chi", json::array({1.0, 0.0, 0.0, 0.0})},
+                          {"chi", json::array({1.0, 0.0, 0.0, 0.0, 0.0})},
                           {"sigma_f", four(0.0)},
                           {"sigma_c", four(4.0)},
                           {"sigma_s", four(0.0)},
                           {"sigma_n2n", four(0.0)},
                           {"mu_bar", four(0.0)},
                           {"beta", 0.0065},
-                          {"transfer", json::array({json::array({1.0, 0.0, 0.0, 0.0}),
-                                                    json::array({0.0, 1.0, 0.0, 0.0}),
-                                                    json::array({0.0, 0.0, 1.0, 0.0}),
-                                                    json::array({0.0, 0.0, 0.0, 1.0})})},
+                          {"transfer", json::array({json::array({1.0, 0.0, 0.0, 0.0, 0.0}),
+                                                    json::array({0.0, 1.0, 0.0, 0.0, 0.0}),
+                                                    json::array({0.0, 0.0, 1.0, 0.0, 0.0}),
+                                                    json::array({0.0, 0.0, 0.0, 1.0, 0.0}), json::array({0.0, 0.0, 0.0, 0.0, 1.0})})},
                           {"cite", "synthetic pure absorber — not physical data"},
                           {"status", "SIM"}};
-        const json xs_doc = {{"schema_version", 2},
+        const json xs_doc = {{"schema_version", 3},
                              {"name", "cap"},
-                             {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3})},
+                             {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3, 1e-10})},
                              {"isotopes", {{"U238", iso}}}};
         spec_examples::write_file(root / "xs" / "cap.json", xs_doc.dump(2));
 
@@ -210,9 +210,9 @@ struct FissionWorld {
         fs::create_directories(root / "xs");
         fs::create_directories(root / "materials");
 
-        const auto four = [](double v) { return json::array({v, v, v, v}); };
+        const auto four = [](double v) { return json::array({v, v, v, v, v}); };
         const json iso = {{"nu", four(2.9)},
-                          {"chi", json::array({1.0, 0.0, 0.0, 0.0})},
+                          {"chi", json::array({1.0, 0.0, 0.0, 0.0, 0.0})},
                           {"sigma_f", four(1.0)},
                           {"sigma_c", four(0.5)},
                           {"sigma_s", four(3.0)},
@@ -220,15 +220,15 @@ struct FissionWorld {
                           {"mu_bar", four(0.0)},  // Σ_tr = Σ_t, so k_inf is exact one-group
                           {"beta", 0.0020},
                           // group-preserving: every scatter stays in group 0.
-                          {"transfer", json::array({json::array({1.0, 0.0, 0.0, 0.0}),
-                                                    json::array({0.0, 1.0, 0.0, 0.0}),
-                                                    json::array({0.0, 0.0, 1.0, 0.0}),
-                                                    json::array({0.0, 0.0, 0.0, 1.0})})},
+                          {"transfer", json::array({json::array({1.0, 0.0, 0.0, 0.0, 0.0}),
+                                                    json::array({0.0, 1.0, 0.0, 0.0, 0.0}),
+                                                    json::array({0.0, 0.0, 1.0, 0.0, 0.0}),
+                                                    json::array({0.0, 0.0, 0.0, 1.0, 0.0}), json::array({0.0, 0.0, 0.0, 0.0, 1.0})})},
                           {"cite", "synthetic fissioning medium — not physical data"},
                           {"status", "SIM"}};
-        const json xs_doc = {{"schema_version", 2},
+        const json xs_doc = {{"schema_version", 3},
                              {"name", "fis"},
-                             {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3})},
+                             {"group_bounds_MeV", json::array({20.0, 3.0, 1.0, 0.1, 1e-3, 1e-10})},
                              {"isotopes", {{"Pu239", iso}}}};
         spec_examples::write_file(root / "xs" / "fis.json", xs_doc.dump(2));
 
@@ -427,8 +427,8 @@ TEST_CASE("device macro cross sections match the CPU mix() (float vs double pari
     for (int layer = 0; layer < w.stack.size(); ++layer) {
         const auto& mat = w.materials->all()[static_cast<std::size_t>(
             w.stack.layer(layer).material_id)];
-        for (int g = 0; g < 4; ++g) {
-            const auto i = static_cast<std::size_t>(layer * 4 + g);
+        for (int g = 0; g < 5; ++g) {
+            const auto i = static_cast<std::size_t>(layer * 5 + g);
             const auto gi = static_cast<std::size_t>(g);
             INFO("layer " << layer << " group " << g);
 
@@ -471,7 +471,7 @@ TEST_CASE("gpu fixed-source pure-capturer leakage matches ref (T-diff, G0c)", "[
     // gpu (float).
     ns::gpu::FixedSourceResult g;
     REQUIRE(ns::gpu::gpu_fixed_source(w.stack, *w.materials, seed, histories,
-                                      {1.0f, 0.0f, 0.0f, 0.0f}, 256, 128, g));
+                                      {1.0f, 0.0f, 0.0f, 0.0f, 0.0f}, 256, 128, g));
 
     const double optical_depth = w.materials->all().front().macro.sigma_c[0] * w.radius_cm;
     const double analytic = std::exp(-optical_depth);
@@ -514,7 +514,7 @@ TEST_CASE("gpu fixed-source with scattering + fission matches ref (T-diff, G0c)"
 
     ns::gpu::FixedSourceResult g;
     REQUIRE(ns::gpu::gpu_fixed_source(w.stack, *w.materials, seed, histories,
-                                      {1.0f, 0.0f, 0.0f, 0.0f}, 256, 128, g));
+                                      {1.0f, 0.0f, 0.0f, 0.0f, 0.0f}, 256, 128, g));
 
     const auto& macro = w.materials->all().front().macro;
     const double k_inf = macro.nu_sigma_f[0] / (macro.sigma_c[0] + macro.sigma_f[0]);
@@ -616,9 +616,9 @@ TEST_CASE("gpu fixed-source is bit-identical across launch configs", "[gpu]") {
     ns::gpu::FixedSourceResult a;
     ns::gpu::FixedSourceResult b;
     REQUIRE(ns::gpu::gpu_fixed_source(w.stack, *w.materials, seed, histories,
-                                      {1.0f, 0.0f, 0.0f, 0.0f}, 64, 128, a));
+                                      {1.0f, 0.0f, 0.0f, 0.0f, 0.0f}, 64, 128, a));
     REQUIRE(ns::gpu::gpu_fixed_source(w.stack, *w.materials, seed, histories,
-                                      {1.0f, 0.0f, 0.0f, 0.0f}, 512, 256, b));
+                                      {1.0f, 0.0f, 0.0f, 0.0f, 0.0f}, 512, 256, b));
     REQUIRE(a.leaked_fraction == b.leaked_fraction);  // bit-identical tallies
     REQUIRE(a.leaked_sigma == b.leaked_sigma);
     REQUIRE(a.k_estimate == b.k_estimate);

@@ -29,17 +29,17 @@ NUKESIM_HD inline float d_group_sigma_tr(const DGroup& g) noexcept {
 }
 
 /// Device material/xs, flattened. Non-owning pointers into device memory; passed
-/// to kernels by value. Group index is 0..3 (kGroups), group-major throughout.
+/// to kernels by value. Group index is 0..4 (kGroups=5), group-major throughout.
 struct DeviceMaterials {
     int num_layers;
-    const float* sigma_t;     // [num_layers*4] macro, 1/cm — precomputed, for flight
-    const float* sigma_tr;    // [num_layers*4]
+    const float* sigma_t;     // [num_layers*5] macro, 1/cm — precomputed, for flight
+    const float* sigma_tr;    // [num_layers*5]
     const int* slot_begin;    // [num_layers] index of a layer's first isotope slot
     const int* slot_count;    // [num_layers] isotope slots in the layer
     const float* nd;          // [total_slots] number density, atoms/barn-cm (nᵢ)
     const int* global_index;  // [total_slots] stable isotope id across layers
-    const DGroup* g;          // [total_slots*4] per slot, per group
-    const float* transfer;    // [total_slots*16] [from*4 + to], rows sum to 1
+    const DGroup* g;          // [total_slots*5] per slot, per group
+    const float* transfer;    // [total_slots*25] [from*5 + to], rows sum to 1
 };
 
 }  // namespace ns::gpu

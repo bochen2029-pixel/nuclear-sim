@@ -56,8 +56,8 @@ private:
         const auto& mats = materials.all();
 
         std::vector<float> r_outer(static_cast<std::size_t>(num_layers_));
-        std::vector<float> sigma_t(static_cast<std::size_t>(num_layers_) * 4, 0.0f);
-        std::vector<float> sigma_tr(static_cast<std::size_t>(num_layers_) * 4, 0.0f);
+        std::vector<float> sigma_t(static_cast<std::size_t>(num_layers_) * 5, 0.0f);
+        std::vector<float> sigma_tr(static_cast<std::size_t>(num_layers_) * 5, 0.0f);
         std::vector<int> slot_begin(static_cast<std::size_t>(num_layers_), 0);
         std::vector<int> slot_count(static_cast<std::size_t>(num_layers_), 0);
         std::vector<float> nd;
@@ -80,7 +80,7 @@ private:
                     continue;
                 }
                 nd.push_back(static_cast<float>(mat.number_density(c) * 1e-24));
-                for (int group = 0; group < 4; ++group) {
+                for (int group = 0; group < 5; ++group) {
                     const auto& gd = con.iso->g[static_cast<std::size_t>(group)];
                     g.push_back(DGroup{
                         static_cast<float>(gd.nu), static_cast<float>(gd.chi),
@@ -88,8 +88,8 @@ private:
                         static_cast<float>(gd.sigma_s), static_cast<float>(gd.sigma_n2n),
                         static_cast<float>(gd.mu_bar)});
                 }
-                for (int from = 0; from < 4; ++from) {
-                    for (int to = 0; to < 4; ++to) {
+                for (int from = 0; from < 5; ++from) {
+                    for (int to = 0; to < 5; ++to) {
                         // A null transfer (SIM sets only) is group-preserving:
                         // identity, so a scatter keeps the group.
                         const double t = con.iso->transfer_is_null
@@ -102,11 +102,11 @@ private:
                 ++cnt;
             }
             slot_count[static_cast<std::size_t>(L)] = cnt;
-            for (int group = 0; group < 4; ++group) {
+            for (int group = 0; group < 5; ++group) {
                 const auto gg = static_cast<std::size_t>(group);
-                sigma_t[static_cast<std::size_t>(L * 4 + group)] =
+                sigma_t[static_cast<std::size_t>(L * 5 + group)] =
                     static_cast<float>(mat.macro.sigma_t[gg]);
-                sigma_tr[static_cast<std::size_t>(L * 4 + group)] =
+                sigma_tr[static_cast<std::size_t>(L * 5 + group)] =
                     static_cast<float>(mat.macro.sigma_tr[gg]);
             }
         }

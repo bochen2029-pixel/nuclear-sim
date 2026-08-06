@@ -195,7 +195,7 @@ int main(int argc, char** argv) {
     const ns::geom::LayerStack eigen_sphere({ns::geom::Layer{"core", 12.0, 0, "SIM"}});
     const ns::geom::LayerStack source_sphere({ns::geom::Layer{"medium", 200.0, 0, "SIM"}});
     const std::uint64_t seed = 20260802;
-    const std::array<float, 4> g0{1.0f, 0.0f, 0.0f, 0.0f};
+    const std::array<float, 5> g0{1.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 
     // --- Golden mode: print the eigen's exact deterministic outputs for the
     // differential-test config, so a rewrite can assert bit-identity. ----------

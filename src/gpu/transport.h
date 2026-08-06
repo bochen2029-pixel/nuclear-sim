@@ -50,7 +50,7 @@ struct FixedSourceResult {
 /// error or an out-of-range material_id.
 bool gpu_fixed_source(const ns::geom::LayerStack& stack,
                       const ns::material::MaterialLib& materials, std::uint64_t seed,
-                      std::int64_t histories, const std::array<float, 4>& group_weights,
+                      std::int64_t histories, const std::array<float, 5>& group_weights,
                       int blocks, int threads, FixedSourceResult& out);
 
 }  // namespace ns::gpu

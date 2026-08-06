@@ -120,11 +120,11 @@ namespace {
 __global__ void k_recompute_macro(DeviceMaterials m, float* out_st, float* out_str,
                                   float* out_nsf) {
     const int lg = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
-    if (lg >= m.num_layers * 4) {
+    if (lg >= m.num_layers * 5) {
         return;
     }
-    const int layer = lg / 4;
-    const int group = lg % 4;
+    const int layer = lg / 5;
+    const int group = lg % 5;
     const int begin = m.slot_begin[layer];
     const int count = m.slot_count[layer];
 
@@ -134,7 +134,7 @@ __global__ void k_recompute_macro(DeviceMaterials m, float* out_st, float* out_s
     for (int s = 0; s < count; ++s) {
         const int slot = begin + s;
         const float n = m.nd[slot];
-        const DGroup& gd = m.g[slot * 4 + group];
+        const DGroup& gd = m.g[slot * 5 + group];
         st += n * d_group_sigma_t(gd);
         str += n * d_group_sigma_tr(gd);
         nsf += n * gd.nu * gd.sigma_f;
@@ -155,8 +155,8 @@ bool device_materials_parity(const ns::geom::LayerStack& stack,
     // density nᵢ = atom_fraction·ρ/M̄·N_A · 1e-24 (atoms/barn-cm), per-layer macro
     // Σ from the material's already-computed macro. global_index and transfer are
     // collision-only and are built with the collision kernel in M4-T2-b.
-    std::vector<float> h_st(static_cast<std::size_t>(num_layers) * 4, 0.0f);
-    std::vector<float> h_str(static_cast<std::size_t>(num_layers) * 4, 0.0f);
+    std::vector<float> h_st(static_cast<std::size_t>(num_layers) * 5, 0.0f);
+    std::vector<float> h_str(static_cast<std::size_t>(num_layers) * 5, 0.0f);
     std::vector<int> h_begin(static_cast<std::size_t>(num_layers), 0);
     std::vector<int> h_count(static_cast<std::size_t>(num_layers), 0);
     std::vector<float> h_nd;
@@ -177,7 +177,7 @@ bool device_materials_parity(const ns::geom::LayerStack& stack,
                 continue;  // mass only, no cross sections in this set
             }
             h_nd.push_back(static_cast<float>(mat.number_density(c) * 1e-24));
-            for (int group = 0; group < 4; ++group) {
+            for (int group = 0; group < 5; ++group) {
                 const auto& gd = con.iso->g[static_cast<std::size_t>(group)];
                 h_g.push_back(DGroup{
                     static_cast<float>(gd.nu), static_cast<float>(gd.chi),
@@ -188,16 +188,16 @@ bool device_materials_parity(const ns::geom::LayerStack& stack,
             ++cnt;
         }
         h_count[static_cast<std::size_t>(L)] = cnt;
-        for (int group = 0; group < 4; ++group) {
+        for (int group = 0; group < 5; ++group) {
             const auto g = static_cast<std::size_t>(group);
-            h_st[static_cast<std::size_t>(L * 4 + group)] = static_cast<float>(mat.macro.sigma_t[g]);
-            h_str[static_cast<std::size_t>(L * 4 + group)] =
+            h_st[static_cast<std::size_t>(L * 5 + group)] = static_cast<float>(mat.macro.sigma_t[g]);
+            h_str[static_cast<std::size_t>(L * 5 + group)] =
                 static_cast<float>(mat.macro.sigma_tr[g]);
         }
     }
 
     const int total_slots = static_cast<int>(h_nd.size());
-    const auto nlg = static_cast<std::size_t>(num_layers) * 4;
+    const auto nlg = static_cast<std::size_t>(num_layers) * 5;
 
     float* d_st = nullptr;
     float* d_str = nullptr;
@@ -215,7 +215,7 @@ bool device_materials_parity(const ns::geom::LayerStack& stack,
            && cudaMalloc(&d_begin, static_cast<std::size_t>(num_layers) * sizeof(int)) == cudaSuccess
            && cudaMalloc(&d_count, static_cast<std::size_t>(num_layers) * sizeof(int)) == cudaSuccess
            && cudaMalloc(&d_nd, slots * sizeof(float)) == cudaSuccess
-           && cudaMalloc(&d_g, slots * 4 * sizeof(DGroup)) == cudaSuccess
+           && cudaMalloc(&d_g, slots * 5 * sizeof(DGroup)) == cudaSuccess
            && cudaMalloc(&d_out_st, nlg * sizeof(float)) == cudaSuccess
            && cudaMalloc(&d_out_str, nlg * sizeof(float)) == cudaSuccess
            && cudaMalloc(&d_out_nsf, nlg * sizeof(float)) == cudaSuccess;
@@ -230,7 +230,7 @@ bool device_materials_parity(const ns::geom::LayerStack& stack,
     if (ok && total_slots > 0) {
         ok = cudaMemcpy(d_nd, h_nd.data(), slots * sizeof(float), cudaMemcpyHostToDevice)
                  == cudaSuccess
-          && cudaMemcpy(d_g, h_g.data(), slots * 4 * sizeof(DGroup), cudaMemcpyHostToDevice)
+          && cudaMemcpy(d_g, h_g.data(), slots * 5 * sizeof(DGroup), cudaMemcpyHostToDevice)
                  == cudaSuccess;
     }
 

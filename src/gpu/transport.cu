@@ -88,7 +88,7 @@ __global__ void k_iota(int* active, int n) {
 }
 
 __global__ void k_init(SoA soa, DeviceLayerStack geom, unsigned long long seed, int n, float w0,
-                       float w1, float w2, float w3) {
+                       float w1, float w2, float w3, float w4) {
     const int stride = static_cast<int>(gridDim.x * blockDim.x);
     for (int p = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x); p < n; p += stride) {
         ns::rng::Stream s(seed, ns::rng::fork(kSourceBase, 0, static_cast<unsigned int>(p)));
@@ -101,11 +101,11 @@ __global__ void k_init(SoA soa, DeviceLayerStack geom, unsigned long long seed, 
         soa.dy[p] = d.y;
         soa.dz[p] = d.z;
 
-        const float total = w0 + w1 + w2 + w3;
+        const float total = w0 + w1 + w2 + w3 + w4;
         const float xi = s.uniform_f() * total;
-        const float cum[4] = {w0, w0 + w1, w0 + w1 + w2, w0 + w1 + w2 + w3};
-        int grp = 3;
-        for (int gi = 0; gi < 4; ++gi) {
+        const float cum[5] = {w0, w0 + w1, w0 + w1 + w2, w0 + w1 + w2 + w3, w0 + w1 + w2 + w3 + w4};
+        int grp = 4;
+        for (int gi = 0; gi < 5; ++gi) {
             if (xi <= cum[gi]) {
                 grp = gi;
                 break;
@@ -146,7 +146,7 @@ __global__ void k_step(SoA soa, DeviceLayerStack geom, DeviceMaterials mat, unsi
             leaked = true;
             terminal = true;
         } else {
-            const float sigma_tr = mat.sigma_tr[L * 4 + grp];
+            const float sigma_tr = mat.sigma_tr[L * 5 + grp];
             const float to_boundary = d_distance_to_boundary(geom, pos, dir, L);
 
             if (sigma_tr <= 0.0f) {
@@ -181,13 +181,13 @@ __global__ void k_step(SoA soa, DeviceLayerStack geom, DeviceMaterials mat, unsi
                     int chosen = begin;
                     for (int si = 0; si < count; ++si) {
                         const int slot = begin + si;
-                        pick -= mat.nd[slot] * d_group_sigma_tr(mat.g[slot * 4 + grp]);
+                        pick -= mat.nd[slot] * d_group_sigma_tr(mat.g[slot * 5 + grp]);
                         if (pick <= 0.0f) {
                             chosen = slot;
                             break;
                         }
                     }
-                    const DGroup gd = mat.g[chosen * 4 + grp];
+                    const DGroup gd = mat.g[chosen * 5 + grp];
                     const float sigma_tr_i = d_group_sigma_tr(gd);
                     if (sigma_tr_i <= 0.0f) {
                         terminal = true;  // transparent isotope
@@ -207,8 +207,8 @@ __global__ void k_step(SoA soa, DeviceLayerStack geom, DeviceMaterials mat, unsi
                             dir = d_sample_isotropic(s);  // isotropic-in-lab scatter
                             float xi = s.uniform_f();
                             int to = grp;
-                            for (int t = 0; t < 4; ++t) {
-                                xi -= mat.transfer[chosen * 16 + grp * 4 + t];
+                            for (int t = 0; t < 5; ++t) {
+                                xi -= mat.transfer[chosen * 25 + grp * 5 + t];
                                 if (xi <= 0.0f) {
                                     to = t;
                                     break;
@@ -372,7 +372,7 @@ double stderr_of(const std::vector<float>& v) {
 
 bool gpu_fixed_source(const ns::geom::LayerStack& stack,
                       const ns::material::MaterialLib& materials, std::uint64_t seed,
-                      std::int64_t histories, const std::array<float, 4>& group_weights,
+                      std::int64_t histories, const std::array<float, 5>& group_weights,
                       int blocks, int threads, FixedSourceResult& out) {
     if (histories <= 0 || histories > kMaxHistories || blocks <= 0 || threads <= 0) {
         return false;
@@ -428,7 +428,8 @@ bool gpu_fixed_source(const ns::geom::LayerStack& stack,
     if (ok) {
         probe_free();  // SoA + scan scratch now resident
         k_init<<<blocks, threads>>>(soa, problem.geometry(), seed, n, group_weights[0],
-                                    group_weights[1], group_weights[2], group_weights[3]);
+                                    group_weights[1], group_weights[2], group_weights[3],
+                                    group_weights[4]);
         k_iota<<<blocks, threads>>>(active, n);
         ok = cudaGetLastError() == cudaSuccess && cudaDeviceSynchronize() == cudaSuccess;
     }

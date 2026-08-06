@@ -84,7 +84,7 @@ __global__ void k_generation(Bank in, int nsrc, DeviceLayerStack geom, DeviceMat
             if (L == kOutsideDev) {
                 break;  // leaked
             }
-            const float str = mat.sigma_tr[L * 4 + grp];
+            const float str = mat.sigma_tr[L * 5 + grp];
             const float d = d_distance_to_boundary(geom, pos, dir, L);
             if (str <= 0.0f) {
                 if (d >= kInfF) {
@@ -114,13 +114,13 @@ __global__ void k_generation(Bank in, int nsrc, DeviceLayerStack geom, DeviceMat
             int chosen = begin;
             for (int si = 0; si < count; ++si) {
                 const int slot = begin + si;
-                pick -= mat.nd[slot] * d_group_sigma_tr(mat.g[slot * 4 + grp]);
+                pick -= mat.nd[slot] * d_group_sigma_tr(mat.g[slot * 5 + grp]);
                 if (pick <= 0.0f) {
                     chosen = slot;
                     break;
                 }
             }
-            const DGroup gd = mat.g[chosen * 4 + grp];
+            const DGroup gd = mat.g[chosen * 5 + grp];
             const float sti = d_group_sigma_tr(gd);  // collision denominator = sigma_tr,i
             if (sti <= 0.0f) {
                 break;
@@ -135,8 +135,8 @@ __global__ void k_generation(Bank in, int nsrc, DeviceLayerStack geom, DeviceMat
                 const float xic = fs.uniform_f();  // birth group from χ of the fissioner
                 float cum = 0.0f;
                 int bg = 3;
-                for (int gg = 0; gg < 4; ++gg) {
-                    cum += mat.g[chosen * 4 + gg].chi;
+                for (int gg = 0; gg < 5; ++gg) {
+                    cum += mat.g[chosen * 5 + gg].chi;
                     if (xic <= cum) {
                         bg = gg;
                         break;
@@ -159,8 +159,8 @@ __global__ void k_generation(Bank in, int nsrc, DeviceLayerStack geom, DeviceMat
             dir = d_iso(s);
             float xi = s.uniform_f();
             int to = grp;
-            for (int t = 0; t < 4; ++t) {
-                xi -= mat.transfer[chosen * 16 + grp * 4 + t];
+            for (int t = 0; t < 5; ++t) {
+                xi -= mat.transfer[chosen * 25 + grp * 5 + t];
                 if (xi <= 0.0f) {
                     to = t;
                     break;

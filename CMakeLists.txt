@@ -393,6 +393,7 @@ nukesim_strict(nukefarm)
 add_library(nukesim_nukebench STATIC
     src/app/nukebench/gates.cpp
     src/app/nukebench/gate_report.cpp
+    src/app/nukebench/scan.cpp
     src/app/nukebench/cli.cpp)
 target_link_libraries(nukesim_nukebench PUBLIC nukesim_core)
 target_include_directories(nukesim_nukebench PUBLIC ${CMAKE_SOURCE_DIR}/src)
@@ -408,6 +409,12 @@ catch_discover_tests(test_nukebench TEST_PREFIX "nukebench.")
 add_executable(nukebench src/app/nukebench/main.cpp)
 target_link_libraries(nukebench PRIVATE nukesim_nukebench)
 nukesim_strict(nukebench)
+
+# kscan (M2-T3): the k-vs-compression scan tool -> the k(rho/rho0) CSV curve (the G1b precursor).
+# Non-test binary (like gate_probe); NOT a nukebench subcommand (no sweep subcommand, MIN-09).
+add_executable(kscan src/app/nukebench/kscan_main.cpp)
+target_link_libraries(kscan PRIVATE nukesim_nukebench)
+nukesim_strict(kscan)
 
 # gates.toml is GENERATED (tools/gen_gates) and committed; this fails if it drifts (03 §10).
 add_test(NAME nukebench.gates_generated_current

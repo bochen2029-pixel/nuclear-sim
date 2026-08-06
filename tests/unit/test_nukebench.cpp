@@ -7,11 +7,14 @@
 #include "app/nukebench/cli.h"
 #include "app/nukebench/gate_report.h"
 #include "app/nukebench/gates.h"
+#include "app/nukebench/scan.h"
 #include "physics/tally/tally.h"
 
 #include "spec_examples.h"
 
+#include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -272,4 +275,44 @@ TEST_CASE("cli_run rejects a bad backend, a missing scenario, and a non-numeric 
     REQUIRE(ns::nukebench::cli_run(scen, {}, out_root, "gpu").exit_code == 3);         // unsupported backend
     REQUIRE(ns::nukebench::cli_run(out_root / "nope.json", {}, out_root, "ref").exit_code == 3);  // no file
     REQUIRE(ns::nukebench::cli_run(scen, {{"pit.mass_kg", "heavy"}}, out_root, "ref").exit_code == 3);  // NaN override
+}
+
+// --- M2-T3: the k-vs-compression scan (the G1b precursor) ---
+
+TEST_CASE("run_compression_scan: k rises with compression (the reactivity handle, Sigma prop rho)",
+          "[nukebench]") {
+    if (!fs::exists(repo() / "data" / "xs" / "fast4.json")) {
+        WARN("data/xs/fast4.json absent -- skipping compression scan");
+        return;
+    }
+    // fast4 Jezebel (bare Pu), a small batch for speed. rho/rho0 = 1.0 -> 2.0 (mass-conserving).
+    const std::vector<double> ratios = {1.0, 1.5, 2.0};
+    const auto pts = ns::nukebench::run_compression_scan(
+        repo() / "data" / "scenarios" / "jezebel.toml", repo(), ratios, 4000, 20, 60, 1);
+    REQUIRE(pts.size() == 3);
+    REQUIRE(pts[0].rho_ratio == 1.0);
+    REQUIRE(pts[2].rho_ratio == 2.0);
+    // Compression RAISES k (mass-conserving Sigma prop rho, NOT a bigger sphere at fixed rho which
+    // reads backwards). The 1.0 -> 2.0 endpoints clear eigen noise by a wide margin (a 2x-density
+    // bare Pu sphere is far more reactive than the critical one).
+    REQUIRE(pts[2].k_eff > pts[0].k_eff);
+    REQUIRE(pts[2].k_prompt > pts[0].k_prompt);
+    // Within-statistics monotonicity for consecutive points (G1b criterion 3): k_i - k_{i-1} >=
+    // -3*sqrt(sig_i^2 + sig_{i-1}^2), sigma in absolute k (sigma_pcm / 1e5).
+    for (std::size_t i = 1; i < pts.size(); ++i) {
+        const double si = pts[i].sigma_pcm / 1e5, sp = pts[i - 1].sigma_pcm / 1e5;
+        REQUIRE(pts[i].k_eff - pts[i - 1].k_eff >= -3.0 * std::sqrt(si * si + sp * sp));
+    }
+    // CSV: header first, one data row per point, locale-independent.
+    const auto csv = ns::nukebench::scan_to_csv(pts);
+    REQUIRE(csv.rfind("rho_ratio,k_eff,k_prompt,sigma_pcm\n", 0) == 0);
+    REQUIRE(std::count(csv.begin(), csv.end(), '\n') == 4);  // header + 3 rows
+}
+
+TEST_CASE("linspace_1_to_2 spans [1.0, 2.0] inclusive", "[nukebench]") {
+    const auto ls = ns::nukebench::linspace_1_to_2(11);
+    REQUIRE(ls.size() == 11);
+    REQUIRE(ls.front() == 1.0);
+    REQUIRE(ls.back() == 2.0);
+    REQUIRE(std::abs(ls[5] - 1.5) < 1e-12);
 }

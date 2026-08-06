@@ -22,6 +22,7 @@ const PIT_R = 1.6;                 // pit radius, world units (the view's hero s
 const N_NUCLEI = 24000;            // representative nuclei (each ≙ ~6e20 atoms)
 const MAXN = 8000;                 // max live neutrons (streaked → keep bounded)
 const SPEED = 2.1;                 // neutron speed (world/s at 1×, display)
+const BURN_FRACTION = 0.72;        // fraction of the pit consumed before disassembly quenches it (partial burn → a husk remains)
 const ISO = [
   { name: 'Pu-239', frac: 0.95683, col: new THREE.Color(0x6f88b8) },
   { name: 'Pu-240', frac: 0.00967, col: new THREE.Color(0xa878c0) },
@@ -108,10 +109,12 @@ scene.add(ground);
 const nucGeo = new THREE.IcosahedronGeometry(1, 2);   // detail 2 → smoother spheres in the sharp focal plane
 // per-instance emissive glow (fission flash) injected into the standard shader
 nucGeo.setAttribute('aGlow', new THREE.InstancedBufferAttribute(new Float32Array(N_NUCLEI), 1));
+// per-instance scale (1 = intact, → 0 as a fissioned nucleus splits apart / is consumed)
+nucGeo.setAttribute('aScale', new THREE.InstancedBufferAttribute(new Float32Array(N_NUCLEI).fill(1), 1));
 const nucMat = new THREE.MeshStandardMaterial({ metalness: 0.42, roughness: 0.36, envMapIntensity: 1.2 });
 nucMat.onBeforeCompile = (sh) => {
-  sh.vertexShader = 'attribute float aGlow;\nvarying float vGlow;\n' +
-    sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vGlow = aGlow;');
+  sh.vertexShader = 'attribute float aGlow;\nattribute float aScale;\nvarying float vGlow;\n' +
+    sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vGlow = aGlow;\n  transformed *= aScale;');
   sh.fragmentShader = 'varying float vGlow;\n' +
     sh.fragmentShader.replace('#include <emissivemap_fragment>',
       '#include <emissivemap_fragment>\n  totalEmissiveRadiance += vGlow * vGlow * vec3(2.4, 1.35, 0.45);');
@@ -126,6 +129,7 @@ const nucBase = new Float32Array(N_NUCLEI * 3);       // isotope base color
 const nucState = new Uint8Array(N_NUCLEI);            // 0 idle · 1 flashing · 2 spent
 const nucAge = new Float32Array(N_NUCLEI);
 const aGlow = nucGeo.getAttribute('aGlow');
+const aScale = nucGeo.getAttribute('aScale');
 const NUC_SIZE = PIT_R * 0.0135;
 {
   const dummy = new THREE.Object3D();
@@ -344,13 +348,10 @@ function ignite() {
 }
 function reset() {
   nAlive = 0; fissionCount = 0; wave = 0; tSim = 0; yieldRel = 0; kEff = 1.0; phase = 'idle';
-  const c = new THREE.Color();
   for (let i = 0; i < N_NUCLEI; i++) {
-    nucState[i] = 0; nucAge[i] = 0; aGlow.array[i] = 0;
-    c.setRGB(nucBase[i * 3], nucBase[i * 3 + 1], nucBase[i * 3 + 2]);
-    nuclei.setColorAt(i, c);
+    nucState[i] = 0; nucAge[i] = 0; aGlow.array[i] = 0; aScale.array[i] = 1;   // restore the intact pit
   }
-  aGlow.needsUpdate = true; nuclei.instanceColor.needsUpdate = true;
+  aGlow.needsUpdate = true; aScale.needsUpdate = true;
 }
 
 // k(t): idle → prompt-supercritical spike → disassembly decay. Drives the capture
@@ -389,10 +390,11 @@ function frame(dtReal, doRender = true) {
   for (let i = nAlive - 1; i >= 0; i--) {
     nPos[i * 3] += nVel[i * 3] * dt; nPos[i * 3 + 1] += nVel[i * 3 + 1] * dt; nPos[i * 3 + 2] += nVel[i * 3 + 2] * dt;
     nClock[i] -= dt;
+    if (k < 0.72 && Math.random() < dt * 8.0) { kill(i); continue; }  // disassembly: neutrons die off fast at quench → the burst collapses + the husk reveals
     if (nClock[i] > 0) continue;
     const x = nPos[i * 3], y = nPos[i * 3 + 1], z = nPos[i * 3 + 2];
     if (x * x + y * y + z * z > PIT_R * PIT_R) { kill(i); continue; }     // leakage
-    if (Math.random() < pCap) {
+    if (Math.random() < pCap && fissionCount < N_NUCLEI * BURN_FRACTION) {
       const j = nearestIdle(x, y, z);
       if (j >= 0) { fission(j, nGen[i] + 1); kill(i); continue; }
     }
@@ -416,22 +418,19 @@ function frame(dtReal, doRender = true) {
   for (let i = nAlive; i < neutrons.count; i++) neutrons.setMatrixAt(i, _hide);
   neutrons.instanceMatrix.needsUpdate = true;
 
-  // ---- nucleus flash decay ----
-  let glowDirty = false, colorDirty = false;
-  const c = new THREE.Color();
+  // ---- fission: bright flash, then the nucleus SPLITS APART / is consumed (shrinks to nothing) ----
+  let glowDirty = false, scaleDirty = false;
   for (let i = 0; i < N_NUCLEI; i++) {
     if (nucState[i] !== 1) continue;
-    nucAge[i] += dt; glowDirty = true;
+    nucAge[i] += dt; glowDirty = true; scaleDirty = true;
     const a = nucAge[i];
-    aGlow.array[i] = Math.max(0, 1 - a * 5.5);
-    if (a > 0.26) {
-      nucState[i] = 2; aGlow.array[i] = 0;
-      c.setRGB(nucBase[i * 3] * SPENT, nucBase[i * 3 + 1] * SPENT, nucBase[i * 3 + 2] * SPENT);
-      nuclei.setColorAt(i, c); colorDirty = true;
-    }
+    aGlow.array[i] = Math.max(0, 1 - a * 6.0);                       // brief white-hot flash
+    const s = a < 0.11 ? 1.0 : Math.max(0, 1 - (a - 0.11) * 2.9);    // then split apart / consumed
+    aScale.array[i] = s;
+    if (s <= 0.002) { nucState[i] = 3; aScale.array[i] = 0; aGlow.array[i] = 0; }   // gone (burned)
   }
   if (glowDirty) aGlow.needsUpdate = true;
-  if (colorDirty) nuclei.instanceColor.needsUpdate = true;
+  if (scaleDirty) aScale.needsUpdate = true;
 
   // ---- burst core + lights driven by population ----
   const inten = Math.min(1, nAlive / MAXN);   // linear fill fraction → clean growth→peak ramp
@@ -478,6 +477,7 @@ function updateHud() {
 el('ignite').onclick = ignite;
 el('reset').onclick = reset;
 el('slowmo').onclick = () => { slowAuto = !slowAuto; el('slowmo').textContent = `◐ SLOW-MO: ${slowAuto ? 'AUTO' : 'OFF'}`; };
+el('dofBtn').onclick = () => { dof.enabled = !dof.enabled; el('dofBtn').textContent = `◉ DOF: ${dof.enabled ? 'ON' : 'OFF'}`; };
 addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); ignite(); } });
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
